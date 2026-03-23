@@ -9,7 +9,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 const root = document.querySelector("#app div")
-const app = Elm.Main.init({ node: root })
+const app = Elm.Main!.init({ node: root })
 
 // Set up the json-render-elm bridge (handles spec-in and action-out ports)
 const bridge = createElmBridge(app, {

@@ -2,6 +2,7 @@
   "components": {
     "Card": {
       "props": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "title": {
@@ -21,6 +22,7 @@
     },
     "Button": {
       "props": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "label": {
@@ -45,6 +47,7 @@
     },
     "Text": {
       "props": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "content": {
@@ -70,6 +73,7 @@
     },
     "Input": {
       "props": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "placeholder": {
@@ -86,6 +90,7 @@
     },
     "Stack": {
       "props": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "direction": {
@@ -96,7 +101,9 @@
             ]
           },
           "gap": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "additionalProperties": false
@@ -106,6 +113,7 @@
     },
     "Image": {
       "props": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "src": {
@@ -126,6 +134,7 @@
     },
     "Badge": {
       "props": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "label": {

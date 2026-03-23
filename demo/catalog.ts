@@ -8,11 +8,11 @@
  *   - catalog.validate()    → validate AI-generated specs
  */
 
-import { defineCatalog } from "@json-render/core"
-import { schema } from "../packages/js-bridge/src/schema.ts"
-import { z } from "zod"
+import { defineCatalog } from "@json-render/core";
+import { schema } from "../packages/js-bridge/src/schema.ts";
+import { z } from "zod";
 
-export const catalog = defineCatalog(schema, {
+export const catalog: ReturnType<typeof defineCatalog> = defineCatalog(schema, {
   components: {
     Card: {
       props: z.object({
@@ -52,7 +52,8 @@ export const catalog = defineCatalog(schema, {
         gap: z.number().int().optional(),
       }),
       hasChildren: true,
-      description: "A flex container that stacks children vertically or horizontally",
+      description:
+        "A flex container that stacks children vertically or horizontally",
     },
     Image: {
       props: z.object({
@@ -71,4 +72,5 @@ export const catalog = defineCatalog(schema, {
       description: "A small colored badge/tag",
     },
   },
-})
+  actions: {},
+});

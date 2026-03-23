@@ -1,0 +1,27 @@
+{
+  "name": "@json-render/elm",
+  "version": "0.1.0",
+  "description": "JS bridge for json-render-elm — connects @json-render/core to Elm via ports",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@json-render/core": ">=0.5.0"
+  },
+  "devDependencies": {
+    "@json-render/core": "^0.15.0",
+    "@testing-library/dom": "^10.0.0",
+    "@testing-library/jest-dom": "^6.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^3.0.0"
+  },
+  "license": "Apache-2.0"
+}
