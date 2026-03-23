@@ -8,6 +8,7 @@ module JsonRender.Visibility exposing
 -}
 
 import Json.Decode as Decode exposing (Decoder)
+import Json.Decode.Pipeline exposing (required)
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Internal.PropValue as PropValue exposing (PropValue(..))
 import JsonRender.State as State
@@ -121,14 +122,14 @@ decoder : Decoder VisibilityCondition
 decoder =
     Decode.oneOf
         [ Decode.field "equals"
-            (Decode.map2 Equals
-                (Decode.field "path" Decode.string)
-                (Decode.field "value" PropValue.decoder)
+            (Decode.succeed Equals
+                |> required "path" Decode.string
+                |> required "value" PropValue.decoder
             )
         , Decode.field "notEquals"
-            (Decode.map2 NotEquals
-                (Decode.field "path" Decode.string)
-                (Decode.field "value" PropValue.decoder)
+            (Decode.succeed NotEquals
+                |> required "path" Decode.string
+                |> required "value" PropValue.decoder
             )
         , Decode.field "truthy" (Decode.string |> Decode.map Truthy)
         , Decode.field "not" (Decode.lazy (\_ -> decoder) |> Decode.map Not)

@@ -49,18 +49,15 @@ decoder =
 
 componentDecoder : Decoder ComponentSchema
 componentDecoder =
-    Decode.field "props" propsObjectDecoder
-        |> Decode.andThen
-            (\fields ->
-                Decode.succeed (ComponentSchema fields)
-                    |> required "description" Decode.string
-                    |> optional "hasChildren" Decode.bool False
-            )
+    Decode.succeed (\fields description hasChildren -> ComponentSchema fields description hasChildren)
+        |> required "props" propsObjectDecoder
+        |> required "description" Decode.string
+        |> optional "hasChildren" Decode.bool False
 
 
 propsObjectDecoder : Decoder (Dict String FieldSchema)
 propsObjectDecoder =
-    Decode.map2
+    Decode.succeed
         (\properties requiredFields ->
             Dict.map
                 (\key fieldType ->
@@ -70,12 +67,8 @@ propsObjectDecoder =
                 )
                 properties
         )
-        (Decode.field "properties" (Decode.dict fieldTypeDecoder))
-        (Decode.oneOf
-            [ Decode.field "required" (Decode.list Decode.string |> Decode.map Set.fromList)
-            , Decode.succeed Set.empty
-            ]
-        )
+        |> required "properties" (Decode.dict fieldTypeDecoder)
+        |> optional "required" (Decode.list Decode.string |> Decode.map Set.fromList) Set.empty
 
 
 fieldTypeDecoder : Decoder FieldType
