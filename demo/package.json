@@ -1,16 +1,28 @@
 {
   "name": "json-render-elm-demo",
-  "private": true,
+  "description": "Demo app for json-render-elm: generate UIs with natural language",
+  "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "scripts": {
+    "postinstall": "elm-tooling install",
     "dev": "vite",
-    "build": "vite build"
+    "prebuild": "elm-tooling install",
+    "build": "vite build",
+    "serve": "vite preview",
+    "lint": "elm-review",
+    "test": "elm-test-rs",
+    "catalog": "node generate-catalog-schema.js && node generate-review-catalog.js",
+    "upgrade": "elm-json upgrade && cd review && elm-json upgrade && cd .."
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0"
   },
   "devDependencies": {
-    "vite": "^6.0.0",
+    "elm-debug-transformer": "^1.2.1",
+    "elm-review": "^2.12.0",
+    "elm-tooling": "^1.15.1",
+    "vite": "^7.3.1",
     "vite-plugin-elm": "^3.0.1"
   }
 }
