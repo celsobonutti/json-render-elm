@@ -12,16 +12,22 @@
     "serve": "vite preview",
     "lint": "elm-review",
     "test": "elm-test-rs",
-    "catalog": "node generate-catalog-schema.js && node generate-review-catalog.js",
-    "upgrade": "elm-json upgrade && cd review && elm-json upgrade && cd .."
+    "catalog": "npx tsx generate-catalog-schema.ts && npx tsx generate-review-catalog.ts",
+    "upgrade": "elm-json upgrade && cd review && elm-json upgrade && cd ..",
+    "elm-review:fix": "elm-review --fix-all"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.80.0"
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@json-render/core": "^0.5.0",
+    "zod": "^3.23.0",
+    "zod-to-json-schema": "^3.25.0"
   },
   "devDependencies": {
     "elm-debug-transformer": "^1.2.1",
     "elm-review": "^2.12.0",
     "elm-tooling": "^1.15.1",
+    "tsx": "^4.0.0",
+    "typescript": "^5.4.0",
     "vite": "^7.3.1",
     "vite-plugin-elm": "^3.0.1"
   }

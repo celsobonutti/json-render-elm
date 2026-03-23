@@ -1,24 +1,24 @@
-module Components.Badge exposing (component)
+module Components.Badge exposing (BadgeProps, component, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)
 import Html.Attributes exposing (class)
 import JsonRender.Actions exposing (Msg)
 import JsonRender.Render exposing (Component, ComponentContext, register)
-import JsonRender.Resolve as Resolve exposing (ResolvedValue)
+import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias BadgeProps =
-    { label : String
-    , color : Maybe String
+    { color : Maybe String
+    , label : String
     }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String BadgeProps
 propsDecoder =
-    Resolve.succeed BadgeProps
-        |> Resolve.required "label" Resolve.string
-        |> Resolve.optional "color" Resolve.string Nothing
+    ResolvedValue.succeed BadgeProps
+        |> ResolvedValue.optional "color" ResolvedValue.string Nothing
+        |> ResolvedValue.required "label" ResolvedValue.string
 
 
 component : Component

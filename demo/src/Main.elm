@@ -2,7 +2,7 @@ port module Main exposing (main)
 
 import Browser
 import Components.Registry exposing (registry)
-import Html exposing (Html, button, div, h1, input, p, span, text, textarea)
+import Html exposing (Html, button, div, h1, p, pre, span, text, textarea)
 import Html.Attributes exposing (class, disabled, placeholder, rows, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Json.Decode as Decode
@@ -12,16 +12,18 @@ import JsonRender.Render as Render
 import JsonRender.Spec as Spec exposing (Spec)
 
 
+-- App-specific ports
 port sendPrompt : String -> Cmd msg
-
-
-port receiveSpec : (Value -> msg) -> Sub msg
 
 
 port receiveError : (String -> msg) -> Sub msg
 
 
-port outgoingAction : Value -> Cmd msg
+-- json-render-elm bridge ports
+port jsonRenderSpecIn : (Value -> msg) -> Sub msg
+
+
+port jsonRenderActionOut : Value -> Cmd msg
 
 
 
@@ -39,6 +41,8 @@ type alias Model =
     , prompt : String
     , error : Maybe String
     , spec : Maybe Spec
+    , specJson : Maybe Value
+    , showJson : Bool
     , renderState : Value
     }
 
@@ -49,6 +53,8 @@ init _ =
       , prompt = ""
       , error = Nothing
       , spec = Nothing
+      , specJson = Nothing
+      , showJson = False
       , renderState = Encode.object []
       }
     , Cmd.none
@@ -65,6 +71,7 @@ type Msg
     | SpecReceived Value
     | ErrorReceived String
     | Reset
+    | ToggleJson
     | JsonRenderMsg Actions.Msg
 
 
@@ -83,12 +90,13 @@ update msg model =
                 , sendPrompt model.prompt
                 )
 
-        SpecReceived value ->
-            case Decode.decodeValue Spec.decoder value of
+        SpecReceived val ->
+            case Decode.decodeValue Spec.decoder val of
                 Ok spec ->
                     ( { model
                         | state = Rendered
                         , spec = Just spec
+                        , specJson = Just val
                         , error = Nothing
                       }
                     , Cmd.none
@@ -109,6 +117,8 @@ update msg model =
             ( { model
                 | state = Idle
                 , spec = Nothing
+                , specJson = Nothing
+                , showJson = False
                 , prompt = ""
                 , error = Nothing
                 , renderState = Encode.object []
@@ -116,10 +126,13 @@ update msg model =
             , Cmd.none
             )
 
+        ToggleJson ->
+            ( { model | showJson = not model.showJson }, Cmd.none )
+
         JsonRenderMsg actionMsg ->
             case actionMsg of
                 Actions.CustomAction name params ->
-                    ( model, outgoingAction (Actions.encodeAction name params) )
+                    ( model, jsonRenderActionOut (Actions.encodeAction name params) )
 
                 _ ->
                     let
@@ -228,6 +241,28 @@ viewRendered model =
                     [ Html.map JsonRenderMsg
                         (Render.render registry model.renderState spec)
                     ]
+                , div [ class "json-panel" ]
+                    [ button [ class "json-toggle", onClick ToggleJson ]
+                        [ text
+                            (if model.showJson then
+                                "Hide JSON spec"
+
+                             else
+                                "Show JSON spec"
+                            )
+                        ]
+                    , if model.showJson then
+                        case model.specJson of
+                            Just json ->
+                                pre [ class "json-content" ]
+                                    [ text (Encode.encode 2 json) ]
+
+                            Nothing ->
+                                text ""
+
+                      else
+                        text ""
+                    ]
                 ]
 
         Nothing ->
@@ -241,7 +276,7 @@ viewRendered model =
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
-        [ receiveSpec SpecReceived
+        [ jsonRenderSpecIn SpecReceived
         , receiveError ErrorReceived
         ]
 

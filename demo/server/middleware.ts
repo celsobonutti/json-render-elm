@@ -1,7 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk"
-import { buildSystemPrompt, specSchema } from "../catalog.js"
+import { compileSpecStream } from "@json-render/core"
+import type { Connect } from "vite"
+import { catalog } from "../catalog.ts"
 
-export function claudeMiddleware(app) {
+export function claudeMiddleware(app: Connect.Server): void {
+  const systemPrompt = catalog.prompt({
+    customRules: [
+      "For images, use placeholder URLs from https://placehold.co (e.g., https://placehold.co/600x400)",
+    ],
+  })
+
   app.use(async (req, res, next) => {
     if (req.url !== "/api/generate" || req.method !== "POST") {
       return next()
@@ -26,13 +34,7 @@ export function claudeMiddleware(app) {
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 4096,
-        system: buildSystemPrompt(),
-        output_config: {
-          format: {
-            type: "json_schema",
-            schema: specSchema,
-          },
-        },
+        system: systemPrompt,
         messages: [{ role: "user", content: prompt }],
       })
 
@@ -43,13 +45,16 @@ export function claudeMiddleware(app) {
         return
       }
 
-      const spec = JSON.parse(text.text)
+      // Claude outputs JSONL (JSON Patch operations) per json-render's protocol.
+      // compileSpecStream compiles them into the flat spec { root, elements }.
+      const spec = compileSpecStream(text.text)
 
       res.writeHead(200, { "Content-Type": "application/json" })
       res.end(JSON.stringify({ spec }))
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
       res.writeHead(500, { "Content-Type": "application/json" })
-      res.end(JSON.stringify({ error: err.message }))
+      res.end(JSON.stringify({ error: message }))
     }
   })
 }

@@ -1,11 +1,11 @@
-module Components.Text exposing (component)
+module Components.Text exposing (TextProps, component, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)
 import Html.Attributes exposing (class)
 import JsonRender.Actions exposing (Msg)
 import JsonRender.Render exposing (Component, ComponentContext, register)
-import JsonRender.Resolve as Resolve exposing (ResolvedValue)
+import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias TextProps =
@@ -16,9 +16,9 @@ type alias TextProps =
 
 propsDecoder : Dict String ResolvedValue -> Result String TextProps
 propsDecoder =
-    Resolve.succeed TextProps
-        |> Resolve.required "content" Resolve.string
-        |> Resolve.optional "size" Resolve.string Nothing
+    ResolvedValue.succeed TextProps
+        |> ResolvedValue.required "content" ResolvedValue.string
+        |> ResolvedValue.optional "size" ResolvedValue.string Nothing
 
 
 component : Component

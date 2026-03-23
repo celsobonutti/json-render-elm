@@ -1,4 +1,4 @@
-module Components.Button exposing (component)
+module Components.Button exposing (ButtonProps, component, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, button, text)
@@ -6,7 +6,7 @@ import Html.Attributes exposing (class)
 import Html.Events exposing (onClick)
 import JsonRender.Actions exposing (Msg)
 import JsonRender.Render exposing (Component, ComponentContext, register)
-import JsonRender.Resolve as Resolve exposing (ResolvedValue)
+import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias ButtonProps =
@@ -17,9 +17,9 @@ type alias ButtonProps =
 
 propsDecoder : Dict String ResolvedValue -> Result String ButtonProps
 propsDecoder =
-    Resolve.succeed ButtonProps
-        |> Resolve.required "label" Resolve.string
-        |> Resolve.optional "variant" Resolve.string Nothing
+    ResolvedValue.succeed ButtonProps
+        |> ResolvedValue.required "label" ResolvedValue.string
+        |> ResolvedValue.optional "variant" ResolvedValue.string Nothing
 
 
 component : Component
@@ -32,10 +32,13 @@ view ctx =
     let
         variantClass =
             case ctx.props.variant of
-                Just v ->
-                    "jr-button-" ++ v
+                Just "secondary" ->
+                    "jr-button-secondary"
 
-                Nothing ->
+                Just "danger" ->
+                    "jr-button-danger"
+
+                _ ->
                     "jr-button-primary"
     in
     button

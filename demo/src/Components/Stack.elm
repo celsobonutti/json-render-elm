@@ -1,11 +1,11 @@
-module Components.Stack exposing (component)
+module Components.Stack exposing (StackProps, component, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, div)
 import Html.Attributes exposing (class, style)
 import JsonRender.Actions exposing (Msg)
 import JsonRender.Render exposing (Component, ComponentContext, register)
-import JsonRender.Resolve as Resolve exposing (ResolvedValue)
+import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias StackProps =
@@ -16,9 +16,9 @@ type alias StackProps =
 
 propsDecoder : Dict String ResolvedValue -> Result String StackProps
 propsDecoder =
-    Resolve.succeed StackProps
-        |> Resolve.optional "direction" Resolve.string Nothing
-        |> Resolve.optional "gap" Resolve.int Nothing
+    ResolvedValue.succeed StackProps
+        |> ResolvedValue.optional "direction" ResolvedValue.string Nothing
+        |> ResolvedValue.optional "gap" ResolvedValue.int Nothing
 
 
 component : Component

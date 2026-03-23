@@ -13,7 +13,8 @@
         },
         "required": [
           "title"
-        ]
+        ],
+        "additionalProperties": false
       },
       "description": "A card container with a title and optional subtitle",
       "hasChildren": true
@@ -36,7 +37,8 @@
         },
         "required": [
           "label"
-        ]
+        ],
+        "additionalProperties": false
       },
       "description": "A clickable button",
       "hasChildren": false
@@ -60,7 +62,8 @@
         },
         "required": [
           "content"
-        ]
+        ],
+        "additionalProperties": false
       },
       "description": "A text block",
       "hasChildren": false
@@ -76,7 +79,7 @@
             "type": "string"
           }
         },
-        "required": []
+        "additionalProperties": false
       },
       "description": "A text input field with an optional label",
       "hasChildren": false
@@ -96,7 +99,7 @@
             "type": "integer"
           }
         },
-        "required": []
+        "additionalProperties": false
       },
       "description": "A flex container that stacks children vertically or horizontally",
       "hasChildren": true
@@ -115,7 +118,8 @@
         "required": [
           "src",
           "alt"
-        ]
+        ],
+        "additionalProperties": false
       },
       "description": "An image element",
       "hasChildren": false
@@ -140,7 +144,8 @@
         },
         "required": [
           "label"
-        ]
+        ],
+        "additionalProperties": false
       },
       "description": "A small colored badge/tag",
       "hasChildren": false

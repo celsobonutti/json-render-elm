@@ -14,11 +14,11 @@ import JsonRender.Render exposing (Registry)
 registry : Registry
 registry =
     Dict.fromList
-        [ ( "Card", Components.Card.component )
+        [ ( "Badge", Components.Badge.component )
         , ( "Button", Components.Button.component )
-        , ( "Text", Components.Text.component )
+        , ( "Card", Components.Card.component )
+        , ( "Image", Components.Image.component )
         , ( "Input", Components.Input.component )
         , ( "Stack", Components.Stack.component )
-        , ( "Image", Components.Image.component )
-        , ( "Badge", Components.Badge.component )
+        , ( "Text", Components.Text.component )
         ]
