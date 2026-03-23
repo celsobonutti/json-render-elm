@@ -2,11 +2,12 @@ module JsonRender.CatalogSync exposing (Config, rule)
 
 {-| elm-review rule that keeps Elm component modules in sync with a json-render catalog.
 
-Checks:
+Workflow:
 
-1.  All catalog components have a corresponding Elm module
-2.  Props type aliases match the catalog schema
-3.  The registry module includes all components
+1.  Run `elm-review` — reports which component files to create
+2.  Create empty stubs: `module Components.Card exposing (..)`
+3.  Run `elm-review --fix` — fills stubs with correct types, decoders, view placeholder
+4.  Implement the view functions (replace the `()` placeholders)
 
 -}
 
@@ -15,10 +16,11 @@ import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Expression as Expression exposing (Expression)
 import Elm.Syntax.Module as Module
 import Elm.Syntax.Node as Node exposing (Node(..))
+import Elm.Syntax.Range exposing (Range)
 import Json.Decode as Decode
 import JsonRender.Internal.ElmCodeGen as ElmCodeGen
 import JsonRender.Internal.SchemaParser as SchemaParser exposing (CatalogSchema, ComponentSchema)
-import JsonRender.Internal.TypeMapping as TypeMapping
+import Review.Fix as Fix
 import Review.Rule as Rule exposing (Rule)
 import Set exposing (Set)
 
@@ -45,6 +47,9 @@ type alias ModuleContext =
     , isComponentModule : Maybe String
     , isRegistryModule : Bool
     , registryEntries : Set String
+    , moduleKey : Rule.ModuleKey
+    , moduleRange : Maybe Range
+    , hasPropsDecoder : Bool
     }
 
 
@@ -86,7 +91,7 @@ moduleVisitor schema =
 fromProjectToModule : Maybe CatalogSchema -> Config -> Rule.ContextCreator ProjectContext ModuleContext
 fromProjectToModule catalog config =
     Rule.initContextCreator
-        (\moduleName _ ->
+        (\moduleKey moduleName _ ->
             let
                 moduleStr =
                     String.join "." (Node.value moduleName)
@@ -120,8 +125,12 @@ fromProjectToModule catalog config =
             , isComponentModule = componentName
             , isRegistryModule = moduleStr == config.componentsNamespace ++ ".Registry"
             , registryEntries = Set.empty
+            , moduleKey = moduleKey
+            , moduleRange = Nothing
+            , hasPropsDecoder = False
             }
         )
+        |> Rule.withModuleKey
         |> Rule.withModuleNameNode
 
 
@@ -155,21 +164,126 @@ foldProjectContexts a b =
 
 
 moduleDefinitionVisitor : Node Module.Module -> ModuleContext -> ( List (Rule.Error {}), ModuleContext )
-moduleDefinitionVisitor _ context =
-    ( [], context )
+moduleDefinitionVisitor (Node range _) context =
+    ( [], { context | moduleRange = Just range } )
 
 
 declarationListVisitor : List (Node Declaration) -> ModuleContext -> ( List (Rule.Error {}), ModuleContext )
 declarationListVisitor declarations context =
-    if context.isRegistryModule then
-        let
-            entries =
-                extractRegistryEntries declarations
-        in
-        ( [], { context | registryEntries = entries } )
+    case context.catalog of
+        Nothing ->
+            ( [], context )
 
-    else
-        ( [], context )
+        Just catalog ->
+            if context.isRegistryModule then
+                let
+                    entries =
+                        extractRegistryEntries declarations
+
+                    catalogNames =
+                        Dict.keys catalog.components |> Set.fromList
+
+                    missing =
+                        Set.diff catalogNames entries
+
+                    errors =
+                        if Set.isEmpty missing then
+                            []
+
+                        else
+                            case context.moduleRange of
+                                Just range ->
+                                    let
+                                        fullRange =
+                                            { start = range.start
+                                            , end = lastDeclarationEnd declarations range
+                                            }
+
+                                        generatedCode =
+                                            ElmCodeGen.registryModule
+                                                context.config.componentsNamespace
+                                                (Dict.keys catalog.components |> List.sort)
+                                    in
+                                    [ Rule.errorWithFix
+                                        { message = "Registry is missing components: " ++ String.join ", " (Set.toList missing)
+                                        , details =
+                                            [ "The registry module does not include all catalog components."
+                                            , "Accept the fix to regenerate it."
+                                            ]
+                                        }
+                                        range
+                                        [ Fix.replaceRangeBy fullRange generatedCode ]
+                                    ]
+
+                                Nothing ->
+                                    []
+                in
+                ( errors, { context | registryEntries = entries } )
+
+            else
+                case context.isComponentModule of
+                    Just componentName ->
+                        let
+                            hasDecoder =
+                                List.any (hasFunction "propsDecoder") declarations
+
+                            errors =
+                                if hasDecoder then
+                                    []
+
+                                else
+                                    case ( context.moduleRange, Dict.get componentName catalog.components ) of
+                                        ( Just range, Just schema ) ->
+                                            let
+                                                fullRange =
+                                                    { start = range.start
+                                                    , end = lastDeclarationEnd declarations range
+                                                    }
+
+                                                generatedCode =
+                                                    ElmCodeGen.componentModule
+                                                        context.config.componentsNamespace
+                                                        componentName
+                                                        schema
+                                            in
+                                            [ Rule.errorWithFix
+                                                { message = componentName ++ " component is missing propsDecoder"
+                                                , details =
+                                                    [ "This module should contain a propsDecoder and component definition matching the catalog."
+                                                    , "Accept the fix to generate the correct types, decoder, and a view placeholder."
+                                                    ]
+                                                }
+                                                range
+                                                [ Fix.replaceRangeBy fullRange generatedCode ]
+                                            ]
+
+                                        _ ->
+                                            []
+                        in
+                        ( errors, context )
+
+                    Nothing ->
+                        ( [], context )
+
+
+hasFunction : String -> Node Declaration -> Bool
+hasFunction name (Node _ decl) =
+    case decl of
+        Declaration.FunctionDeclaration func ->
+            Node.value (Node.value func.declaration).name == name
+
+        _ ->
+            False
+
+
+lastDeclarationEnd : List (Node Declaration) -> Range -> { row : Int, column : Int }
+lastDeclarationEnd declarations moduleRange =
+    case List.reverse declarations of
+        (Node range _) :: _ ->
+            range.end
+
+        [] ->
+            moduleRange.end
 
 
 extractRegistryEntries : List (Node Declaration) -> Set String
@@ -234,55 +348,71 @@ finalEvaluation config projectCtx =
 
         Just catalog ->
             let
-                missingModuleErrors =
-                    Dict.toList catalog.components
-                        |> List.filterMap
-                            (\( name, _ ) ->
-                                if Set.member name projectCtx.seenModules then
-                                    Nothing
+                missingModules =
+                    Dict.keys catalog.components
+                        |> List.filter (\name -> not (Set.member name projectCtx.seenModules))
+                        |> List.sort
 
-                                else
-                                    Just
-                                        (Rule.globalError
-                                            { message = "Missing component module: " ++ config.componentsNamespace ++ "." ++ name
-                                            , details =
-                                                [ "The catalog defines a \"" ++ name ++ "\" component but no " ++ config.componentsNamespace ++ "." ++ name ++ " module exists."
-                                                , "Run elm-review --fix to generate it with the correct props type and decoder."
-                                                ]
-                                            }
+                missingModuleError =
+                    if List.isEmpty missingModules then
+                        []
+
+                    else
+                        let
+                            fileList =
+                                missingModules
+                                    |> List.map
+                                        (\name ->
+                                            "src/"
+                                                ++ String.replace "." "/" config.componentsNamespace
+                                                ++ "/"
+                                                ++ name
+                                                ++ ".elm"
                                         )
-                            )
+                                    |> String.join ", "
+
+                            nsPath =
+                                String.replace "." "/" config.componentsNamespace
+
+                            stubHint =
+                                missingModules
+                                    |> List.map
+                                        (\name ->
+                                            "  echo 'module "
+                                                ++ config.componentsNamespace
+                                                ++ "."
+                                                ++ name
+                                                ++ " exposing (..)' > src/"
+                                                ++ nsPath
+                                                ++ "/"
+                                                ++ name
+                                                ++ ".elm"
+                                        )
+                                    |> String.join " && \\\n"
+                        in
+                        [ Rule.globalError
+                            { message = "Missing component modules: " ++ String.join ", " missingModules
+                            , details =
+                                [ "Create these files: " ++ fileList
+                                , "Quick stub command:\n\nmkdir -p src/" ++ nsPath ++ " && \\\n" ++ stubHint
+                                , "Then run elm-review --fix to fill them in."
+                                ]
+                            }
+                        ]
 
                 missingRegistryError =
                     if not projectCtx.registrySeen then
                         [ Rule.globalError
                             { message = "Missing registry module: " ++ config.componentsNamespace ++ ".Registry"
                             , details =
-                                [ "No " ++ config.componentsNamespace ++ ".Registry module found."
-                                , "Run elm-review --fix to regenerate it."
+                                [ "Create: src/" ++ String.replace "." "/" config.componentsNamespace ++ "/Registry.elm"
+                                , "Quick stub: echo 'module " ++ config.componentsNamespace ++ ".Registry exposing (..)' > src/" ++ String.replace "." "/" config.componentsNamespace ++ "/Registry.elm"
+                                , "Then run elm-review --fix to fill it in."
                                 ]
                             }
                         ]
 
                     else
-                        let
-                            catalogNames =
-                                Dict.keys catalog.components |> Set.fromList
-
-                            missing =
-                                Set.diff catalogNames projectCtx.registryComponents
-                        in
-                        if Set.isEmpty missing then
-                            []
-
-                        else
-                            [ Rule.globalError
-                                { message = "Registry is missing components: " ++ String.join ", " (Set.toList missing)
-                                , details =
-                                    [ "The registry module does not include all catalog components."
-                                    , "Run elm-review --fix to regenerate it."
-                                    ]
-                                }
-                            ]
+                        []
             in
-            missingModuleErrors ++ missingRegistryError
+            missingModuleError ++ missingRegistryError
