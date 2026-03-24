@@ -1,0 +1,11 @@
+{
+  "root": "t",
+  "elements": {
+    "t": {
+      "type": "Text",
+      "props": { "content": "Secret message" },
+      "children": [],
+      "visible": { "truthy": "/show" }
+    }
+  }
+}
