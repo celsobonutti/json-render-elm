@@ -1,0 +1,30 @@
+{
+  "root": "form",
+  "elements": {
+    "form": {
+      "type": "Card",
+      "props": { "title": "Contact Us" },
+      "children": ["name-input", "submit-btn", "success-msg"]
+    },
+    "name-input": {
+      "type": "Input",
+      "props": {
+        "value": { "$bindState": "/form/name" },
+        "label": "Name",
+        "placeholder": "Your name"
+      },
+      "children": []
+    },
+    "submit-btn": {
+      "type": "Button",
+      "props": { "label": "Send" },
+      "children": []
+    },
+    "success-msg": {
+      "type": "Text",
+      "props": { "content": { "$template": "Thanks, ${/form/name}!" } },
+      "children": [],
+      "visible": { "truthy": "/submitted" }
+    }
+  }
+}
