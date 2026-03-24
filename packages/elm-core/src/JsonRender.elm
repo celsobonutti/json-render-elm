@@ -33,11 +33,12 @@ render =
     Render.render
 
 
-{-| Register a component with a props decoder and view function.
+{-| Register a component with a props decoder, bindings decoder, and view function.
 -}
 register :
     (Dict String ResolvedValue -> Result String props)
-    -> (ComponentContext props -> Html Msg)
+    -> (Dict String (Value -> Msg) -> bindings)
+    -> (ComponentContext props bindings -> Html Msg)
     -> Component
 register =
     Render.register

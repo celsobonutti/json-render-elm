@@ -25,6 +25,7 @@ testRegistry =
                         |> Resolve.required "title" Resolve.string
                         |> (\d -> d props)
                 )
+                (\_ -> ())
                 (\ctx ->
                     div [ class "card" ]
                         [ text ctx.props
@@ -39,6 +40,7 @@ testRegistry =
                         |> Resolve.required "content" Resolve.string
                         |> (\d -> d props)
                 )
+                (\_ -> ())
                 (\ctx -> text ctx.props)
           )
         ]
@@ -137,4 +139,57 @@ suite =
                 Render.render testRegistry state spec
                     |> Query.fromHtml
                     |> Query.hasNot [ Selector.text "Hidden" ]
+        , test "resolves $bindState and provides setter binding" <|
+            \_ ->
+                let
+                    bindRegistry =
+                        Dict.fromList
+                            [ ( "Input"
+                              , Render.register
+                                    (\props ->
+                                        Resolve.succeed identity
+                                            |> Resolve.required "value" Resolve.string
+                                            |> (\d -> d props)
+                                    )
+                                    (\bindings ->
+                                        { value = Dict.get "value" bindings }
+                                    )
+                                    (\ctx ->
+                                        div []
+                                            [ text ctx.props
+                                            , case ctx.bindings.value of
+                                                Just _ ->
+                                                    text "[bound]"
+
+                                                Nothing ->
+                                                    text "[unbound]"
+                                            ]
+                                    )
+                              )
+                            ]
+
+                    formState =
+                        Encode.object
+                            [ ( "form"
+                              , Encode.object [ ( "name", Encode.string "Alice" ) ]
+                              )
+                            ]
+
+                    spec =
+                        { root = "input-1"
+                        , elements =
+                            Dict.fromList
+                                [ ( "input-1"
+                                  , { type_ = "Input"
+                                    , props = Dict.fromList [ ( "value", BindStateExpr "/form/name" ) ]
+                                    , children = []
+                                    , visible = Nothing
+                                    }
+                                  )
+                                ]
+                        }
+                in
+                Render.render bindRegistry formState spec
+                    |> Query.fromHtml
+                    |> Query.has [ Selector.text "Alice", Selector.text "[bound]" ]
         ]

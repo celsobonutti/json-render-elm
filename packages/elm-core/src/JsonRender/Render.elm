@@ -14,13 +14,15 @@ import Dict exposing (Dict)
 import Html exposing (Html)
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions exposing (Msg(..))
+import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext, ResolvedValue)
 import JsonRender.Spec exposing (Element, Spec)
 import JsonRender.Visibility as Visibility
 
 
-type alias ComponentContext props =
+type alias ComponentContext props bindings =
     { props : props
+    , bindings : bindings
     , children : List (Html Msg)
     , emit : String -> Msg
     }
@@ -28,6 +30,7 @@ type alias ComponentContext props =
 
 type alias RawComponentContext =
     { props : Dict String ResolvedValue
+    , bindings : Dict String (Value -> Msg)
     , children : List (Html Msg)
     , emit : String -> Msg
     }
@@ -43,15 +46,17 @@ type alias Registry =
 
 register :
     (Dict String ResolvedValue -> Result String props)
-    -> (ComponentContext props -> Html Msg)
+    -> (Dict String (Value -> Msg) -> bindings)
+    -> (ComponentContext props bindings -> Html Msg)
     -> Component
-register propsDecoder view =
+register propsDecoder bindingsDecoder view =
     Component
         (\raw ->
             case propsDecoder raw.props of
                 Ok typed ->
                     view
                         { props = typed
+                        , bindings = bindingsDecoder raw.bindings
                         , children = raw.children
                         , emit = raw.emit
                         }
@@ -59,6 +64,21 @@ register propsDecoder view =
                 Err _ ->
                     Html.text ""
         )
+
+
+extractBindings : Dict String PropValue -> Dict String (Value -> Msg)
+extractBindings props =
+    Dict.foldl
+        (\key propValue acc ->
+            case propValue of
+                BindStateExpr path ->
+                    Dict.insert key (\val -> SetState path val) acc
+
+                _ ->
+                    acc
+        )
+        Dict.empty
+        props
 
 
 render : Registry -> Value -> Spec -> Html Msg
@@ -93,6 +113,9 @@ renderElementInner registry state repeatCtx spec element =
                 resolved =
                     Resolve.resolveProps state repeatCtx element.props
 
+                bindings =
+                    extractBindings element.props
+
                 children =
                     List.filterMap
                         (\id ->
@@ -103,6 +126,7 @@ renderElementInner registry state repeatCtx spec element =
             in
             componentFn
                 { props = resolved
+                , bindings = bindings
                 , children = children
                 , emit = \event -> CustomAction event Encode.null
                 }
