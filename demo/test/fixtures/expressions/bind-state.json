@@ -1,0 +1,13 @@
+{
+  "root": "input-1",
+  "elements": {
+    "input-1": {
+      "type": "Input",
+      "props": {
+        "value": { "$bindState": "/form/name" },
+        "placeholder": "Enter name"
+      },
+      "children": []
+    }
+  }
+}

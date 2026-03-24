@@ -1,0 +1,10 @@
+{
+  "root": "t",
+  "elements": {
+    "t": {
+      "type": "Text",
+      "props": { "content": { "$template": "Welcome, ${/user/name}!" } },
+      "children": []
+    }
+  }
+}
