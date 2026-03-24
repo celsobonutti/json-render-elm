@@ -75,4 +75,41 @@ suite =
                     , \c -> String.contains "( \"Card\", Components.Card.component )" c |> Expect.equal True
                     ]
                     code
+        , test "generates bindings type alias" <|
+            \_ ->
+                let
+                    code =
+                        ElmCodeGen.bindingsTypeAlias "Card" cardSchema
+                in
+                Expect.all
+                    [ \c -> String.contains "type alias CardBindings" c |> Expect.equal True
+                    , \c -> String.contains "subtitle : Maybe (Value -> Msg)" c |> Expect.equal True
+                    , \c -> String.contains "title : Maybe (Value -> Msg)" c |> Expect.equal True
+                    ]
+                    code
+        , test "generates bindings decoder" <|
+            \_ ->
+                let
+                    code =
+                        ElmCodeGen.bindingsDecoder "Card" cardSchema
+                in
+                Expect.all
+                    [ \c -> String.contains "Bind.succeed CardBindings" c |> Expect.equal True
+                    , \c -> String.contains "|> Bind.bindable \"subtitle\"" c |> Expect.equal True
+                    , \c -> String.contains "|> Bind.bindable \"title\"" c |> Expect.equal True
+                    ]
+                    code
+        , test "component module includes bindings" <|
+            \_ ->
+                let
+                    code =
+                        ElmCodeGen.componentModule "Components" "Card" cardSchema
+                in
+                Expect.all
+                    [ \c -> String.contains "CardBindings" c |> Expect.equal True
+                    , \c -> String.contains "import JsonRender.Bind as Bind" c |> Expect.equal True
+                    , \c -> String.contains "register propsDecoder bindingsDecoder view" c |> Expect.equal True
+                    , \c -> String.contains "ComponentContext CardProps CardBindings" c |> Expect.equal True
+                    ]
+                    code
         ]

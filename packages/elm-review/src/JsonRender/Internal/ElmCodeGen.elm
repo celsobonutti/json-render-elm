@@ -1,5 +1,7 @@
 module JsonRender.Internal.ElmCodeGen exposing
-    ( componentModule
+    ( bindingsDecoder
+    , bindingsTypeAlias
+    , componentModule
     , propsDecoder
     , propsTypeAlias
     , registryModule
@@ -74,6 +76,49 @@ propsDecoder componentName schema =
         ++ String.join "\n" pipelineSteps
 
 
+bindingsTypeAlias : String -> ComponentSchema -> String
+bindingsTypeAlias componentName schema =
+    let
+        fields =
+            Dict.keys schema.fields
+                |> List.sort
+                |> List.map (\name -> name ++ " : Maybe (Value -> Msg)")
+
+        body =
+            case fields of
+                [] ->
+                    "    {}"
+
+                first :: rest ->
+                    "    { "
+                        ++ first
+                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
+                        ++ "\n    }"
+    in
+    "type alias " ++ componentName ++ "Bindings =\n" ++ body
+
+
+bindingsDecoder : String -> ComponentSchema -> String
+bindingsDecoder componentName schema =
+    let
+        fields =
+            Dict.keys schema.fields
+                |> List.sort
+
+        pipelineSteps =
+            List.map
+                (\name -> "        |> Bind.bindable \"" ++ name ++ "\"")
+                fields
+    in
+    "bindingsDecoder : Dict String (Value -> Msg) -> "
+        ++ componentName
+        ++ "Bindings\nbindingsDecoder =\n"
+        ++ "    Bind.succeed "
+        ++ componentName
+        ++ "Bindings\n"
+        ++ String.join "\n" pipelineSteps
+
+
 componentModule : String -> String -> ComponentSchema -> String
 componentModule namespace componentName schema =
     let
@@ -85,25 +130,41 @@ componentModule namespace componentName schema =
 
         decoderCode =
             propsDecoder componentName schema
+
+        bindingsType =
+            bindingsTypeAlias componentName schema
+
+        bindingsDecoderCode =
+            bindingsDecoder componentName schema
     in
     "module "
         ++ moduleName
         ++ " exposing ("
         ++ componentName
-        ++ "Props, propsDecoder, component)\n\n"
+        ++ "Props, "
+        ++ componentName
+        ++ "Bindings, propsDecoder, bindingsDecoder, component)\n\n"
         ++ "import Dict exposing (Dict)\n"
         ++ "import Html exposing (Html)\n"
+        ++ "import Json.Encode exposing (Value)\n"
         ++ "import JsonRender.Actions exposing (Msg)\n"
+        ++ "import JsonRender.Bind as Bind\n"
         ++ "import JsonRender.Render exposing (ComponentContext, Component, register)\n"
         ++ "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)\n\n\n"
         ++ typeAlias
         ++ "\n\n\n"
+        ++ bindingsType
+        ++ "\n\n\n"
         ++ decoderCode
         ++ "\n\n\n"
-        ++ "component : Component\ncomponent =\n    register propsDecoder view\n\n\n"
+        ++ bindingsDecoderCode
+        ++ "\n\n\n"
+        ++ "component : Component\ncomponent =\n    register propsDecoder bindingsDecoder view\n\n\n"
         ++ "view : ComponentContext "
         ++ componentName
-        ++ "Props -> Html Msg\nview ctx =\n    ()\n"
+        ++ "Props "
+        ++ componentName
+        ++ "Bindings -> Html Msg\nview ctx =\n    ()\n"
 
 
 registryModule : String -> List String -> String
