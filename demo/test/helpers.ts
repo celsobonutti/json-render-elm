@@ -9,7 +9,7 @@ export async function sendSpec(page: Page, fixturePath: string) {
   const json = readFileSync(join(__dirname, "fixtures", fixturePath), "utf-8")
   const spec = JSON.parse(json)
   await page.evaluate((s) => (window as any).__bridge.sendSpec(s), spec)
-  await page.locator("#render-root :first-child:not(#no-spec)").waitFor()
+  await page.locator("#render-root > :first-child:not(#no-spec)").waitFor()
 }
 
 export async function setState(page: Page, state: object) {
