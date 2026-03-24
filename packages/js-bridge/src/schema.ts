@@ -12,7 +12,7 @@ import { defineSchema } from "@json-render/core";
  * - No `on` field on elements — actions are handled via Elm's `emit` + ports
  * - No `repeat` field — not yet supported (backlog)
  * - No `state` on spec — Elm model owns state
- * - Read-only expressions only ($state, $item, $index, $template)
+ * - Expressions: $state, $item, $index, $template (read-only), $bindState (two-way binding)
  */
 export const schema = defineSchema(
   (s) => ({
@@ -84,7 +84,7 @@ export const schema = defineSchema(
       'The "visible" field goes on the ELEMENT object, NOT inside "props". Correct: {"type":"Card","props":{},"visible":{"$state":"/show"},"children":[...]}.',
 
       // Expression support
-      'Dynamic props: use { "$state": "/path" } to read from state, { "$item": "field" } in repeat contexts, { "$index": true } for loop index, { "$template": "Hello ${/name}" } for string interpolation.',
+      'Dynamic props: use { "$state": "/path" } to read from state, { "$bindState": "/path" } for two-way binding (read and write), { "$item": "field" } in repeat contexts, { "$index": true } for loop index, { "$template": "Hello ${/name}" } for string interpolation.',
 
       // Design quality
       "Design with visual hierarchy: use container components to group content, proper spacing, and status indicators. ONLY use components from the AVAILABLE COMPONENTS list.",
