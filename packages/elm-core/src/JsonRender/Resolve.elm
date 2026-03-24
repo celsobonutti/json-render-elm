@@ -97,6 +97,9 @@ resolvePropValue state repeatCtx prop =
         TemplateExpr template ->
             RString (resolveTemplate state template)
 
+        BindStateExpr path ->
+            jsonValueToResolved (State.get path state |> Maybe.withDefault Encode.null)
+
 
 jsonValueToResolved : Value -> ResolvedValue
 jsonValueToResolved value =

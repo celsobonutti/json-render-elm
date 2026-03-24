@@ -93,6 +93,18 @@ suite =
                     Expect.equal
                         (Just (RInt 5))
                         (Dict.get "idx" resolved)
+            , test "resolves $bindState expression (read direction)" <|
+                \_ ->
+                    let
+                        props =
+                            Dict.fromList [ ( "value", BindStateExpr "/user/name" ) ]
+
+                        resolved =
+                            Resolve.resolveProps state Nothing props
+                    in
+                    Expect.equal
+                        (Just (RString "Alice"))
+                        (Dict.get "value" resolved)
             ]
         , describe "pipeline decoders"
             [ test "succeed + required decodes props" <|
