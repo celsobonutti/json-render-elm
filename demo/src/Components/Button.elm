@@ -24,10 +24,10 @@ propsDecoder =
 
 component : Component
 component =
-    register propsDecoder view
+    register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext ButtonProps -> Html Msg
+view : ComponentContext ButtonProps () -> Html Msg
 view ctx =
     let
         variantClass =

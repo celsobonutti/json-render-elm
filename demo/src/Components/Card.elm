@@ -23,10 +23,10 @@ propsDecoder =
 
 component : Component
 component =
-    register propsDecoder view
+    register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext CardProps -> Html Msg
+view : ComponentContext CardProps () -> Html Msg
 view ctx =
     div [ class "jr-card" ]
         ([ h3 [ class "jr-card-title" ] [ text ctx.props.title ] ]

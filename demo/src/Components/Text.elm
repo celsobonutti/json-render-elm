@@ -23,10 +23,10 @@ propsDecoder =
 
 component : Component
 component =
-    register propsDecoder view
+    register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext TextProps -> Html Msg
+view : ComponentContext TextProps () -> Html Msg
 view ctx =
     let
         sizeClass =

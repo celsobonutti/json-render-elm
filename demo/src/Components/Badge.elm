@@ -23,10 +23,10 @@ propsDecoder =
 
 component : Component
 component =
-    register propsDecoder view
+    register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext BadgeProps -> Html Msg
+view : ComponentContext BadgeProps () -> Html Msg
 view ctx =
     let
         colorClass =

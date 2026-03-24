@@ -23,10 +23,10 @@ propsDecoder =
 
 component : Component
 component =
-    register propsDecoder view
+    register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext ImageProps -> Html Msg
+view : ComponentContext ImageProps () -> Html Msg
 view ctx =
     img
         [ src ctx.props.src

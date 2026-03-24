@@ -23,10 +23,10 @@ propsDecoder =
 
 component : Component
 component =
-    register propsDecoder view
+    register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext StackProps -> Html Msg
+view : ComponentContext StackProps () -> Html Msg
 view ctx =
     let
         dirClass =
