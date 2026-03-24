@@ -212,4 +212,34 @@ suite =
 
                     Err err ->
                         Expect.fail (Decode.errorToString err)
+        , test "decodes $bindState expression" <|
+            \_ ->
+                let
+                    json =
+                        """
+                        {
+                          "root": "t",
+                          "elements": {
+                            "t": {
+                              "type": "Input",
+                              "props": { "value": { "$bindState": "/form/name" } },
+                              "children": []
+                            }
+                          }
+                        }
+                        """
+                in
+                case Decode.decodeString Spec.decoder json of
+                    Ok spec ->
+                        case Dict.get "t" spec.elements of
+                            Just el ->
+                                Expect.equal
+                                    (Just (BindStateExpr "/form/name"))
+                                    (Dict.get "value" el.props)
+
+                            Nothing ->
+                                Expect.fail "element not found"
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
         ]
