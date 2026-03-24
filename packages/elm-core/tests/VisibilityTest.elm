@@ -1,6 +1,7 @@
 module VisibilityTest exposing (..)
 
 import Expect
+import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Visibility as Visibility exposing (VisibilityCondition(..))
@@ -49,4 +50,42 @@ suite =
                 Visibility.evaluate state Nothing
                     (Or [ Truthy "/count", Truthy "/isAdmin" ])
                     |> Expect.equal True
+        , test "decodes truthy condition from JSON" <|
+            \_ ->
+                let
+                    json =
+                        """{"truthy": "/isAdmin"}"""
+                in
+                case Decode.decodeString Visibility.decoder json of
+                    Ok condition ->
+                        Expect.equal (Truthy "/isAdmin") condition
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
+        , test "decodes and evaluates equals condition from JSON" <|
+            \_ ->
+                let
+                    json =
+                        """{"equals": {"path": "/role", "value": "admin"}}"""
+                in
+                case Decode.decodeString Visibility.decoder json of
+                    Ok condition ->
+                        Visibility.evaluate state Nothing condition
+                            |> Expect.equal True
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
+        , test "decodes and evaluates compound condition from JSON" <|
+            \_ ->
+                let
+                    json =
+                        """{"and": [{"truthy": "/isAdmin"}, {"equals": {"path": "/role", "value": "admin"}}]}"""
+                in
+                case Decode.decodeString Visibility.decoder json of
+                    Ok condition ->
+                        Visibility.evaluate state Nothing condition
+                            |> Expect.equal True
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
         ]

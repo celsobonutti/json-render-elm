@@ -105,6 +105,29 @@ suite =
                     Expect.equal
                         (Just (RString "Alice"))
                         (Dict.get "value" resolved)
+            , test "resolves mixed props (literals + expressions)" <|
+                \_ ->
+                    let
+                        props =
+                            Dict.fromList
+                                [ ( "title", StringValue "Contact" )
+                                , ( "name", StateExpr "/user/name" )
+                                , ( "greeting", TemplateExpr "Hi ${/user/name}!" )
+                                , ( "value", BindStateExpr "/user/name" )
+                                , ( "active", BoolValue True )
+                                ]
+
+                        resolved =
+                            Resolve.resolveProps state Nothing props
+                    in
+                    Expect.all
+                        [ \r -> Expect.equal (Just (RString "Contact")) (Dict.get "title" r)
+                        , \r -> Expect.equal (Just (RString "Alice")) (Dict.get "name" r)
+                        , \r -> Expect.equal (Just (RString "Hi Alice!")) (Dict.get "greeting" r)
+                        , \r -> Expect.equal (Just (RString "Alice")) (Dict.get "value" r)
+                        , \r -> Expect.equal (Just (RBool True)) (Dict.get "active" r)
+                        ]
+                        resolved
             ]
         , describe "pipeline decoders"
             [ test "succeed + required decodes props" <|

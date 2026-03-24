@@ -242,4 +242,63 @@ suite =
 
                     Err err ->
                         Expect.fail (Decode.errorToString err)
+        , test "decodes a complex multi-element spec" <|
+            \_ ->
+                let
+                    json =
+                        """
+                        {
+                          "root": "form",
+                          "elements": {
+                            "form": {
+                              "type": "Card",
+                              "props": { "title": "Contact" },
+                              "children": ["name-input", "greeting"]
+                            },
+                            "name-input": {
+                              "type": "Input",
+                              "props": {
+                                "value": { "$bindState": "/form/name" },
+                                "placeholder": "Your name"
+                              },
+                              "children": []
+                            },
+                            "greeting": {
+                              "type": "Text",
+                              "props": { "content": { "$template": "Hello ${/form/name}!" } },
+                              "children": [],
+                              "visible": { "truthy": "/showGreeting" }
+                            }
+                          }
+                        }
+                        """
+                in
+                case Decode.decodeString Spec.decoder json of
+                    Ok spec ->
+                        Expect.all
+                            [ \s -> Expect.equal "form" s.root
+                            , \s -> Expect.equal 3 (Dict.size s.elements)
+                            , \s ->
+                                case Dict.get "name-input" s.elements of
+                                    Just el ->
+                                        Expect.equal (Just (BindStateExpr "/form/name")) (Dict.get "value" el.props)
+
+                                    Nothing ->
+                                        Expect.fail "name-input not found"
+                            , \s ->
+                                case Dict.get "greeting" s.elements of
+                                    Just el ->
+                                        Expect.all
+                                            [ \e -> Expect.equal (Just (TemplateExpr "Hello ${/form/name}!")) (Dict.get "content" e.props)
+                                            , \e -> Expect.notEqual Nothing e.visible
+                                            ]
+                                            el
+
+                                    Nothing ->
+                                        Expect.fail "greeting not found"
+                            ]
+                            spec
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
         ]
