@@ -4,8 +4,10 @@ import Dict
 import Expect
 import Html exposing (div, text)
 import Html.Attributes exposing (class)
+import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender.Internal.PropValue exposing (PropValue(..))
+import JsonRender.Spec as Spec
 import JsonRender.Render as Render exposing (Component, Registry)
 import JsonRender.Resolve as Resolve exposing (ResolvedValue(..))
 import JsonRender.Spec exposing (Element, Spec)
@@ -192,4 +194,216 @@ suite =
                 Render.render bindRegistry formState spec
                     |> Query.fromHtml
                     |> Query.has [ Selector.text "Alice", Selector.text "[bound]" ]
+        , describe "full pipeline (JSON → decode → render)"
+            [ test "renders a card from JSON spec" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "card-1",
+                              "elements": {
+                                "card-1": {
+                                  "type": "Card",
+                                  "props": { "title": "Hello World" },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry Encode.null spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.class "card", Selector.text "Hello World" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "renders nested children from JSON spec" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "card-1",
+                              "elements": {
+                                "card-1": {
+                                  "type": "Card",
+                                  "props": { "title": "Parent" },
+                                  "children": ["text-1"]
+                                },
+                                "text-1": {
+                                  "type": "Text",
+                                  "props": { "content": "Child content" },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry Encode.null spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "Parent", Selector.text "Child content" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "resolves $state expression from JSON spec" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": { "content": { "$state": "/greeting" } },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "greeting", Encode.string "Hello Alice" ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "Hello Alice" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "resolves $template expression from JSON spec" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": { "content": { "$template": "Welcome, ${/user/name}!" } },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object
+                                [ ( "user", Encode.object [ ( "name", Encode.string "Bob" ) ] ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "Welcome, Bob!" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "visibility hides element from JSON spec" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": { "content": "Secret" },
+                                  "children": [],
+                                  "visible": { "truthy": "/show" }
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "show", Encode.bool False ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.hasNot [ Selector.text "Secret" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "visibility shows element from JSON spec" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": { "content": "Visible" },
+                                  "children": [],
+                                  "visible": { "truthy": "/show" }
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "show", Encode.bool True ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "Visible" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "full contact form pipeline from JSON" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "form",
+                              "elements": {
+                                "form": {
+                                  "type": "Card",
+                                  "props": { "title": "Contact Us" },
+                                  "children": ["greeting"]
+                                },
+                                "greeting": {
+                                  "type": "Text",
+                                  "props": { "content": { "$template": "Hello, ${/user/name}!" } },
+                                  "children": [],
+                                  "visible": { "truthy": "/showGreeting" }
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object
+                                [ ( "user", Encode.object [ ( "name", Encode.string "Alice" ) ] )
+                                , ( "showGreeting", Encode.bool True )
+                                ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has
+                                    [ Selector.text "Contact Us"
+                                    , Selector.text "Hello, Alice!"
+                                    ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            ]
         ]
