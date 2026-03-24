@@ -1,0 +1,10 @@
+{
+  "root": "btn-1",
+  "elements": {
+    "btn-1": {
+      "type": "Button",
+      "props": { "label": "Submit" },
+      "children": []
+    }
+  }
+}
