@@ -20,7 +20,7 @@ type alias CatalogSchema =
 type alias ComponentSchema =
     { fields : Dict String FieldSchema
     , description : String
-    , hasChildren : Bool
+    , slots : List String
     }
 
 
@@ -49,10 +49,10 @@ decoder =
 
 componentDecoder : Decoder ComponentSchema
 componentDecoder =
-    Decode.succeed (\fields description hasChildren -> ComponentSchema fields description hasChildren)
+    Decode.succeed (\fields description slots -> ComponentSchema fields description slots)
         |> required "props" propsObjectDecoder
         |> required "description" Decode.string
-        |> optional "hasChildren" Decode.bool False
+        |> optional "slots" (Decode.list Decode.string) []
 
 
 propsObjectDecoder : Decoder (Dict String FieldSchema)

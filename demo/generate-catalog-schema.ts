@@ -11,7 +11,7 @@ import { catalog } from "./catalog.ts";
 interface CatalogSchemaComponent {
   props: object;
   description: string;
-  hasChildren: boolean;
+  slots: string[];
 }
 
 const components: Record<string, CatalogSchemaComponent> = {};
@@ -22,7 +22,7 @@ for (const name of catalog.componentNames) {
   components[name] = {
     props: def.props.toJSONSchema(),
     description: def.description ?? "",
-    hasChildren: (def.slots ?? []).length > 0,
+    slots: def.slots ?? [],
   };
 }
 

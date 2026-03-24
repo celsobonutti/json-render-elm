@@ -7,7 +7,7 @@ import Test exposing (..)
 
 sampleSchemaJson : String
 sampleSchemaJson =
-    """{"components":{"Card":{"props":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]},"description":"A card","hasChildren":true}}}"""
+    """{"components":{"Card":{"props":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]},"description":"A card","slots":["default"]}}}"""
 
 
 baseConfig : CatalogSync.Config
@@ -79,7 +79,7 @@ registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
             \_ ->
                 let
                     twoComponentSchema =
-                        """{"components":{"Card":{"props":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]},"description":"A card","hasChildren":true},"Button":{"props":{"type":"object","properties":{"label":{"type":"string"}},"required":["label"]},"description":"A button","hasChildren":false}}}"""
+                        """{"components":{"Card":{"props":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]},"description":"A card","slots":["default"]},"Button":{"props":{"type":"object","properties":{"label":{"type":"string"}},"required":["label"]},"description":"A button","slots":[]}}}"""
 
                     twoConfig =
                         { schemaJson = twoComponentSchema

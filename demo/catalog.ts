@@ -12,14 +12,14 @@ import { defineCatalog } from "@json-render/core";
 import { schema } from "../packages/js-bridge/src/schema.ts";
 import { z } from "zod";
 
-export const catalog: ReturnType<typeof defineCatalog> = defineCatalog(schema, {
+export const catalog = defineCatalog(schema, {
   components: {
     Card: {
       props: z.object({
         title: z.string(),
         subtitle: z.string().optional(),
       }),
-      hasChildren: true,
+      slots: ["default"],
       description: "A card container with a title and optional subtitle",
     },
     Button: {
@@ -27,7 +27,7 @@ export const catalog: ReturnType<typeof defineCatalog> = defineCatalog(schema, {
         label: z.string(),
         variant: z.enum(["primary", "secondary", "danger"]).optional(),
       }),
-      hasChildren: false,
+      slots: [],
       description: "A clickable button",
     },
     Text: {
@@ -35,7 +35,7 @@ export const catalog: ReturnType<typeof defineCatalog> = defineCatalog(schema, {
         content: z.string(),
         size: z.enum(["sm", "md", "lg", "xl"]).optional(),
       }),
-      hasChildren: false,
+      slots: [],
       description: "A text block",
     },
     Input: {
@@ -43,7 +43,7 @@ export const catalog: ReturnType<typeof defineCatalog> = defineCatalog(schema, {
         placeholder: z.string().optional(),
         label: z.string().optional(),
       }),
-      hasChildren: false,
+      slots: [],
       description: "A text input field with an optional label",
     },
     Stack: {
@@ -51,7 +51,7 @@ export const catalog: ReturnType<typeof defineCatalog> = defineCatalog(schema, {
         direction: z.enum(["vertical", "horizontal"]).optional(),
         gap: z.number().int().optional(),
       }),
-      hasChildren: true,
+      slots: ["default"],
       description:
         "A flex container that stacks children vertically or horizontally",
     },
@@ -60,7 +60,7 @@ export const catalog: ReturnType<typeof defineCatalog> = defineCatalog(schema, {
         src: z.string(),
         alt: z.string(),
       }),
-      hasChildren: false,
+      slots: [],
       description: "An image element",
     },
     Badge: {
@@ -68,7 +68,7 @@ export const catalog: ReturnType<typeof defineCatalog> = defineCatalog(schema, {
         label: z.string(),
         color: z.enum(["green", "red", "yellow", "blue", "gray"]).optional(),
       }),
-      hasChildren: false,
+      slots: [],
       description: "A small colored badge/tag",
     },
   },

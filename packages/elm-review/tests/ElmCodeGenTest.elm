@@ -15,7 +15,7 @@ cardSchema =
             , ( "subtitle", { fieldType = FString, required = False } )
             ]
     , description = "A card container"
-    , hasChildren = True
+    , slots = [ "default" ]
     }
 
 

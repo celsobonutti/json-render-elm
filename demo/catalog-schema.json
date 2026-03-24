@@ -18,7 +18,9 @@
         "additionalProperties": false
       },
       "description": "A card container with a title and optional subtitle",
-      "hasChildren": true
+      "slots": [
+        "default"
+      ]
     },
     "Button": {
       "props": {
@@ -43,7 +45,7 @@
         "additionalProperties": false
       },
       "description": "A clickable button",
-      "hasChildren": false
+      "slots": []
     },
     "Text": {
       "props": {
@@ -69,7 +71,7 @@
         "additionalProperties": false
       },
       "description": "A text block",
-      "hasChildren": false
+      "slots": []
     },
     "Input": {
       "props": {
@@ -86,7 +88,7 @@
         "additionalProperties": false
       },
       "description": "A text input field with an optional label",
-      "hasChildren": false
+      "slots": []
     },
     "Stack": {
       "props": {
@@ -109,7 +111,9 @@
         "additionalProperties": false
       },
       "description": "A flex container that stacks children vertically or horizontally",
-      "hasChildren": true
+      "slots": [
+        "default"
+      ]
     },
     "Image": {
       "props": {
@@ -130,7 +134,7 @@
         "additionalProperties": false
       },
       "description": "An image element",
-      "hasChildren": false
+      "slots": []
     },
     "Badge": {
       "props": {
@@ -157,7 +161,7 @@
         "additionalProperties": false
       },
       "description": "A small colored badge/tag",
-      "hasChildren": false
+      "slots": []
     }
   }
 }

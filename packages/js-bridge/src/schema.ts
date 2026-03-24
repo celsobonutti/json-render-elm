@@ -41,8 +41,8 @@ export const schema = defineSchema(
       components: s.map({
         /** Zod schema for component props */
         props: s.zod(),
-        /** Whether this component can have children */
-        hasChildren: s.boolean(),
+        /** Slots for this component. Use ['default'] for children, or named slots like ['header', 'footer'] */
+        slots: s.array(s.string()),
         /** Description for AI generation hints */
         description: s.string(),
         /** Example prop values used in prompt examples (auto-generated from Zod schema if omitted) */

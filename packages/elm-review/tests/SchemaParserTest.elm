@@ -22,7 +22,7 @@ sampleSchema =
             "required": ["title"]
           },
           "description": "A card container",
-          "hasChildren": true
+          "slots": ["default"]
         },
         "Button": {
           "props": {
@@ -34,7 +34,7 @@ sampleSchema =
             "required": ["label"]
           },
           "description": "A clickable button",
-          "hasChildren": false
+          "slots": []
         }
       }
     }
