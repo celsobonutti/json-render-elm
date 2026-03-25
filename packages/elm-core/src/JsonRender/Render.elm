@@ -12,7 +12,7 @@ module JsonRender.Render exposing
 
 import Dict exposing (Dict)
 import Html exposing (Html)
-import Json.Encode as Encode exposing (Value)
+import Json.Encode exposing (Value)
 import JsonRender.Actions exposing (Msg(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext, ResolvedValue)
@@ -20,35 +20,35 @@ import JsonRender.Spec exposing (Element, Spec)
 import JsonRender.Visibility as Visibility
 
 
-type alias ComponentContext props bindings =
+type alias ComponentContext props bindings action =
     { props : props
     , bindings : bindings
-    , children : List (Html Msg)
-    , emit : String -> Msg
+    , children : List (Html (Msg action))
+    , emit : action -> Msg action
     }
 
 
-type alias RawComponentContext =
+type alias RawComponentContext action =
     { props : Dict String ResolvedValue
-    , bindings : Dict String (Value -> Msg)
-    , children : List (Html Msg)
-    , emit : String -> Msg
+    , bindings : Dict String (Value -> Msg action)
+    , children : List (Html (Msg action))
+    , emit : action -> Msg action
     }
 
 
-type Component
-    = Component (RawComponentContext -> Html Msg)
+type Component action
+    = Component (RawComponentContext action -> Html (Msg action))
 
 
-type alias Registry =
-    Dict String Component
+type alias Registry action =
+    Dict String (Component action)
 
 
 register :
     (Dict String ResolvedValue -> Result String props)
-    -> (Dict String (Value -> Msg) -> bindings)
-    -> (ComponentContext props bindings -> Html Msg)
-    -> Component
+    -> (Dict String (Value -> Msg action) -> bindings)
+    -> (ComponentContext props bindings action -> Html (Msg action))
+    -> Component action
 register propsDecoder bindingsDecoder view =
     Component
         (\raw ->
@@ -66,7 +66,7 @@ register propsDecoder bindingsDecoder view =
         )
 
 
-extractBindings : Dict String PropValue -> Dict String (Value -> Msg)
+extractBindings : Dict String PropValue -> Dict String (Value -> Msg action)
 extractBindings props =
     Dict.foldl
         (\key propValue acc ->
@@ -81,7 +81,7 @@ extractBindings props =
         props
 
 
-render : Registry -> Value -> Spec -> Html Msg
+render : Registry action -> Value -> Spec -> Html (Msg action)
 render registry state spec =
     case Dict.get spec.root spec.elements of
         Just element ->
@@ -91,7 +91,7 @@ render registry state spec =
             Html.text ""
 
 
-renderElement : Registry -> Value -> Maybe RepeatContext -> Spec -> Element -> Html Msg
+renderElement : Registry action -> Value -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
 renderElement registry state repeatCtx spec element =
     case element.visible of
         Just condition ->
@@ -105,7 +105,7 @@ renderElement registry state repeatCtx spec element =
             renderElementInner registry state repeatCtx spec element
 
 
-renderElementInner : Registry -> Value -> Maybe RepeatContext -> Spec -> Element -> Html Msg
+renderElementInner : Registry action -> Value -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
 renderElementInner registry state repeatCtx spec element =
     case Dict.get element.type_ registry of
         Just (Component componentFn) ->
@@ -128,7 +128,7 @@ renderElementInner registry state repeatCtx spec element =
                 { props = resolved
                 , bindings = bindings
                 , children = children
-                , emit = \event -> CustomAction event Encode.null
+                , emit = \action -> CustomAction action
                 }
 
         Nothing ->

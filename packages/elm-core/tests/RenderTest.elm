@@ -17,7 +17,11 @@ import Test.Html.Query as Query
 import Test.Html.Selector as Selector
 
 
-testRegistry : Registry
+type TestAction
+    = TestNoAction
+
+
+testRegistry : Render.Registry TestAction
 testRegistry =
     Dict.fromList
         [ ( "Card"
@@ -144,6 +148,7 @@ suite =
         , test "resolves $bindState and provides setter binding" <|
             \_ ->
                 let
+                    bindRegistry : Render.Registry TestAction
                     bindRegistry =
                         Dict.fromList
                             [ ( "Input"
