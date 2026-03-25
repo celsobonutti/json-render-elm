@@ -66,6 +66,7 @@ suite =
                                     , props = Dict.fromList [ ( "content", StringValue "Hello" ) ]
                                     , children = []
                                     , visible = Nothing
+                                    , repeat = Nothing
                                     }
                                   )
                                 ]
@@ -86,6 +87,7 @@ suite =
                                     , props = Dict.fromList [ ( "title", StringValue "My Card" ) ]
                                     , children = [ "inner" ]
                                     , visible = Nothing
+                                    , repeat = Nothing
                                     }
                                   )
                                 , ( "inner"
@@ -93,6 +95,7 @@ suite =
                                     , props = Dict.fromList [ ( "content", StringValue "Body" ) ]
                                     , children = []
                                     , visible = Nothing
+                                    , repeat = Nothing
                                     }
                                   )
                                 ]
@@ -113,6 +116,7 @@ suite =
                                     , props = Dict.empty
                                     , children = []
                                     , visible = Nothing
+                                    , repeat = Nothing
                                     }
                                   )
                                 ]
@@ -136,6 +140,7 @@ suite =
                                     , props = Dict.fromList [ ( "content", StringValue "Hidden" ) ]
                                     , children = []
                                     , visible = Just (Truthy "/show")
+                                    , repeat = Nothing
                                     }
                                   )
                                 ]
@@ -190,6 +195,7 @@ suite =
                                     , props = Dict.fromList [ ( "value", BindStateExpr "/form/name" ) ]
                                     , children = []
                                     , visible = Nothing
+                                    , repeat = Nothing
                                     }
                                   )
                                 ]

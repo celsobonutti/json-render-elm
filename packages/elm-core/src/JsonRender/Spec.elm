@@ -1,5 +1,6 @@
 module JsonRender.Spec exposing
     ( Element
+    , Repeat
     , Spec
     , decoder
     , propValueDecoder
@@ -30,6 +31,13 @@ type alias Element =
     , props : Dict String PropValue
     , children : List String
     , visible : Maybe VisibilityCondition
+    , repeat : Maybe Repeat
+    }
+
+
+type alias Repeat =
+    { statePath : String
+    , key : Maybe String
     }
 
 
@@ -47,6 +55,14 @@ elementDecoder =
         |> required "props" (Decode.dict PropValue.decoder)
         |> required "children" (Decode.list Decode.string)
         |> optional "visible" (Decode.map Just JsonRender.Visibility.decoder) Nothing
+        |> optional "repeat" (Decode.map Just repeatDecoder) Nothing
+
+
+repeatDecoder : Decoder Repeat
+repeatDecoder =
+    Decode.succeed Repeat
+        |> required "statePath" Decode.string
+        |> optional "key" (Decode.map Just Decode.string) Nothing
 
 
 {-| Re-export for convenience.

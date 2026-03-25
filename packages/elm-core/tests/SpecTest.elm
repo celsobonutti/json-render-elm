@@ -272,6 +272,86 @@ suite =
 
                     Err err ->
                         Expect.fail (Decode.errorToString err)
+        , test "decodes element with repeat field (statePath + key)" <|
+            \_ ->
+                let
+                    json =
+                        """
+                        {
+                          "root": "list",
+                          "elements": {
+                            "list": {
+                              "type": "Stack",
+                              "props": { "direction": "vertical" },
+                              "children": ["item"],
+                              "repeat": { "statePath": "/todos", "key": "id" }
+                            },
+                            "item": {
+                              "type": "Text",
+                              "props": { "content": { "$item": "title" } },
+                              "children": []
+                            }
+                          }
+                        }
+                        """
+                in
+                case Decode.decodeString Spec.decoder json of
+                    Ok spec ->
+                        case Dict.get "list" spec.elements of
+                            Just el ->
+                                Expect.equal
+                                    (Just { statePath = "/todos", key = Just "id" })
+                                    el.repeat
+
+                            Nothing ->
+                                Expect.fail "element not found"
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
+        , test "decodes element with repeat field (statePath only, no key)" <|
+            \_ ->
+                let
+                    json =
+                        """
+                        {
+                          "root": "list",
+                          "elements": {
+                            "list": {
+                              "type": "Stack",
+                              "props": {},
+                              "children": [],
+                              "repeat": { "statePath": "/items" }
+                            }
+                          }
+                        }
+                        """
+                in
+                case Decode.decodeString Spec.decoder json of
+                    Ok spec ->
+                        case Dict.get "list" spec.elements of
+                            Just el ->
+                                Expect.equal
+                                    (Just { statePath = "/items", key = Nothing })
+                                    el.repeat
+
+                            Nothing ->
+                                Expect.fail "element not found"
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
+        , test "element without repeat decodes as Nothing" <|
+            \_ ->
+                case Decode.decodeString Spec.decoder specJson of
+                    Ok spec ->
+                        case Dict.get "card-1" spec.elements of
+                            Just el ->
+                                Expect.equal Nothing el.repeat
+
+                            Nothing ->
+                                Expect.fail "element not found"
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
         , test "decodes a complex multi-element spec" <|
             \_ ->
                 let
