@@ -18,6 +18,9 @@ port jsonRenderSpecIn : (Value -> msg) -> Sub msg
 port jsonRenderStateIn : (Value -> msg) -> Sub msg
 
 
+port testActionOut : Value -> Cmd msg
+
+
 type alias Model =
     { spec : Maybe Spec
     , renderState : Value
@@ -66,11 +69,16 @@ update msg model =
             )
 
 
-handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
-handleAction action model =
+encodeAction : Action -> Value
+encodeAction action =
     case action of
         Press ->
-            ( model, Cmd.none )
+            Encode.object [ ( "name", Encode.string "press" ) ]
+
+
+handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
+handleAction action model =
+    ( model, testActionOut (encodeAction action) )
 
 
 view : Model -> Html Msg

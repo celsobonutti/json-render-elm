@@ -11,3 +11,7 @@ const bridge = createElmBridge(app)
 ;(window as any).__setState = (state: object) => {
   app.ports.jsonRenderStateIn.send(state)
 }
+
+app.ports.testActionOut.subscribe((action: unknown) => {
+  ;(window as any).__lastAction = action
+})

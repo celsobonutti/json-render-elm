@@ -26,3 +26,7 @@ export async function sendSpec(
 export async function setState(page: Page, state: object) {
   await page.evaluate((s) => (window as any).__setState(s), state)
 }
+
+export async function getLastAction(page: Page) {
+  return page.evaluate(() => (window as any).__lastAction)
+}
