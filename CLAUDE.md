@@ -113,7 +113,7 @@ The CatalogSync rule validates component modules against a catalog JSON Schema. 
 2. **Playwright e2e tests** (`demo/test/`) — test in a real browser:
    - Create JSON fixture files in `demo/test/fixtures/<category>/`
    - Create spec file in `demo/test/specs/<category>.spec.ts`
-   - Use helpers: `sendSpec`, `setState`, `getLastAction`
+   - Use helpers: `sendSpec`, `setState`
    - Test pattern: `beforeEach` navigates to `""` (resolves to test harness), then send fixture + assert DOM
 
 ### Test Patterns
