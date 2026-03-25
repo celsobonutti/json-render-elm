@@ -14,6 +14,11 @@ interface CatalogSchemaComponent {
   slots: string[];
 }
 
+interface CatalogSchemaAction {
+  params: object;
+  description: string;
+}
+
 const components: Record<string, CatalogSchemaComponent> = {};
 for (const name of catalog.componentNames) {
   const def =
@@ -26,8 +31,19 @@ for (const name of catalog.componentNames) {
   };
 }
 
+const actions: Record<string, CatalogSchemaAction> = {};
+for (const name of Object.keys(catalog.data.actions)) {
+  const def =
+    catalog.data.actions[name as keyof typeof catalog.data.actions];
+  if (!def) continue;
+  actions[name] = {
+    params: def.params.toJSONSchema(),
+    description: def.description ?? "",
+  };
+}
+
 writeFileSync(
   "catalog-schema.json",
-  JSON.stringify({ components }, null, 2) + "\n",
+  JSON.stringify({ components, actions }, null, 2) + "\n",
 );
 console.log("Generated catalog-schema.json");

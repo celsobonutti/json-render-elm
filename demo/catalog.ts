@@ -72,5 +72,14 @@ export const catalog = defineCatalog(schema, {
       description: "A small colored badge/tag",
     },
   },
-  actions: {},
+  actions: {
+    press: {
+      params: z.object({}),
+      description: "Generic button press",
+    },
+    export: {
+      params: z.object({ format: z.string() }),
+      description: "Export data in a given format",
+    },
+  },
 });

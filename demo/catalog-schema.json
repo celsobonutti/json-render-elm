@@ -163,5 +163,32 @@
       "description": "A small colored badge/tag",
       "slots": []
     }
+  },
+  "actions": {
+    "press": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "description": "Generic button press"
+    },
+    "export": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Export data in a given format"
+    }
   }
 }
