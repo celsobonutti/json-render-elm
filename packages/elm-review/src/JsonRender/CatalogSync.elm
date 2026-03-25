@@ -16,10 +16,12 @@ import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Expression as Expression exposing (Expression)
 import Elm.Syntax.Module as Module
 import Elm.Syntax.Node as Node exposing (Node(..))
+import Elm.Syntax.Type as Type
 import Elm.Syntax.Range exposing (Range)
 import Json.Decode as Decode
 import JsonRender.Internal.ElmCodeGen as ElmCodeGen
 import JsonRender.Internal.SchemaParser as SchemaParser exposing (CatalogSchema, ComponentSchema)
+import JsonRender.Internal.TypeMapping as TypeMapping
 import Review.Fix as Fix
 import Review.Rule as Rule exposing (Rule)
 import Set exposing (Set)
@@ -229,6 +231,53 @@ declarationListVisitor declarations context =
                 in
                 ( errors, { context | registryEntries = entries } )
 
+            else if context.isActionsModule then
+                let
+                    existingVariants =
+                        extractActionVariants declarations
+
+                    expectedVariants =
+                        Dict.keys catalog.actions
+                            |> List.map TypeMapping.capitalizeFirst
+                            |> Set.fromList
+
+                    missing =
+                        Set.diff expectedVariants existingVariants
+
+                    errors =
+                        if Set.isEmpty missing then
+                            []
+
+                        else
+                            case context.moduleRange of
+                                Just range ->
+                                    let
+                                        fullRange =
+                                            { start = range.start
+                                            , end = lastDeclarationEnd declarations range
+                                            }
+
+                                        generatedCode =
+                                            ElmCodeGen.actionsModule
+                                                context.config.componentsNamespace
+                                                catalog.actions
+                                    in
+                                    [ Rule.errorWithFix
+                                        { message = "Actions module is missing variants: " ++ String.join ", " (Set.toList missing)
+                                        , details =
+                                            [ "The Actions module does not match the catalog actions."
+                                            , "Accept the fix to regenerate it."
+                                            ]
+                                        }
+                                        range
+                                        [ Fix.replaceRangeBy fullRange generatedCode ]
+                                    ]
+
+                                Nothing ->
+                                    []
+                in
+                ( errors, context )
+
             else
                 case context.isComponentModule of
                     Just componentName ->
@@ -310,6 +359,30 @@ extractRegistryEntries declarations =
                     in
                     if name == "registry" then
                         extractEntriesFromExpression (Node.value implementation.expression) acc
+
+                    else
+                        acc
+
+                _ ->
+                    acc
+        )
+        Set.empty
+        declarations
+
+
+extractActionVariants : List (Node Declaration) -> Set String
+extractActionVariants declarations =
+    List.foldl
+        (\(Node _ decl) acc ->
+            case decl of
+                Declaration.CustomTypeDeclaration typeDecl ->
+                    if Node.value typeDecl.name == "Action" then
+                        List.foldl
+                            (\(Node _ constructor) innerAcc ->
+                                Set.insert (Node.value constructor.name) innerAcc
+                            )
+                            acc
+                            typeDecl.constructors
 
                     else
                         acc

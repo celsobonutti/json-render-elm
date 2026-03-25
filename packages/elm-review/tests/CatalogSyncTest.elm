@@ -172,7 +172,7 @@ registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
                                 ]
                           }
                         ]
-        , test "no errors when component, registry, and actions modules exist" <|
+        , test "no errors when component, registry, and actions modules exist with correct type" <|
             \_ ->
                 [ """module Components.Card exposing (..)
 type alias CardProps = { title : String }
@@ -191,4 +191,77 @@ type Action = Press
                 ]
                     |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
                     |> Review.Test.expectNoErrors
+        , test "reports outdated actions module when variants are wrong" <|
+            \_ ->
+                let
+                    schemaWithTwoActions =
+                        """{"components":{"Card":{"props":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]},"description":"A card","slots":["default"]}},"actions":{"press":{"params":{"type":"object","properties":{},"required":[]},"description":"Generic button press"},"export":{"params":{"type":"object","properties":{"format":{"type":"string"}},"required":["format"]},"description":"Export data"}}}"""
+
+                    twoActionsConfig =
+                        { schemaJson = schemaWithTwoActions
+                        , componentsNamespace = "Components"
+                        }
+                in
+                [ """module Components.Card exposing (..)
+type alias CardProps = { title : String }
+propsDecoder = identity
+component = ()
+view ctx = ()
+"""
+                , """module Components.Registry exposing (registry)
+import Dict
+import Components.Card
+registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
+"""
+                , """module Components.Actions exposing (Action(..))
+type Action = Press
+"""
+                ]
+                    |> Review.Test.runOnModules (CatalogSync.rule twoActionsConfig)
+                    |> Review.Test.expectErrorsForModules
+                        [ ( "Components.Actions"
+                          , [ Review.Test.error
+                                { message = "Actions module is missing variants: Export"
+                                , details =
+                                    [ "The Actions module does not match the catalog actions."
+                                    , "Accept the fix to regenerate it."
+                                    ]
+                                , under = "module Components.Actions exposing (Action(..))"
+                                }
+                                |> Review.Test.whenFixed ("module Components.Actions exposing (Action(..))\n\n\ntype alias ExportParams =\n    { format : String\n    }\n\n\ntype Action\n    = Export ExportParams\n    | Press\n")
+                            ]
+                          )
+                        ]
+        , test "fixes stub actions module" <|
+            \_ ->
+                [ """module Components.Card exposing (..)
+type alias CardProps = { title : String }
+propsDecoder = identity
+component = ()
+view ctx = ()
+"""
+                , """module Components.Registry exposing (registry)
+import Dict
+import Components.Card
+registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
+"""
+                , """module Components.Actions exposing (..)
+placeholder = ()
+"""
+                ]
+                    |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
+                    |> Review.Test.expectErrorsForModules
+                        [ ( "Components.Actions"
+                          , [ Review.Test.error
+                                { message = "Actions module is missing variants: Press"
+                                , details =
+                                    [ "The Actions module does not match the catalog actions."
+                                    , "Accept the fix to regenerate it."
+                                    ]
+                                , under = "module Components.Actions exposing (..)"
+                                }
+                                |> Review.Test.whenFixed ("module Components.Actions exposing (Action(..))\n\n\ntype Action\n    = Press\n")
+                            ]
+                          )
+                        ]
         ]
