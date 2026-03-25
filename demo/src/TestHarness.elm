@@ -1,6 +1,7 @@
 port module TestHarness exposing (main)
 
 import Browser
+import Components.Actions exposing (Action(..))
 import Components.Registry exposing (registry)
 import Html exposing (Html, div)
 import Html.Attributes exposing (id)
@@ -12,9 +13,6 @@ import JsonRender.Spec as Spec exposing (Spec)
 
 
 port jsonRenderSpecIn : (Value -> msg) -> Sub msg
-
-
-port jsonRenderActionOut : Value -> Cmd msg
 
 
 port jsonRenderStateIn : (Value -> msg) -> Sub msg
@@ -29,7 +27,7 @@ type alias Model =
 type Msg
     = SpecReceived Value
     | StateReceived Value
-    | JsonRenderMsg Actions.Msg
+    | JsonRenderMsg (Actions.Msg Action)
 
 
 init : () -> ( Model, Cmd Msg )
@@ -56,19 +54,23 @@ update msg model =
             ( { model | renderState = val }, Cmd.none )
 
         JsonRenderMsg actionMsg ->
-            case actionMsg of
-                Actions.CustomAction name params ->
-                    ( model, jsonRenderActionOut (Actions.encodeAction name params) )
+            let
+                actionsModel =
+                    { spec = model.spec, state = model.renderState }
 
-                _ ->
-                    let
-                        actionsModel =
-                            { spec = model.spec, state = model.renderState }
+                ( newActionsModel, cmd ) =
+                    Actions.update handleAction actionMsg actionsModel
+            in
+            ( { model | renderState = newActionsModel.state }
+            , Cmd.map JsonRenderMsg cmd
+            )
 
-                        ( newActionsModel, _ ) =
-                            Actions.update actionMsg actionsModel
-                    in
-                    ( { model | renderState = newActionsModel.state }, Cmd.none )
+
+handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
+handleAction action model =
+    case action of
+        Press ->
+            ( model, Cmd.none )
 
 
 view : Model -> Html Msg

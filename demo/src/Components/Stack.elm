@@ -1,5 +1,6 @@
 module Components.Stack exposing (StackProps, component, propsDecoder)
 
+import Components.Actions exposing (Action)
 import Dict exposing (Dict)
 import Html exposing (Html, div)
 import Html.Attributes exposing (class, style)
@@ -21,12 +22,12 @@ propsDecoder =
         |> ResolvedValue.optional "gap" ResolvedValue.int Nothing
 
 
-component : Component
+component : Component Action
 component =
     register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext StackProps () -> Html Msg
+view : ComponentContext StackProps () Action -> Html (Msg Action)
 view ctx =
     let
         dirClass =

@@ -1,6 +1,7 @@
 port module Main exposing (main)
 
 import Browser
+import Components.Actions exposing (Action(..))
 import Components.Registry exposing (registry)
 import Html exposing (Html, button, div, h1, p, pre, span, text, textarea)
 import Html.Attributes exposing (class, disabled, placeholder, rows, value)
@@ -21,9 +22,6 @@ port receiveError : (String -> msg) -> Sub msg
 
 -- json-render-elm bridge ports
 port jsonRenderSpecIn : (Value -> msg) -> Sub msg
-
-
-port jsonRenderActionOut : Value -> Cmd msg
 
 
 
@@ -72,7 +70,7 @@ type Msg
     | ErrorReceived String
     | Reset
     | ToggleJson
-    | JsonRenderMsg Actions.Msg
+    | JsonRenderMsg (Actions.Msg Action)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -130,19 +128,24 @@ update msg model =
             ( { model | showJson = not model.showJson }, Cmd.none )
 
         JsonRenderMsg actionMsg ->
-            case actionMsg of
-                Actions.CustomAction name params ->
-                    ( model, jsonRenderActionOut (Actions.encodeAction name params) )
+            let
+                actionsModel =
+                    { spec = model.spec, state = model.renderState }
 
-                _ ->
-                    let
-                        actionsModel =
-                            { spec = model.spec, state = model.renderState }
+                ( newActionsModel, cmd ) =
+                    Actions.update handleAction actionMsg actionsModel
+            in
+            ( { model | renderState = newActionsModel.state }
+            , Cmd.map JsonRenderMsg cmd
+            )
 
-                        ( newActionsModel, _ ) =
-                            Actions.update actionMsg actionsModel
-                    in
-                    ( { model | renderState = newActionsModel.state }, Cmd.none )
+
+
+handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
+handleAction action model =
+    case action of
+        Press ->
+            ( model, Cmd.none )
 
 
 

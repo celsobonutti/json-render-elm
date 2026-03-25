@@ -1,5 +1,6 @@
 module Components.Button exposing (ButtonProps, component, propsDecoder)
 
+import Components.Actions exposing (Action(..))
 import Dict exposing (Dict)
 import Html exposing (Html, button, text)
 import Html.Attributes exposing (class)
@@ -22,12 +23,12 @@ propsDecoder =
         |> ResolvedValue.optional "variant" ResolvedValue.string Nothing
 
 
-component : Component
+component : Component Action
 component =
     register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext ButtonProps () -> Html Msg
+view : ComponentContext ButtonProps () Action -> Html (Msg Action)
 view ctx =
     let
         variantClass =
@@ -43,6 +44,6 @@ view ctx =
     in
     button
         [ class ("jr-button " ++ variantClass)
-        , onClick (ctx.emit "press")
+        , onClick (ctx.emit Press)
         ]
         [ text ctx.props.label ]

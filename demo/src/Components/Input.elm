@@ -1,5 +1,6 @@
 module Components.Input exposing (InputBindings, InputProps, component, inputBindingsDecoder, propsDecoder)
 
+import Components.Actions exposing (Action)
 import Dict exposing (Dict)
 import Html exposing (Html, div, input, label, text)
 import Html.Attributes exposing (class, placeholder, type_)
@@ -19,9 +20,9 @@ type alias InputProps =
 
 
 type alias InputBindings =
-    { label : Maybe (Value -> Msg)
-    , placeholder : Maybe (Value -> Msg)
-    , value : Maybe (Value -> Msg)
+    { label : Maybe (Value -> Msg Action)
+    , placeholder : Maybe (Value -> Msg Action)
+    , value : Maybe (Value -> Msg Action)
     }
 
 
@@ -33,7 +34,7 @@ propsDecoder =
         |> ResolvedValue.optional "value" ResolvedValue.string Nothing
 
 
-inputBindingsDecoder : Dict String (Value -> Msg) -> InputBindings
+inputBindingsDecoder : Dict String (Value -> Msg Action) -> InputBindings
 inputBindingsDecoder =
     Bind.succeed InputBindings
         |> Bind.bindable "label"
@@ -41,12 +42,12 @@ inputBindingsDecoder =
         |> Bind.bindable "value"
 
 
-component : Component
+component : Component Action
 component =
     register propsDecoder inputBindingsDecoder view
 
 
-view : ComponentContext InputProps InputBindings -> Html Msg
+view : ComponentContext InputProps InputBindings Action -> Html (Msg Action)
 view ctx =
     div [ class "jr-input-wrapper" ]
         ((case ctx.props.label of

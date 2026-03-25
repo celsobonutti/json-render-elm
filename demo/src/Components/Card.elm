@@ -1,5 +1,6 @@
 module Components.Card exposing (CardProps, component, propsDecoder)
 
+import Components.Actions exposing (Action)
 import Dict exposing (Dict)
 import Html exposing (Html, div, h3, p, text)
 import Html.Attributes exposing (class)
@@ -21,12 +22,12 @@ propsDecoder =
         |> ResolvedValue.required "title" ResolvedValue.string
 
 
-component : Component
+component : Component Action
 component =
     register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext CardProps () -> Html Msg
+view : ComponentContext CardProps () Action -> Html (Msg Action)
 view ctx =
     div [ class "jr-card" ]
         ([ h3 [ class "jr-card-title" ] [ text ctx.props.title ] ]

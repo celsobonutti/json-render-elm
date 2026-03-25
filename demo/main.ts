@@ -11,12 +11,8 @@ if (process.env.NODE_ENV === "development") {
 const root = document.querySelector("#app div")
 const app = Elm.Main!.init({ node: root })
 
-// Set up the json-render-elm bridge (handles spec-in and action-out ports)
-const bridge = createElmBridge(app, {
-  onAction: (name: string, params: unknown) => {
-    console.log("Custom action:", name, params)
-  },
-})
+// Set up the json-render-elm bridge (handles spec-in port)
+const bridge = createElmBridge(app)
 
 // App-specific: prompt → API → bridge.sendSpec
 app.ports.sendPrompt.subscribe(async (prompt: string) => {

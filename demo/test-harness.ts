@@ -5,11 +5,7 @@ import { createElmBridge } from "../packages/js-bridge/src/index.ts"
 const root = document.querySelector("#app")
 const app = Elm.TestHarness!.init({ node: root })
 
-const bridge = createElmBridge(app, {
-  onAction: (name: string, params: unknown) => {
-    ;(window as any).__lastAction = { name, params }
-  },
-})
+const bridge = createElmBridge(app)
 
 ;(window as any).__bridge = bridge
 ;(window as any).__setState = (state: object) => {

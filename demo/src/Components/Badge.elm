@@ -1,5 +1,6 @@
 module Components.Badge exposing (BadgeProps, component, propsDecoder)
 
+import Components.Actions exposing (Action)
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)
 import Html.Attributes exposing (class)
@@ -21,12 +22,12 @@ propsDecoder =
         |> ResolvedValue.required "label" ResolvedValue.string
 
 
-component : Component
+component : Component Action
 component =
     register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext BadgeProps () -> Html Msg
+view : ComponentContext BadgeProps () Action -> Html (Msg Action)
 view ctx =
     let
         colorClass =
