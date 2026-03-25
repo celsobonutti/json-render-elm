@@ -67,7 +67,7 @@ suite =
                             Encode.object [ ( "id", Encode.string "abc" ) ]
 
                         ctx =
-                            Just { item = item, index = 2 }
+                            Just { item = item, index = 2, basePath = "/items/2" }
 
                         props =
                             Dict.fromList [ ( "itemId", ItemExpr "id" ) ]
@@ -82,7 +82,7 @@ suite =
                 \_ ->
                     let
                         ctx =
-                            Just { item = Encode.null, index = 5 }
+                            Just { item = Encode.null, index = 5, basePath = "/items/5" }
 
                         props =
                             Dict.fromList [ ( "idx", IndexExpr ) ]
@@ -105,6 +105,72 @@ suite =
                     Expect.equal
                         (Just (RString "Alice"))
                         (Dict.get "value" resolved)
+            , test "resolves $bindItem expression (read direction)" <|
+                \_ ->
+                    let
+                        item =
+                            Encode.object [ ( "title", Encode.string "Buy milk" ) ]
+
+                        ctx =
+                            Just { item = item, index = 0, basePath = "/todos/0" }
+
+                        props =
+                            Dict.fromList [ ( "label", BindItemExpr "title" ) ]
+
+                        resolved =
+                            Resolve.resolveProps state ctx props
+                    in
+                    Expect.equal
+                        (Just (RString "Buy milk"))
+                        (Dict.get "label" resolved)
+            , test "resolves $bindItem with empty string to whole item" <|
+                \_ ->
+                    let
+                        item =
+                            Encode.string "hello"
+
+                        ctx =
+                            Just { item = item, index = 0, basePath = "/items/0" }
+
+                        props =
+                            Dict.fromList [ ( "value", BindItemExpr "" ) ]
+
+                        resolved =
+                            Resolve.resolveProps state ctx props
+                    in
+                    Expect.equal
+                        (Just (RString "hello"))
+                        (Dict.get "value" resolved)
+            , test "resolves $bindItem outside repeat context to RNull" <|
+                \_ ->
+                    let
+                        props =
+                            Dict.fromList [ ( "value", BindItemExpr "title" ) ]
+
+                        resolved =
+                            Resolve.resolveProps state Nothing props
+                    in
+                    Expect.equal
+                        (Just RNull)
+                        (Dict.get "value" resolved)
+            , test "resolves $item with empty string to whole item" <|
+                \_ ->
+                    let
+                        item =
+                            Encode.object [ ( "name", Encode.string "Alice" ) ]
+
+                        ctx =
+                            Just { item = item, index = 0, basePath = "/items/0" }
+
+                        props =
+                            Dict.fromList [ ( "data", ItemExpr "" ) ]
+
+                        resolved =
+                            Resolve.resolveProps state ctx props
+                    in
+                    Expect.equal
+                        (Just (RObject (Dict.fromList [ ( "name", RString "Alice" ) ])))
+                        (Dict.get "data" resolved)
             , test "resolves mixed props (literals + expressions)" <|
                 \_ ->
                     let
@@ -186,7 +252,7 @@ suite =
                                 [ ( "tags", Encode.list Encode.string [ "a", "b" ] ) ]
 
                         ctx =
-                            Just { item = item, index = 0 }
+                            Just { item = item, index = 0, basePath = "/items/0" }
 
                         props =
                             Dict.fromList [ ( "tags", ItemExpr "tags" ) ]

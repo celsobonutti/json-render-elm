@@ -26,6 +26,7 @@ type VisibilityCondition
 type alias RepeatContext =
     { item : Value
     , index : Int
+    , basePath : String
     }
 
 

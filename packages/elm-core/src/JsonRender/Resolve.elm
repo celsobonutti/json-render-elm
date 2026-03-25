@@ -34,6 +34,7 @@ type ResolvedValue
 type alias RepeatContext =
     { item : Value
     , index : Int
+    , basePath : String
     }
 
 
@@ -76,12 +77,16 @@ resolvePropValue state repeatCtx prop =
         ItemExpr field ->
             case repeatCtx of
                 Just ctx ->
-                    case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
-                        Ok val ->
-                            jsonValueToResolved val
+                    if field == "" then
+                        jsonValueToResolved ctx.item
 
-                        Err _ ->
-                            RNull
+                    else
+                        case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
+                            Ok val ->
+                                jsonValueToResolved val
+
+                            Err _ ->
+                                RNull
 
                 Nothing ->
                     RNull
@@ -103,12 +108,16 @@ resolvePropValue state repeatCtx prop =
         BindItemExpr field ->
             case repeatCtx of
                 Just ctx ->
-                    case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
-                        Ok val ->
-                            jsonValueToResolved val
+                    if field == "" then
+                        jsonValueToResolved ctx.item
 
-                        Err _ ->
-                            RNull
+                    else
+                        case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
+                            Ok val ->
+                                jsonValueToResolved val
+
+                            Err _ ->
+                                RNull
 
                 Nothing ->
                     RNull
