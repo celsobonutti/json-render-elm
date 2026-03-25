@@ -129,6 +129,75 @@ suite =
                         ]
                         resolved
             ]
+        , describe "jsonValueToResolved handles complex types"
+            [ test "$state resolves object to RObject" <|
+                \_ ->
+                    let
+                        props =
+                            Dict.fromList [ ( "user", StateExpr "/user" ) ]
+
+                        resolved =
+                            Resolve.resolveProps state Nothing props
+                    in
+                    Expect.equal
+                        (Just (RObject (Dict.fromList [ ( "name", RString "Alice" ), ( "age", RInt 30 ) ])))
+                        (Dict.get "user" resolved)
+            , test "$state resolves array to RList" <|
+                \_ ->
+                    let
+                        arrayState =
+                            Encode.object
+                                [ ( "tags", Encode.list Encode.string [ "elm", "fp" ] ) ]
+
+                        props =
+                            Dict.fromList [ ( "tags", StateExpr "/tags" ) ]
+
+                        resolved =
+                            Resolve.resolveProps arrayState Nothing props
+                    in
+                    Expect.equal
+                        (Just (RList [ RString "elm", RString "fp" ]))
+                        (Dict.get "tags" resolved)
+            , test "$state resolves nested object/array" <|
+                \_ ->
+                    let
+                        nestedState =
+                            Encode.object
+                                [ ( "data"
+                                  , Encode.object
+                                        [ ( "items", Encode.list Encode.int [ 1, 2, 3 ] ) ]
+                                  )
+                                ]
+
+                        props =
+                            Dict.fromList [ ( "data", StateExpr "/data" ) ]
+
+                        resolved =
+                            Resolve.resolveProps nestedState Nothing props
+                    in
+                    Expect.equal
+                        (Just (RObject (Dict.fromList [ ( "items", RList [ RInt 1, RInt 2, RInt 3 ] ) ])))
+                        (Dict.get "data" resolved)
+            , test "$item resolves object field that is an array" <|
+                \_ ->
+                    let
+                        item =
+                            Encode.object
+                                [ ( "tags", Encode.list Encode.string [ "a", "b" ] ) ]
+
+                        ctx =
+                            Just { item = item, index = 0 }
+
+                        props =
+                            Dict.fromList [ ( "tags", ItemExpr "tags" ) ]
+
+                        resolved =
+                            Resolve.resolveProps state ctx props
+                    in
+                    Expect.equal
+                        (Just (RList [ RString "a", RString "b" ]))
+                        (Dict.get "tags" resolved)
+            ]
         , describe "pipeline decoders"
             [ test "succeed + required decodes props" <|
                 \_ ->

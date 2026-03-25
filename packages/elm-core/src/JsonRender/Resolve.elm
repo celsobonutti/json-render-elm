@@ -128,7 +128,17 @@ jsonValueToResolved value =
                                             RNull
 
                                         Err _ ->
-                                            RNull
+                                            case Decode.decodeValue (Decode.list Decode.value) value of
+                                                Ok items ->
+                                                    RList (List.map jsonValueToResolved items)
+
+                                                Err _ ->
+                                                    case Decode.decodeValue (Decode.keyValuePairs Decode.value) value of
+                                                        Ok pairs ->
+                                                            RObject (Dict.fromList (List.map (\( k, v ) -> ( k, jsonValueToResolved v )) pairs))
+
+                                                        Err _ ->
+                                                            RNull
 
 
 resolveTemplate : Value -> String -> String
