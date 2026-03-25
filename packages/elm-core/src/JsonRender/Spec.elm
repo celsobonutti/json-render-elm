@@ -1,5 +1,7 @@
 module JsonRender.Spec exposing
-    ( Element
+    ( ActionBinding
+    , Element
+    , EventHandler(..)
     , Repeat
     , Spec
     , decoder
@@ -32,6 +34,7 @@ type alias Element =
     , children : List String
     , visible : Maybe VisibilityCondition
     , repeat : Maybe Repeat
+    , on : Dict String EventHandler
     }
 
 
@@ -39,6 +42,17 @@ type alias Repeat =
     { statePath : String
     , key : Maybe String
     }
+
+
+type alias ActionBinding =
+    { action : String
+    , params : Dict String PropValue
+    }
+
+
+type EventHandler
+    = SingleAction ActionBinding
+    | ChainedActions (List ActionBinding)
 
 
 decoder : Decoder Spec
@@ -56,6 +70,7 @@ elementDecoder =
         |> required "children" (Decode.list Decode.string)
         |> optional "visible" (Decode.map Just JsonRender.Visibility.decoder) Nothing
         |> optional "repeat" (Decode.map Just repeatDecoder) Nothing
+        |> optional "on" (Decode.dict eventHandlerDecoder) Dict.empty
 
 
 repeatDecoder : Decoder Repeat
@@ -63,6 +78,21 @@ repeatDecoder =
     Decode.succeed Repeat
         |> required "statePath" Decode.string
         |> optional "key" (Decode.map Just Decode.string) Nothing
+
+
+actionBindingDecoder : Decoder ActionBinding
+actionBindingDecoder =
+    Decode.succeed ActionBinding
+        |> required "action" Decode.string
+        |> optional "params" (Decode.dict PropValue.decoder) Dict.empty
+
+
+eventHandlerDecoder : Decoder EventHandler
+eventHandlerDecoder =
+    Decode.oneOf
+        [ Decode.list actionBindingDecoder |> Decode.map ChainedActions
+        , actionBindingDecoder |> Decode.map SingleAction
+        ]
 
 
 {-| Re-export for convenience.

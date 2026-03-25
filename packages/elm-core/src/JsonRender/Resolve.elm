@@ -1,7 +1,9 @@
 module JsonRender.Resolve exposing
     ( ResolvedValue(..)
     , RepeatContext
+    , resolveActionParams
     , resolveProps
+    , resolvedToValue
     , succeed
     , required
     , optional
@@ -45,6 +47,45 @@ type alias PropsDecoder a =
 resolveProps : Value -> Maybe RepeatContext -> Dict String PropValue -> Dict String ResolvedValue
 resolveProps state repeatCtx props =
     Dict.map (\_ v -> resolvePropValue state repeatCtx v) props
+
+
+{-| Convert a ResolvedValue back to a JSON Value. Inverse of jsonValueToResolved.
+-}
+resolvedToValue : ResolvedValue -> Value
+resolvedToValue resolved =
+    case resolved of
+        RString s ->
+            Encode.string s
+
+        RInt i ->
+            Encode.int i
+
+        RFloat f ->
+            Encode.float f
+
+        RBool b ->
+            Encode.bool b
+
+        RNull ->
+            Encode.null
+
+        RList items ->
+            Encode.list resolvedToValue items
+
+        RObject obj ->
+            obj
+                |> Dict.toList
+                |> List.map (\( k, v ) -> ( k, resolvedToValue v ))
+                |> Encode.object
+
+
+{-| Resolve action params: resolve each PropValue to a JSON Value.
+-}
+resolveActionParams : Value -> Maybe RepeatContext -> Dict String PropValue -> Dict String Value
+resolveActionParams state repeatCtx params =
+    params
+        |> resolveProps state repeatCtx
+        |> Dict.map (\_ v -> resolvedToValue v)
 
 
 resolvePropValue : Value -> Maybe RepeatContext -> PropValue -> ResolvedValue

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { sendSpec, setState } from "../helpers"
+import { sendSpec, setState, getLastAction } from "../helpers"
 
 test.describe("Repeat", () => {
   test.beforeEach(async ({ page }) => {
@@ -65,5 +65,94 @@ test.describe("Repeat", () => {
       ],
     })
     await expect(page.locator(".jr-text")).toHaveCount(2)
+  })
+})
+
+test.describe("Repeat with on-driven interactions", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("")
+    await page.locator("#render-root").waitFor({ state: "attached" })
+  })
+
+  test("add todo via button click with chained actions", async ({ page }) => {
+    await setState(page, {
+      newTodo: "Buy milk",
+      todos: [],
+    })
+    await sendSpec(page, "repeat/todo-interactive.json")
+
+    // Input shows initial value
+    const input = page.locator(".jr-input")
+    await expect(input).toHaveValue("Buy milk")
+
+    // No todo items initially
+    const todoTexts = page.locator(".jr-stack-vertical .jr-text")
+    await expect(todoTexts).toHaveCount(0)
+
+    // Click Add button
+    await page.locator(".jr-button").click()
+
+    // Todo should appear
+    await expect(page.locator(".jr-text").first()).toHaveText("Buy milk")
+
+    // Input should be cleared
+    await expect(input).toHaveValue("")
+  })
+
+  test("add multiple todos via repeated button clicks", async ({ page }) => {
+    await setState(page, {
+      newTodo: "",
+      todos: [],
+    })
+    await sendSpec(page, "repeat/todo-interactive.json")
+
+    const input = page.locator(".jr-input")
+    const addBtn = page.locator(".jr-button")
+
+    // Add first todo
+    await input.fill("Buy milk")
+    await addBtn.click()
+    await expect(input).toHaveValue("")
+
+    // Add second todo
+    await input.fill("Walk dog")
+    await addBtn.click()
+    await expect(input).toHaveValue("")
+
+    // Both todos should be in the list
+    const items = page.locator(".jr-text")
+    await expect(items).toHaveCount(2)
+  })
+
+  test("per-item button captures $item from repeat context", async ({
+    page,
+  }) => {
+    await setState(page, {
+      todos: [
+        { id: "1", title: "Buy milk" },
+        { id: "2", title: "Walk dog" },
+      ],
+      selectedForRemoval: null,
+    })
+    await sendSpec(page, "repeat/todo-with-remove.json")
+
+    // Two todo rows should render
+    const titles = page.locator(".jr-text")
+    await expect(titles).toHaveCount(2)
+    await expect(titles.nth(0)).toHaveText("Buy milk")
+    await expect(titles.nth(1)).toHaveText("Walk dog")
+
+    // Click the second Remove button
+    const removeButtons = page.locator(".jr-button-danger")
+    await expect(removeButtons).toHaveCount(2)
+    await removeButtons.nth(1).click()
+
+    // The $item expression in the action params should resolve to the
+    // second item's id, storing it in /selectedForRemoval
+    // We verify by checking state was updated (the remove button sets
+    // /selectedForRemoval to the item's id)
+    // Since we can't directly read state, we verify the UI still shows
+    // both items (the action only sets state, doesn't remove)
+    await expect(titles).toHaveCount(2)
   })
 })

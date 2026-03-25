@@ -163,5 +163,156 @@ suite =
                         [ \c -> String.contains "module Components.Actions" c |> Expect.equal True
                         , \c -> String.contains "type Action" c |> Expect.equal True
                         , \c -> String.contains "type alias ExportParams" c |> Expect.equal True
+                        , \c -> String.contains "decodeAction" c |> Expect.equal True
+                        ]
+        , test "actions module exposes decodeAction" <|
+            \_ ->
+                ElmCodeGen.actionsModule "Components" testActions
+                    |> String.contains "exposing (Action(..), decodeAction)"
+                    |> Expect.equal True
+        , test "actions module has correct imports" <|
+            \_ ->
+                ElmCodeGen.actionsModule "Components" testActions
+                    |> Expect.all
+                        [ \c -> String.contains "import Dict exposing (Dict)" c |> Expect.equal True
+                        , \c -> String.contains "import Json.Decode as Decode" c |> Expect.equal True
+                        , \c -> String.contains "import Json.Encode exposing (Value)" c |> Expect.equal True
+                        ]
+        , test "generates decodeAction function signature" <|
+            \_ ->
+                ElmCodeGen.decodeActionFunction testActions
+                    |> String.contains "decodeAction : String -> Dict String Value -> Result String Action"
+                    |> Expect.equal True
+        , test "decodeAction has case on name" <|
+            \_ ->
+                ElmCodeGen.decodeActionFunction testActions
+                    |> String.contains "case name of"
+                    |> Expect.equal True
+        , test "decodeAction handles empty params action with Ok" <|
+            \_ ->
+                ElmCodeGen.decodeActionFunction testActions
+                    |> String.contains "\"press\" ->\n            Ok Press"
+                    |> Expect.equal True
+        , test "decodeAction handles parameterized action with Dict.get" <|
+            \_ ->
+                ElmCodeGen.decodeActionFunction testActions
+                    |> String.contains "Dict.get \"format\" params"
+                    |> Expect.equal True
+        , test "decodeAction decodes param value with Decode.decodeValue" <|
+            \_ ->
+                ElmCodeGen.decodeActionFunction testActions
+                    |> String.contains "Decode.decodeValue Decode.string format_raw"
+                    |> Expect.equal True
+        , test "decodeAction constructs record on success" <|
+            \_ ->
+                ElmCodeGen.decodeActionFunction testActions
+                    |> String.contains "Ok (Export { format = format })"
+                    |> Expect.equal True
+        , test "decodeAction has error for wrong type" <|
+            \_ ->
+                ElmCodeGen.decodeActionFunction testActions
+                    |> String.contains "Err \"format must be a String\""
+                    |> Expect.equal True
+        , test "decodeAction has error for missing param" <|
+            \_ ->
+                ElmCodeGen.decodeActionFunction testActions
+                    |> String.contains "Err \"missing required param format\""
+                    |> Expect.equal True
+        , test "decodeAction has catch-all for unknown actions" <|
+            \_ ->
+                ElmCodeGen.decodeActionFunction testActions
+                    |> String.contains "Err (\"Unknown action: \" ++ name)"
+                    |> Expect.equal True
+        , test "decodeAction with multiple params" <|
+            \_ ->
+                let
+                    multiParamAction =
+                        Dict.fromList
+                            [ ( "save"
+                              , { params =
+                                    Dict.fromList
+                                        [ ( "filename", { fieldType = FString, required = True } )
+                                        , ( "overwrite", { fieldType = FBool, required = True } )
+                                        ]
+                                , description = "Save file"
+                                }
+                              )
+                            ]
+                in
+                ElmCodeGen.decodeActionFunction multiParamAction
+                    |> Expect.all
+                        [ \c -> String.contains "Dict.get \"filename\" params" c |> Expect.equal True
+                        , \c -> String.contains "Dict.get \"overwrite\" params" c |> Expect.equal True
+                        , \c -> String.contains "Decode.decodeValue Decode.string filename_raw" c |> Expect.equal True
+                        , \c -> String.contains "Decode.decodeValue Decode.bool overwrite_raw" c |> Expect.equal True
+                        , \c -> String.contains "Ok (Save { filename = filename, overwrite = overwrite })" c |> Expect.equal True
+                        ]
+        , test "decodeAction with optional params uses let binding" <|
+            \_ ->
+                let
+                    optionalParamAction =
+                        Dict.fromList
+                            [ ( "notify"
+                              , { params =
+                                    Dict.fromList
+                                        [ ( "message", { fieldType = FString, required = True } )
+                                        , ( "channel", { fieldType = FString, required = False } )
+                                        ]
+                                , description = "Send notification"
+                                }
+                              )
+                            ]
+                in
+                ElmCodeGen.decodeActionFunction optionalParamAction
+                    |> Expect.all
+                        [ \c -> String.contains "Dict.get \"message\" params" c |> Expect.equal True
+                        , \c -> String.contains "channel =\n" c |> Expect.equal True
+                        , \c -> String.contains "Maybe.andThen" c |> Expect.equal True
+                        , \c -> String.contains "Result.toMaybe" c |> Expect.equal True
+                        ]
+        , test "decodeAction with integer param uses Decode.int" <|
+            \_ ->
+                let
+                    intParamAction =
+                        Dict.fromList
+                            [ ( "resize"
+                              , { params =
+                                    Dict.fromList
+                                        [ ( "width", { fieldType = FInt, required = True } ) ]
+                                , description = "Resize"
+                                }
+                              )
+                            ]
+                in
+                ElmCodeGen.decodeActionFunction intParamAction
+                    |> Expect.all
+                        [ \c -> String.contains "Decode.decodeValue Decode.int width_raw" c |> Expect.equal True
+                        , \c -> String.contains "width must be a Int" c |> Expect.equal True
+                        ]
+        , test "decodeAction with no actions produces NoAction type and catch-all only" <|
+            \_ ->
+                let
+                    emptyActions =
+                        Dict.empty
+                in
+                ElmCodeGen.decodeActionFunction emptyActions
+                    |> Expect.all
+                        [ \c -> String.contains "case name of" c |> Expect.equal True
+                        , \c -> String.contains "Err (\"Unknown action: \" ++ name)" c |> Expect.equal True
+                        ]
+        , test "actions module with only empty-param actions has no params type aliases" <|
+            \_ ->
+                let
+                    onlyEmptyActions =
+                        Dict.fromList
+                            [ ( "press", pressAction )
+                            , ( "click", { params = Dict.empty, description = "Click" } )
+                            ]
+                in
+                ElmCodeGen.actionsModule "Components" onlyEmptyActions
+                    |> Expect.all
+                        [ \c -> String.contains "type alias" c |> Expect.equal False
+                        , \c -> String.contains "Ok Press" c |> Expect.equal True
+                        , \c -> String.contains "Ok Click" c |> Expect.equal True
                         ]
         ]

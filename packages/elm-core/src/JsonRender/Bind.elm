@@ -9,18 +9,17 @@ setter functions instead of prop values.
 
 import Dict exposing (Dict)
 import Json.Encode exposing (Value)
-import JsonRender.Actions exposing (Msg)
 
 
 {-| A function that decodes a raw bindings dict into a typed bindings record.
 -}
-type alias BindingsDecoder action a =
-    Dict String (Value -> Msg action) -> a
+type alias BindingsDecoder msg a =
+    Dict String (Value -> msg) -> a
 
 
 {-| Start a bindings decoder pipeline.
 -}
-succeed : a -> BindingsDecoder action a
+succeed : a -> BindingsDecoder msg a
 succeed a _ =
     a
 
@@ -31,6 +30,6 @@ Returns `Just setter` if the prop had a `$bindState` or `$bindItem` expression,
 `Nothing` otherwise.
 
 -}
-bindable : String -> BindingsDecoder action (Maybe (Value -> Msg action) -> b) -> BindingsDecoder action b
+bindable : String -> BindingsDecoder msg (Maybe (Value -> msg) -> b) -> BindingsDecoder msg b
 bindable key prev dict =
     prev dict (Dict.get key dict)

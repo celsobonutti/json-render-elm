@@ -1,0 +1,55 @@
+{
+  "root": "app",
+  "elements": {
+    "app": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["add-section", "list"]
+    },
+    "add-section": {
+      "type": "Stack",
+      "props": { "direction": "horizontal" },
+      "children": ["input", "add-btn"]
+    },
+    "input": {
+      "type": "Input",
+      "props": {
+        "value": { "$bindState": "/newTodo" },
+        "label": "New Todo",
+        "placeholder": "What needs to be done?"
+      },
+      "children": []
+    },
+    "add-btn": {
+      "type": "Button",
+      "props": { "label": "Add" },
+      "children": [],
+      "on": {
+        "press": [
+          {
+            "action": "pushState",
+            "params": {
+              "path": "/todos",
+              "value": { "$state": "/newTodo" }
+            }
+          },
+          {
+            "action": "setState",
+            "params": { "path": "/newTodo", "value": "" }
+          }
+        ]
+      }
+    },
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["todo-text"],
+      "repeat": { "statePath": "/todos" }
+    },
+    "todo-text": {
+      "type": "Text",
+      "props": { "content": { "$item": "" } },
+      "children": []
+    }
+  }
+}

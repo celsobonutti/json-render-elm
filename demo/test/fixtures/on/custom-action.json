@@ -1,0 +1,16 @@
+{
+  "root": "btn",
+  "elements": {
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Fire Custom" },
+      "children": [],
+      "on": {
+        "press": {
+          "action": "press",
+          "params": {}
+        }
+      }
+    }
+  }
+}

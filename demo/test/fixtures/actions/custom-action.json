@@ -4,7 +4,10 @@
     "btn-1": {
       "type": "Button",
       "props": { "label": "Submit" },
-      "children": []
+      "children": [],
+      "on": {
+        "press": { "action": "press", "params": {} }
+      }
     }
   }
 }

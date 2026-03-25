@@ -1,10 +1,8 @@
 module Components.Image exposing (ImageProps, component, propsDecoder)
 
-import Components.Actions exposing (Action)
 import Dict exposing (Dict)
 import Html exposing (Html, img)
 import Html.Attributes exposing (alt, class, src)
-import JsonRender.Actions exposing (Msg)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -22,12 +20,12 @@ propsDecoder =
         |> ResolvedValue.required "src" ResolvedValue.string
 
 
-component : Component Action
+component : Component msg
 component =
     register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext ImageProps () Action -> Html (Msg Action)
+view : ComponentContext ImageProps () msg -> Html msg
 view ctx =
     img
         [ src ctx.props.src

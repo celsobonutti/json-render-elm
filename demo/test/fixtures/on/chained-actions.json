@@ -1,0 +1,49 @@
+{
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["input", "btn", "list", "loading-text"]
+    },
+    "input": {
+      "type": "Input",
+      "props": {
+        "value": { "$bindState": "/newTodo" },
+        "label": "New Todo",
+        "placeholder": "Enter a todo"
+      },
+      "children": []
+    },
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Add Todo" },
+      "children": [],
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "path": "/loading", "value": true } },
+          { "action": "pushState", "params": { "path": "/todos", "value": { "$state": "/newTodo" } } },
+          { "action": "setState", "params": { "path": "/newTodo", "value": "" } },
+          { "action": "setState", "params": { "path": "/loading", "value": false } }
+        ]
+      }
+    },
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["todo-item"],
+      "repeat": { "statePath": "/todos" }
+    },
+    "todo-item": {
+      "type": "Text",
+      "props": { "content": { "$item": "" } },
+      "children": []
+    },
+    "loading-text": {
+      "type": "Text",
+      "props": { "content": "Loading..." },
+      "children": [],
+      "visible": { "truthy": "/loading" }
+    }
+  }
+}

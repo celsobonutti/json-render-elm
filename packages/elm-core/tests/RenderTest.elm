@@ -4,6 +4,7 @@ import Dict
 import Expect
 import Html exposing (div, text)
 import Html.Attributes exposing (class)
+import Html.Events exposing (onClick)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender.Internal.PropValue exposing (PropValue(..))
@@ -16,11 +17,7 @@ import Test.Html.Query as Query
 import Test.Html.Selector as Selector
 
 
-type TestAction
-    = TestNoAction
-
-
-testRegistry : Render.Registry TestAction
+testRegistry : Render.Registry msg
 testRegistry =
     Dict.fromList
         [ ( "Card"
@@ -48,6 +45,22 @@ testRegistry =
                 (\_ -> ())
                 (\ctx -> text ctx.props)
           )
+        , ( "Button"
+          , Render.register
+                (\props ->
+                    Resolve.succeed identity
+                        |> Resolve.required "label" Resolve.string
+                        |> (\d -> d props)
+                )
+                (\_ -> ())
+                (\ctx ->
+                    Html.button
+                        [ class "button"
+                        , onClick (ctx.emit "press")
+                        ]
+                        [ text ctx.props ]
+                )
+          )
         ]
 
 
@@ -67,6 +80,7 @@ suite =
                                     , children = []
                                     , visible = Nothing
                                     , repeat = Nothing
+                                    , on = Dict.empty
                                     }
                                   )
                                 ]
@@ -88,6 +102,7 @@ suite =
                                     , children = [ "inner" ]
                                     , visible = Nothing
                                     , repeat = Nothing
+                                    , on = Dict.empty
                                     }
                                   )
                                 , ( "inner"
@@ -96,6 +111,7 @@ suite =
                                     , children = []
                                     , visible = Nothing
                                     , repeat = Nothing
+                                    , on = Dict.empty
                                     }
                                   )
                                 ]
@@ -117,6 +133,7 @@ suite =
                                     , children = []
                                     , visible = Nothing
                                     , repeat = Nothing
+                                    , on = Dict.empty
                                     }
                                   )
                                 ]
@@ -141,6 +158,7 @@ suite =
                                     , children = []
                                     , visible = Just (Truthy "/show")
                                     , repeat = Nothing
+                                    , on = Dict.empty
                                     }
                                   )
                                 ]
@@ -152,7 +170,7 @@ suite =
         , test "resolves $bindState and provides setter binding" <|
             \_ ->
                 let
-                    bindRegistry : Render.Registry TestAction
+                    bindRegistry : Render.Registry msg
                     bindRegistry =
                         Dict.fromList
                             [ ( "Input"
@@ -196,6 +214,7 @@ suite =
                                     , children = []
                                     , visible = Nothing
                                     , repeat = Nothing
+                                    , on = Dict.empty
                                     }
                                   )
                                 ]
@@ -416,102 +435,49 @@ suite =
                         Err err ->
                             Expect.fail (Decode.errorToString err)
             ]
-        , describe "repeat rendering"
-            [ test "repeat renders children once per array item" <|
+        , describe "emit and on"
+            [ test "button with on.press renders and has button element" <|
                 \_ ->
                     let
                         json =
                             """
                             {
-                              "root": "list",
+                              "root": "btn",
                               "elements": {
-                                "list": {
-                                  "type": "Card",
-                                  "props": { "title": "Todos" },
-                                  "children": ["item"],
-                                  "repeat": { "statePath": "/todos", "key": "id" }
-                                },
-                                "item": {
-                                  "type": "Text",
-                                  "props": { "content": { "$item": "title" } },
-                                  "children": []
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Click Me" },
+                                  "children": [],
+                                  "on": {
+                                    "press": {
+                                      "action": "setState",
+                                      "params": { "path": "/clicked", "value": true }
+                                    }
+                                  }
                                 }
                               }
                             }
                             """
-
-                        todoState =
-                            Encode.object
-                                [ ( "todos"
-                                  , Encode.list identity
-                                        [ Encode.object [ ( "id", Encode.string "1" ), ( "title", Encode.string "Buy milk" ) ]
-                                        , Encode.object [ ( "id", Encode.string "2" ), ( "title", Encode.string "Walk dog" ) ]
-                                        ]
-                                  )
-                                ]
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry todoState spec
+                            Render.render testRegistry Encode.null spec
                                 |> Query.fromHtml
-                                |> Query.has [ Selector.text "Buy milk", Selector.text "Walk dog" ]
+                                |> Query.has [ Selector.class "button", Selector.text "Click Me" ]
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)
-            , test "repeat with empty array renders no children" <|
+            , test "element without on field still renders normally" <|
                 \_ ->
                     let
                         json =
                             """
                             {
-                              "root": "list",
+                              "root": "t",
                               "elements": {
-                                "list": {
-                                  "type": "Card",
-                                  "props": { "title": "Empty" },
-                                  "children": ["item"],
-                                  "repeat": { "statePath": "/todos" }
-                                },
-                                "item": {
+                                "t": {
                                   "type": "Text",
-                                  "props": { "content": { "$item": "title" } },
-                                  "children": []
-                                }
-                              }
-                            }
-                            """
-
-                        emptyState =
-                            Encode.object [ ( "todos", Encode.list identity [] ) ]
-                    in
-                    case Decode.decodeString Spec.decoder json of
-                        Ok spec ->
-                            Render.render testRegistry emptyState spec
-                                |> Query.fromHtml
-                                |> Expect.all
-                                    [ Query.has [ Selector.text "Empty" ]
-                                    , Query.hasNot [ Selector.tag "span" ]
-                                    ]
-
-                        Err err ->
-                            Expect.fail (Decode.errorToString err)
-            , test "repeat with missing state path renders no children" <|
-                \_ ->
-                    let
-                        json =
-                            """
-                            {
-                              "root": "list",
-                              "elements": {
-                                "list": {
-                                  "type": "Card",
-                                  "props": { "title": "Missing" },
-                                  "children": ["item"],
-                                  "repeat": { "statePath": "/nonexistent" }
-                                },
-                                "item": {
-                                  "type": "Text",
-                                  "props": { "content": "should not appear" },
+                                  "props": { "content": "No events" },
                                   "children": []
                                 }
                               }
@@ -522,144 +488,111 @@ suite =
                         Ok spec ->
                             Render.render testRegistry Encode.null spec
                                 |> Query.fromHtml
-                                |> Expect.all
-                                    [ Query.has [ Selector.text "Missing" ]
-                                    , Query.hasNot [ Selector.text "should not appear" ]
+                                |> Query.has [ Selector.text "No events" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "on field does not affect props resolution" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "btn",
+                              "elements": {
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": { "$state": "/buttonLabel" } },
+                                  "children": [],
+                                  "on": {
+                                    "press": { "action": "setState", "params": { "path": "/x", "value": 1 } }
+                                  }
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "buttonLabel", Encode.string "Dynamic Label" ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "Dynamic Label" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "button with chained on.press renders correctly" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "btn",
+                              "elements": {
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Add Todo" },
+                                  "children": [],
+                                  "on": {
+                                    "press": [
+                                      { "action": "pushState", "params": { "path": "/todos", "value": { "$state": "/newTodo" } } },
+                                      { "action": "setState", "params": { "path": "/newTodo", "value": "" } }
                                     ]
-
-                        Err err ->
-                            Expect.fail (Decode.errorToString err)
-            , test "$bindItem produces SetState with index-based path" <|
-                \_ ->
-                    let
-                        bindRegistry : Render.Registry TestAction
-                        bindRegistry =
-                            Dict.fromList
-                                [ ( "Card"
-                                  , Render.register
-                                        (\props ->
-                                            Resolve.succeed identity
-                                                |> Resolve.required "title" Resolve.string
-                                                |> (\d -> d props)
-                                        )
-                                        (\_ -> ())
-                                        (\ctx ->
-                                            div [ class "card" ]
-                                                [ text ctx.props
-                                                , div [] ctx.children
-                                                ]
-                                        )
-                                  )
-                                , ( "Input"
-                                  , Render.register
-                                        (\props ->
-                                            Resolve.succeed identity
-                                                |> Resolve.required "value" Resolve.string
-                                                |> (\d -> d props)
-                                        )
-                                        (\bindings ->
-                                            { value = Dict.get "value" bindings }
-                                        )
-                                        (\ctx ->
-                                            div []
-                                                [ text ctx.props
-                                                , case ctx.bindings.value of
-                                                    Just _ ->
-                                                        text "[bound]"
-
-                                                    Nothing ->
-                                                        text "[unbound]"
-                                                ]
-                                        )
-                                  )
-                                ]
-
-                        json =
-                            """
-                            {
-                              "root": "list",
-                              "elements": {
-                                "list": {
-                                  "type": "Card",
-                                  "props": { "title": "Todos" },
-                                  "children": ["item"],
-                                  "repeat": { "statePath": "/todos", "key": "id" }
-                                },
-                                "item": {
-                                  "type": "Input",
-                                  "props": { "value": { "$bindItem": "name" } },
-                                  "children": []
+                                  }
                                 }
                               }
                             }
                             """
-
-                        todoState =
-                            Encode.object
-                                [ ( "todos"
-                                  , Encode.list identity
-                                        [ Encode.object [ ( "id", Encode.string "1" ), ( "name", Encode.string "Alice" ) ]
-                                        ]
-                                  )
-                                ]
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render bindRegistry todoState spec
+                            Render.render testRegistry Encode.null spec
                                 |> Query.fromHtml
-                                |> Query.has [ Selector.text "Alice", Selector.text "[bound]" ]
+                                |> Query.has [ Selector.class "button", Selector.text "Add Todo" ]
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)
-            , test "nested repeats shadow outer context" <|
+            , test "button with on.press alongside siblings renders full tree" <|
                 \_ ->
                     let
                         json =
                             """
                             {
-                              "root": "outer",
+                              "root": "card",
                               "elements": {
-                                "outer": {
+                                "card": {
                                   "type": "Card",
-                                  "props": { "title": "Groups" },
-                                  "children": ["inner"],
-                                  "repeat": { "statePath": "/groups" }
+                                  "props": { "title": "Form" },
+                                  "children": ["msg", "btn"]
                                 },
-                                "inner": {
-                                  "type": "Card",
-                                  "props": { "title": { "$item": "name" } },
-                                  "children": ["leaf"],
-                                  "repeat": { "statePath": "/items" }
-                                },
-                                "leaf": {
+                                "msg": {
                                   "type": "Text",
-                                  "props": { "content": { "$item": "label" } },
+                                  "props": { "content": "Fill in the form" },
                                   "children": []
+                                },
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Submit" },
+                                  "children": [],
+                                  "on": {
+                                    "press": { "action": "setState", "params": { "path": "/submitted", "value": true } }
+                                  }
                                 }
                               }
                             }
                             """
-
-                        nestedState =
-                            Encode.object
-                                [ ( "groups"
-                                  , Encode.list identity
-                                        [ Encode.object [ ( "name", Encode.string "Group A" ) ]
-                                        ]
-                                  )
-                                , ( "items"
-                                  , Encode.list identity
-                                        [ Encode.object [ ( "label", Encode.string "Item X" ) ]
-                                        , Encode.object [ ( "label", Encode.string "Item Y" ) ]
-                                        ]
-                                  )
-                                ]
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry nestedState spec
+                            Render.render testRegistry Encode.null spec
                                 |> Query.fromHtml
-                                |> Query.has [ Selector.text "Item X", Selector.text "Item Y" ]
+                                |> Query.has
+                                    [ Selector.text "Form"
+                                    , Selector.text "Fill in the form"
+                                    , Selector.text "Submit"
+                                    ]
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)

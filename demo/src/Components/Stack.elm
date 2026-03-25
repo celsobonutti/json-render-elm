@@ -1,10 +1,8 @@
 module Components.Stack exposing (StackProps, component, propsDecoder)
 
-import Components.Actions exposing (Action)
 import Dict exposing (Dict)
 import Html exposing (Html, div)
 import Html.Attributes exposing (class, style)
-import JsonRender.Actions exposing (Msg)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -22,12 +20,12 @@ propsDecoder =
         |> ResolvedValue.optional "gap" ResolvedValue.int Nothing
 
 
-component : Component Action
+component : Component msg
 component =
     register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext StackProps () Action -> Html (Msg Action)
+view : ComponentContext StackProps () msg -> Html msg
 view ctx =
     let
         dirClass =

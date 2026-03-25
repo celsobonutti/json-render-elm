@@ -2,6 +2,7 @@ module JsonRender.Internal.TypeMapping exposing
     ( capitalizeFirst
     , enumTypeDeclaration
     , toElmType
+    , toJsonDecoder
     , toResolvedValueExtractor
     )
 
@@ -34,6 +35,34 @@ toElmType fieldType =
 
         FObject _ ->
             "Value"
+
+
+toJsonDecoder : FieldType -> String
+toJsonDecoder fieldType =
+    case fieldType of
+        FString ->
+            "Decode.string"
+
+        FInt ->
+            "Decode.int"
+
+        FFloat ->
+            "Decode.float"
+
+        FBool ->
+            "Decode.bool"
+
+        FNullable inner ->
+            "(Decode.nullable " ++ toJsonDecoder inner ++ ")"
+
+        FList inner ->
+            "(Decode.list " ++ toJsonDecoder inner ++ ")"
+
+        FEnum _ ->
+            "Decode.string"
+
+        FObject _ ->
+            "Decode.value"
 
 
 toResolvedValueExtractor : FieldType -> String

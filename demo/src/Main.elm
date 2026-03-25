@@ -1,8 +1,9 @@
 port module Main exposing (main)
 
 import Browser
-import Components.Actions exposing (Action(..))
+import Components.Actions exposing (Action(..), decodeAction)
 import Components.Registry exposing (registry)
+import Dict
 import Html exposing (Html, button, div, h1, p, pre, span, text, textarea)
 import Html.Attributes exposing (class, disabled, placeholder, rows, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
@@ -136,12 +137,18 @@ update msg model =
                     { spec = model.spec, state = model.renderState }
 
                 ( newActionsModel, cmd ) =
-                    Actions.update handleAction actionMsg actionsModel
+                    Actions.update actionConfig actionMsg actionsModel
             in
             ( { model | renderState = newActionsModel.state }
             , Cmd.map JsonRenderMsg cmd
             )
 
+
+actionConfig : Actions.ActionConfig Action
+actionConfig =
+    { handleAction = handleAction
+    , decodeAction = decodeAction
+    }
 
 
 handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )

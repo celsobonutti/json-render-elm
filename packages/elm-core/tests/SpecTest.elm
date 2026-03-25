@@ -4,7 +4,7 @@ import Dict
 import Expect
 import Json.Decode as Decode
 import JsonRender.Internal.PropValue exposing (PropValue(..))
-import JsonRender.Spec as Spec
+import JsonRender.Spec as Spec exposing (EventHandler(..))
 import Test exposing (..)
 
 
@@ -242,116 +242,6 @@ suite =
 
                     Err err ->
                         Expect.fail (Decode.errorToString err)
-        , test "decodes $bindItem expression" <|
-            \_ ->
-                let
-                    json =
-                        """
-                        {
-                          "root": "t",
-                          "elements": {
-                            "t": {
-                              "type": "Input",
-                              "props": { "checked": { "$bindItem": "completed" } },
-                              "children": []
-                            }
-                          }
-                        }
-                        """
-                in
-                case Decode.decodeString Spec.decoder json of
-                    Ok spec ->
-                        case Dict.get "t" spec.elements of
-                            Just el ->
-                                Expect.equal
-                                    (Just (BindItemExpr "completed"))
-                                    (Dict.get "checked" el.props)
-
-                            Nothing ->
-                                Expect.fail "element not found"
-
-                    Err err ->
-                        Expect.fail (Decode.errorToString err)
-        , test "decodes element with repeat field (statePath + key)" <|
-            \_ ->
-                let
-                    json =
-                        """
-                        {
-                          "root": "list",
-                          "elements": {
-                            "list": {
-                              "type": "Stack",
-                              "props": { "direction": "vertical" },
-                              "children": ["item"],
-                              "repeat": { "statePath": "/todos", "key": "id" }
-                            },
-                            "item": {
-                              "type": "Text",
-                              "props": { "content": { "$item": "title" } },
-                              "children": []
-                            }
-                          }
-                        }
-                        """
-                in
-                case Decode.decodeString Spec.decoder json of
-                    Ok spec ->
-                        case Dict.get "list" spec.elements of
-                            Just el ->
-                                Expect.equal
-                                    (Just { statePath = "/todos", key = Just "id" })
-                                    el.repeat
-
-                            Nothing ->
-                                Expect.fail "element not found"
-
-                    Err err ->
-                        Expect.fail (Decode.errorToString err)
-        , test "decodes element with repeat field (statePath only, no key)" <|
-            \_ ->
-                let
-                    json =
-                        """
-                        {
-                          "root": "list",
-                          "elements": {
-                            "list": {
-                              "type": "Stack",
-                              "props": {},
-                              "children": [],
-                              "repeat": { "statePath": "/items" }
-                            }
-                          }
-                        }
-                        """
-                in
-                case Decode.decodeString Spec.decoder json of
-                    Ok spec ->
-                        case Dict.get "list" spec.elements of
-                            Just el ->
-                                Expect.equal
-                                    (Just { statePath = "/items", key = Nothing })
-                                    el.repeat
-
-                            Nothing ->
-                                Expect.fail "element not found"
-
-                    Err err ->
-                        Expect.fail (Decode.errorToString err)
-        , test "element without repeat decodes as Nothing" <|
-            \_ ->
-                case Decode.decodeString Spec.decoder specJson of
-                    Ok spec ->
-                        case Dict.get "card-1" spec.elements of
-                            Just el ->
-                                Expect.equal Nothing el.repeat
-
-                            Nothing ->
-                                Expect.fail "element not found"
-
-                    Err err ->
-                        Expect.fail (Decode.errorToString err)
         , test "decodes a complex multi-element spec" <|
             \_ ->
                 let
@@ -411,4 +301,267 @@ suite =
 
                     Err err ->
                         Expect.fail (Decode.errorToString err)
+        , describe "on field"
+            [ test "decodes element with on field containing single action" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "btn",
+                              "elements": {
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Click" },
+                                  "children": [],
+                                  "on": {
+                                    "press": {
+                                      "action": "setState",
+                                      "params": { "path": "/clicked", "value": true }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "btn" spec.elements of
+                                Just el ->
+                                    case Dict.get "press" el.on of
+                                        Just (SingleAction binding) ->
+                                            Expect.all
+                                                [ \b -> Expect.equal "setState" b.action
+                                                , \b -> Expect.equal (Just (StringValue "/clicked")) (Dict.get "path" b.params)
+                                                , \b -> Expect.equal (Just (BoolValue True)) (Dict.get "value" b.params)
+                                                ]
+                                                binding
+
+                                        Just (ChainedActions _) ->
+                                            Expect.fail "expected SingleAction, got ChainedActions"
+
+                                        Nothing ->
+                                            Expect.fail "press handler not found"
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "decodes element with on field containing chained actions array" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "btn",
+                              "elements": {
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Add" },
+                                  "children": [],
+                                  "on": {
+                                    "press": [
+                                      { "action": "setState", "params": { "path": "/loading", "value": true } },
+                                      { "action": "pushState", "params": { "path": "/items", "value": "new" } }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "btn" spec.elements of
+                                Just el ->
+                                    case Dict.get "press" el.on of
+                                        Just (ChainedActions bindings) ->
+                                            Expect.all
+                                                [ \bs -> Expect.equal 2 (List.length bs)
+                                                , \bs ->
+                                                    case List.head bs of
+                                                        Just first ->
+                                                            Expect.equal "setState" first.action
+
+                                                        Nothing ->
+                                                            Expect.fail "empty chain"
+                                                , \bs ->
+                                                    case List.drop 1 bs |> List.head of
+                                                        Just second ->
+                                                            Expect.equal "pushState" second.action
+
+                                                        Nothing ->
+                                                            Expect.fail "missing second action"
+                                                ]
+                                                bindings
+
+                                        Just (SingleAction _) ->
+                                            Expect.fail "expected ChainedActions, got SingleAction"
+
+                                        Nothing ->
+                                            Expect.fail "press handler not found"
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "decodes element with on containing expression params" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "btn",
+                              "elements": {
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Push" },
+                                  "children": [],
+                                  "on": {
+                                    "press": {
+                                      "action": "pushState",
+                                      "params": {
+                                        "path": "/items",
+                                        "value": { "$state": "/newItem" }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "btn" spec.elements of
+                                Just el ->
+                                    case Dict.get "press" el.on of
+                                        Just (SingleAction binding) ->
+                                            Expect.all
+                                                [ \b -> Expect.equal "pushState" b.action
+                                                , \b -> Expect.equal (Just (StringValue "/items")) (Dict.get "path" b.params)
+                                                , \b -> Expect.equal (Just (StateExpr "/newItem")) (Dict.get "value" b.params)
+                                                ]
+                                                binding
+
+                                        _ ->
+                                            Expect.fail "expected SingleAction with expression param"
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "decodes element without on field as empty dict" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": { "content": "Hello" },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "t" spec.elements of
+                                Just el ->
+                                    Expect.equal Dict.empty el.on
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "decodes on field with multiple event handlers" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "inp",
+                              "elements": {
+                                "inp": {
+                                  "type": "Input",
+                                  "props": { "value": "test" },
+                                  "children": [],
+                                  "on": {
+                                    "change": { "action": "setState", "params": { "path": "/val", "value": "x" } },
+                                    "submit": { "action": "setState", "params": { "path": "/submitted", "value": true } }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "inp" spec.elements of
+                                Just el ->
+                                    Expect.all
+                                        [ \e -> Expect.equal 2 (Dict.size e.on)
+                                        , \e -> Expect.notEqual Nothing (Dict.get "change" e.on)
+                                        , \e -> Expect.notEqual Nothing (Dict.get "submit" e.on)
+                                        ]
+                                        el
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "decodes on field with $item expression in params" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "btn",
+                              "elements": {
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Remove" },
+                                  "children": [],
+                                  "on": {
+                                    "press": {
+                                      "action": "removeState",
+                                      "params": {
+                                        "path": { "$template": "/todos/${/currentIndex}" }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "btn" spec.elements of
+                                Just el ->
+                                    case Dict.get "press" el.on of
+                                        Just (SingleAction binding) ->
+                                            Expect.equal
+                                                (Just (TemplateExpr "/todos/${/currentIndex}"))
+                                                (Dict.get "path" binding.params)
+
+                                        _ ->
+                                            Expect.fail "expected SingleAction"
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            ]
         ]

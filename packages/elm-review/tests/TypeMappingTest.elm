@@ -1,5 +1,6 @@
 module TypeMappingTest exposing (..)
 
+import Dict
 import Expect
 import JsonRender.Internal.SchemaParser exposing (FieldType(..))
 import JsonRender.Internal.TypeMapping as TypeMapping
@@ -45,4 +46,36 @@ suite =
             \_ ->
                 TypeMapping.toResolvedValueExtractor FString
                     |> Expect.equal "ResolvedValue.string"
+        , test "toJsonDecoder maps string to Decode.string" <|
+            \_ ->
+                TypeMapping.toJsonDecoder FString
+                    |> Expect.equal "Decode.string"
+        , test "toJsonDecoder maps integer to Decode.int" <|
+            \_ ->
+                TypeMapping.toJsonDecoder FInt
+                    |> Expect.equal "Decode.int"
+        , test "toJsonDecoder maps number to Decode.float" <|
+            \_ ->
+                TypeMapping.toJsonDecoder FFloat
+                    |> Expect.equal "Decode.float"
+        , test "toJsonDecoder maps boolean to Decode.bool" <|
+            \_ ->
+                TypeMapping.toJsonDecoder FBool
+                    |> Expect.equal "Decode.bool"
+        , test "toJsonDecoder maps nullable to Decode.nullable" <|
+            \_ ->
+                TypeMapping.toJsonDecoder (FNullable FString)
+                    |> Expect.equal "(Decode.nullable Decode.string)"
+        , test "toJsonDecoder maps list to Decode.list" <|
+            \_ ->
+                TypeMapping.toJsonDecoder (FList FInt)
+                    |> Expect.equal "(Decode.list Decode.int)"
+        , test "toJsonDecoder maps enum to Decode.string" <|
+            \_ ->
+                TypeMapping.toJsonDecoder (FEnum [ "a", "b" ])
+                    |> Expect.equal "Decode.string"
+        , test "toJsonDecoder maps object to Decode.value" <|
+            \_ ->
+                TypeMapping.toJsonDecoder (FObject Dict.empty)
+                    |> Expect.equal "Decode.value"
         ]

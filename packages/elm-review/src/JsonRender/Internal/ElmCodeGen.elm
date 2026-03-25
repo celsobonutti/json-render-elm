@@ -5,13 +5,14 @@ module JsonRender.Internal.ElmCodeGen exposing
     , bindingsDecoder
     , bindingsTypeAlias
     , componentModule
+    , decodeActionFunction
     , propsDecoder
     , propsTypeAlias
     , registryModule
     )
 
 import Dict exposing (Dict)
-import JsonRender.Internal.SchemaParser exposing (ActionSchema, ComponentSchema)
+import JsonRender.Internal.SchemaParser as SchemaParser exposing (ActionSchema, ComponentSchema)
 import JsonRender.Internal.TypeMapping as TypeMapping
 
 
@@ -233,6 +234,150 @@ actionType actions =
                 ++ "\n"
 
 
+decodeActionFunction : Dict String ActionSchema -> String
+decodeActionFunction actions =
+    let
+        sortedActions =
+            Dict.toList actions
+                |> List.sortBy Tuple.first
+
+        branches =
+            List.map actionBranch sortedActions
+
+        catchAll =
+            "        _ ->\n            Err (\"Unknown action: \" ++ name)"
+
+        allBranches =
+            branches ++ [ catchAll ]
+    in
+    "decodeAction : String -> Dict String Value -> Result String Action\n"
+        ++ "decodeAction name params =\n"
+        ++ "    case name of\n"
+        ++ String.join "\n\n" allBranches
+
+
+actionBranch : ( String, ActionSchema ) -> String
+actionBranch ( name, schema ) =
+    let
+        capitalName =
+            TypeMapping.capitalizeFirst name
+
+        sortedParams =
+            Dict.toList schema.params
+                |> List.sortBy Tuple.first
+                |> List.filter (\( _, field ) -> field.required)
+
+        optionalParams =
+            Dict.toList schema.params
+                |> List.sortBy Tuple.first
+                |> List.filter (\( _, field ) -> not field.required)
+    in
+    if Dict.isEmpty schema.params then
+        "        \"" ++ name ++ "\" ->\n            Ok " ++ capitalName
+
+    else
+        let
+            allParams =
+                sortedParams ++ optionalParams
+
+            paramNames =
+                List.map Tuple.first allParams
+
+            recordFields =
+                List.map
+                    (\( pName, _ ) -> pName ++ " = " ++ pName)
+                    allParams
+                    |> String.join ", "
+
+            successExpr =
+                "Ok (" ++ capitalName ++ " { " ++ recordFields ++ " })"
+        in
+        "        \""
+            ++ name
+            ++ "\" ->\n"
+            ++ nestedParamDecoding allParams successExpr 12
+
+
+nestedParamDecoding : List ( String, { a | fieldType : SchemaParser.FieldType, required : Bool } ) -> String -> Int -> String
+nestedParamDecoding params successExpr baseIndent =
+    case params of
+        [] ->
+            indent baseIndent ++ successExpr
+
+        ( pName, field ) :: rest ->
+            let
+                decoderExpr =
+                    TypeMapping.toJsonDecoder field.fieldType
+
+                currentIndent =
+                    indent baseIndent
+
+                innerIndent =
+                    indent (baseIndent + 4)
+
+                innerInnerIndent =
+                    indent (baseIndent + 8)
+            in
+            if field.required then
+                currentIndent
+                    ++ "case Dict.get \""
+                    ++ pName
+                    ++ "\" params of\n"
+                    ++ innerIndent
+                    ++ "Just "
+                    ++ pName
+                    ++ "_raw ->\n"
+                    ++ innerInnerIndent
+                    ++ "case Decode.decodeValue "
+                    ++ decoderExpr
+                    ++ " "
+                    ++ pName
+                    ++ "_raw of\n"
+                    ++ indent (baseIndent + 12)
+                    ++ "Ok "
+                    ++ pName
+                    ++ " ->\n"
+                    ++ nestedParamDecoding rest successExpr (baseIndent + 16)
+                    ++ "\n\n"
+                    ++ indent (baseIndent + 12)
+                    ++ "Err _ ->\n"
+                    ++ indent (baseIndent + 16)
+                    ++ "Err \""
+                    ++ pName
+                    ++ " must be a "
+                    ++ TypeMapping.toElmType field.fieldType
+                    ++ "\"\n\n"
+                    ++ innerIndent
+                    ++ "Nothing ->\n"
+                    ++ innerInnerIndent
+                    ++ "Err \"missing required param "
+                    ++ pName
+                    ++ "\""
+
+            else
+                currentIndent
+                    ++ "let\n"
+                    ++ innerIndent
+                    ++ pName
+                    ++ " =\n"
+                    ++ innerInnerIndent
+                    ++ "Dict.get \""
+                    ++ pName
+                    ++ "\" params\n"
+                    ++ innerInnerIndent
+                    ++ "|> Maybe.andThen (\\raw -> Decode.decodeValue "
+                    ++ decoderExpr
+                    ++ " raw |> Result.toMaybe)\n"
+                    ++ currentIndent
+                    ++ "in\n"
+                    ++ nestedParamDecoding rest successExpr baseIndent
+
+
+indent : Int -> String
+indent n =
+    String.repeat n " "
+
+
 actionsModule : String -> Dict String ActionSchema -> String
 actionsModule namespace actions =
     let
@@ -255,12 +400,22 @@ actionsModule namespace actions =
 
                 _ ->
                     String.join "\n\n\n" paramsTypes ++ "\n\n\n"
+
+        imports =
+            "import Dict exposing (Dict)\n"
+                ++ "import Json.Decode as Decode\n"
+                ++ "import Json.Encode exposing (Value)\n"
     in
     "module "
         ++ namespace
-        ++ ".Actions exposing (Action(..))\n\n\n"
+        ++ ".Actions exposing (Action(..), decodeAction)\n\n"
+        ++ imports
+        ++ "\n\n"
         ++ paramsTypesStr
         ++ actionType actions
+        ++ "\n\n"
+        ++ decodeActionFunction actions
+        ++ "\n"
 
 
 registryModule : String -> List String -> String

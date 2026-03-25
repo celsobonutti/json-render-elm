@@ -1,12 +1,10 @@
 module Components.Input exposing (InputBindings, InputProps, component, inputBindingsDecoder, propsDecoder)
 
-import Components.Actions exposing (Action)
 import Dict exposing (Dict)
 import Html exposing (Html, div, input, label, text)
 import Html.Attributes exposing (class, placeholder, type_)
 import Html.Events
 import Json.Encode as Encode exposing (Value)
-import JsonRender.Actions exposing (Msg)
 import JsonRender.Bind as Bind
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
@@ -19,10 +17,10 @@ type alias InputProps =
     }
 
 
-type alias InputBindings =
-    { label : Maybe (Value -> Msg Action)
-    , placeholder : Maybe (Value -> Msg Action)
-    , value : Maybe (Value -> Msg Action)
+type alias InputBindings msg =
+    { label : Maybe (Value -> msg)
+    , placeholder : Maybe (Value -> msg)
+    , value : Maybe (Value -> msg)
     }
 
 
@@ -34,7 +32,7 @@ propsDecoder =
         |> ResolvedValue.optional "value" ResolvedValue.string Nothing
 
 
-inputBindingsDecoder : Dict String (Value -> Msg Action) -> InputBindings
+inputBindingsDecoder : Dict String (Value -> msg) -> InputBindings msg
 inputBindingsDecoder =
     Bind.succeed InputBindings
         |> Bind.bindable "label"
@@ -42,12 +40,12 @@ inputBindingsDecoder =
         |> Bind.bindable "value"
 
 
-component : Component Action
+component : Component msg
 component =
     register propsDecoder inputBindingsDecoder view
 
 
-view : ComponentContext InputProps InputBindings Action -> Html (Msg Action)
+view : ComponentContext InputProps (InputBindings msg) msg -> Html msg
 view ctx =
     div [ class "jr-input-wrapper" ]
         ((case ctx.props.label of

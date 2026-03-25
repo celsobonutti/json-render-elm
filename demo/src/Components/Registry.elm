@@ -1,6 +1,5 @@
 module Components.Registry exposing (registry)
 
-import Components.Actions exposing (Action)
 import Components.Badge
 import Components.Button
 import Components.Card
@@ -12,7 +11,7 @@ import Dict
 import JsonRender.Render exposing (Registry)
 
 
-registry : Registry Action
+registry : Registry msg
 registry =
     Dict.fromList
         [ ( "Badge", Components.Badge.component )

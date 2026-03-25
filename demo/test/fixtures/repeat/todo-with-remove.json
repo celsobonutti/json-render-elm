@@ -1,0 +1,40 @@
+{
+  "root": "app",
+  "elements": {
+    "app": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["list"]
+    },
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["todo-row"],
+      "repeat": { "statePath": "/todos", "key": "id" }
+    },
+    "todo-row": {
+      "type": "Stack",
+      "props": { "direction": "horizontal" },
+      "children": ["todo-title", "remove-btn"]
+    },
+    "todo-title": {
+      "type": "Text",
+      "props": { "content": { "$item": "title" } },
+      "children": []
+    },
+    "remove-btn": {
+      "type": "Button",
+      "props": { "label": "Remove", "variant": "danger" },
+      "children": [],
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": {
+            "path": "/selectedForRemoval",
+            "value": { "$item": "id" }
+          }
+        }
+      }
+    }
+  }
+}

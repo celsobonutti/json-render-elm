@@ -1,0 +1,44 @@
+{
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["input", "btn", "list"]
+    },
+    "input": {
+      "type": "Input",
+      "props": {
+        "value": { "$bindState": "/inputValue" },
+        "label": "Value",
+        "placeholder": "Type something"
+      },
+      "children": []
+    },
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Push Value" },
+      "children": [],
+      "on": {
+        "press": {
+          "action": "pushState",
+          "params": {
+            "path": "/collected",
+            "value": { "$state": "/inputValue" }
+          }
+        }
+      }
+    },
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["list-item"],
+      "repeat": { "statePath": "/collected" }
+    },
+    "list-item": {
+      "type": "Text",
+      "props": { "content": { "$item": "" } },
+      "children": []
+    }
+  }
+}

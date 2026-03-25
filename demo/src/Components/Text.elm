@@ -1,10 +1,8 @@
 module Components.Text exposing (TextProps, component, propsDecoder)
 
-import Components.Actions exposing (Action)
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)
 import Html.Attributes exposing (class)
-import JsonRender.Actions exposing (Msg)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -22,12 +20,12 @@ propsDecoder =
         |> ResolvedValue.optional "size" ResolvedValue.string Nothing
 
 
-component : Component Action
+component : Component msg
 component =
     register propsDecoder (\_ -> ()) view
 
 
-view : ComponentContext TextProps () Action -> Html (Msg Action)
+view : ComponentContext TextProps () msg -> Html msg
 view ctx =
     let
         sizeClass =

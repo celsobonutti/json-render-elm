@@ -228,10 +228,64 @@ type Action = Press
                                     ]
                                 , under = "module Components.Actions exposing (Action(..))"
                                 }
-                                |> Review.Test.whenFixed ("module Components.Actions exposing (Action(..))\n\n\ntype alias ExportParams =\n    { format : String\n    }\n\n\ntype Action\n    = Export ExportParams\n    | Press\n")
+                                |> Review.Test.whenFixed ("module Components.Actions exposing (Action(..), decodeAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\n\n\ntype alias ExportParams =\n    { format : String\n    }\n\n\ntype Action\n    = Export ExportParams\n    | Press\n\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"export\" ->\n            case Dict.get \"format\" params of\n                Just format_raw ->\n                    case Decode.decodeValue Decode.string format_raw of\n                        Ok format ->\n                            Ok (Export { format = format })\n\n                        Err _ ->\n                            Err \"format must be a String\"\n\n                Nothing ->\n                    Err \"missing required param format\"\n\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n")
                             ]
                           )
                         ]
+        , test "no errors when actions module has all variants including decodeAction" <|
+            \_ ->
+                let
+                    schemaWithTwoActions =
+                        """{"components":{"Card":{"props":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]},"description":"A card","slots":["default"]}},"actions":{"press":{"params":{"type":"object","properties":{},"required":[]},"description":"Generic button press"},"export":{"params":{"type":"object","properties":{"format":{"type":"string"}},"required":["format"]},"description":"Export data"}}}"""
+
+                    twoActionsConfig =
+                        { schemaJson = schemaWithTwoActions
+                        , componentsNamespace = "Components"
+                        }
+                in
+                [ """module Components.Card exposing (..)
+type alias CardProps = { title : String }
+propsDecoder = identity
+component = ()
+view ctx = ()
+"""
+                , """module Components.Registry exposing (registry)
+import Dict
+import Components.Card
+registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
+"""
+                , """module Components.Actions exposing (Action(..), decodeAction)
+type Action = Export ExportParams | Press
+decodeAction name params = Ok Press
+"""
+                ]
+                    |> Review.Test.runOnModules (CatalogSync.rule twoActionsConfig)
+                    |> Review.Test.expectNoErrors
+        , test "no actions in catalog means no actions module needed" <|
+            \_ ->
+                let
+                    noActionsSchema =
+                        """{"components":{"Card":{"props":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]},"description":"A card","slots":["default"]}}}"""
+
+                    noActionsConfig =
+                        { schemaJson = noActionsSchema
+                        , componentsNamespace = "Components"
+                        }
+                in
+                [ """module Components.Card exposing (..)
+type alias CardProps = { title : String }
+propsDecoder = identity
+component = ()
+view ctx = ()
+"""
+                , """module Components.Registry exposing (registry)
+import Dict
+import Components.Card
+registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
+"""
+                ]
+                    |> Review.Test.runOnModules (CatalogSync.rule noActionsConfig)
+                    |> Review.Test.expectNoErrors
         , test "fixes stub actions module" <|
             \_ ->
                 [ """module Components.Card exposing (..)
@@ -260,7 +314,7 @@ placeholder = ()
                                     ]
                                 , under = "module Components.Actions exposing (..)"
                                 }
-                                |> Review.Test.whenFixed ("module Components.Actions exposing (Action(..))\n\n\ntype Action\n    = Press\n")
+                                |> Review.Test.whenFixed ("module Components.Actions exposing (Action(..), decodeAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\n\n\ntype Action\n    = Press\n\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n")
                             ]
                           )
                         ]

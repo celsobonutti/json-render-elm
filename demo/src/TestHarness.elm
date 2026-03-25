@@ -1,8 +1,9 @@
 port module TestHarness exposing (main)
 
 import Browser
-import Components.Actions exposing (Action(..))
+import Components.Actions exposing (Action(..), decodeAction)
 import Components.Registry exposing (registry)
+import Dict
 import Html exposing (Html, div)
 import Html.Attributes exposing (id)
 import Json.Decode as Decode
@@ -62,11 +63,18 @@ update msg model =
                     { spec = model.spec, state = model.renderState }
 
                 ( newActionsModel, cmd ) =
-                    Actions.update handleAction actionMsg actionsModel
+                    Actions.update actionConfig actionMsg actionsModel
             in
             ( { model | renderState = newActionsModel.state }
             , Cmd.map JsonRenderMsg cmd
             )
+
+
+actionConfig : Actions.ActionConfig Action
+actionConfig =
+    { handleAction = handleAction
+    , decodeAction = decodeAction
+    }
 
 
 encodeAction : Action -> Value

@@ -1,8 +1,8 @@
 module JsonRender.Render exposing
     ( Component
-    , Registry
     , ComponentContext
     , RawComponentContext
+    , Registry
     , register
     , render
     )
@@ -19,40 +19,40 @@ import Json.Encode exposing (Value)
 import JsonRender.Actions exposing (Msg(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext, ResolvedValue)
-import JsonRender.Spec exposing (Element, Repeat, Spec)
+import JsonRender.Spec exposing (Element, EventHandler(..), Repeat, Spec)
 import JsonRender.State as State
 import JsonRender.Visibility as Visibility
 
 
-type alias ComponentContext props bindings action =
+type alias ComponentContext props bindings msg =
     { props : props
     , bindings : bindings
-    , children : List (Html (Msg action))
-    , emit : action -> Msg action
+    , children : List (Html msg)
+    , emit : String -> msg
     }
 
 
-type alias RawComponentContext action =
+type alias RawComponentContext msg =
     { props : Dict String ResolvedValue
-    , bindings : Dict String (Value -> Msg action)
-    , children : List (Html (Msg action))
-    , emit : action -> Msg action
+    , bindings : Dict String (Value -> msg)
+    , children : List (Html msg)
+    , emit : String -> msg
     }
 
 
-type Component action
-    = Component (RawComponentContext action -> Html (Msg action))
+type Component msg
+    = Component (RawComponentContext msg -> Html msg)
 
 
-type alias Registry action =
-    Dict String (Component action)
+type alias Registry msg =
+    Dict String (Component msg)
 
 
 register :
     (Dict String ResolvedValue -> Result String props)
-    -> (Dict String (Value -> Msg action) -> bindings)
-    -> (ComponentContext props bindings action -> Html (Msg action))
-    -> Component action
+    -> (Dict String (Value -> msg) -> bindings)
+    -> (ComponentContext props bindings msg -> Html msg)
+    -> Component msg
 register propsDecoder bindingsDecoder view =
     Component
         (\raw ->
@@ -101,7 +101,23 @@ extractBindings repeatCtx props =
         props
 
 
-renderChildren : Registry action -> Value -> Maybe RepeatContext -> Spec -> List String -> List (Html (Msg action))
+{-| Build an emit function from an element's `on` dict and the current repeat context.
+Looks up the event name in the `on` dict and produces the appropriate Msg.
+-}
+buildEmit : Dict String EventHandler -> Maybe RepeatContext -> String -> Msg action
+buildEmit onHandlers repeatCtx eventName =
+    case Dict.get eventName onHandlers of
+        Just (SingleAction binding) ->
+            ExecuteAction binding repeatCtx
+
+        Just (ChainedActions bindings) ->
+            ExecuteChain bindings repeatCtx
+
+        Nothing ->
+            ActionError ("No handler for event: " ++ eventName)
+
+
+renderChildren : Registry (Msg action) -> Value -> Maybe RepeatContext -> Spec -> List String -> List (Html (Msg action))
 renderChildren registry state repeatCtx spec childIds =
     List.filterMap
         (\id ->
@@ -136,7 +152,7 @@ getItemKey maybeKey index item =
             String.fromInt index
 
 
-renderRepeatedChildren : Registry action -> Value -> Spec -> Element -> Repeat -> List (Html (Msg action))
+renderRepeatedChildren : Registry (Msg action) -> Value -> Spec -> Element -> Repeat -> List (Html (Msg action))
 renderRepeatedChildren registry state spec element repeat =
     case State.get repeat.statePath state |> Maybe.andThen decodeList of
         Just items ->
@@ -183,7 +199,7 @@ renderRepeatedChildren registry state spec element repeat =
             []
 
 
-render : Registry action -> Value -> Spec -> Html (Msg action)
+render : Registry (Msg action) -> Value -> Spec -> Html (Msg action)
 render registry state spec =
     case Dict.get spec.root spec.elements of
         Just element ->
@@ -193,7 +209,7 @@ render registry state spec =
             Html.text ""
 
 
-renderElement : Registry action -> Value -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
+renderElement : Registry (Msg action) -> Value -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
 renderElement registry state repeatCtx spec element =
     case element.visible of
         Just condition ->
@@ -207,7 +223,7 @@ renderElement registry state repeatCtx spec element =
             renderElementInner registry state repeatCtx spec element
 
 
-renderElementInner : Registry action -> Value -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
+renderElementInner : Registry (Msg action) -> Value -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
 renderElementInner registry state repeatCtx spec element =
     case Dict.get element.type_ registry of
         Just (Component componentFn) ->
@@ -230,7 +246,7 @@ renderElementInner registry state repeatCtx spec element =
                 { props = resolved
                 , bindings = bindings
                 , children = children
-                , emit = \action -> CustomAction action
+                , emit = buildEmit element.on repeatCtx
                 }
 
         Nothing ->
