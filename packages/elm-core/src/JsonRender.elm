@@ -28,7 +28,7 @@ import JsonRender.Spec as Spec exposing (Spec)
 
 {-| Render a spec to Html using the given registry and state.
 -}
-render : Registry -> Value -> Spec -> Html Msg
+render : Registry action -> Value -> Spec -> Html (Msg action)
 render =
     Render.render
 
@@ -37,9 +37,9 @@ render =
 -}
 register :
     (Dict String ResolvedValue -> Result String props)
-    -> (Dict String (Value -> Msg) -> bindings)
-    -> (ComponentContext props bindings -> Html Msg)
-    -> Component
+    -> (Dict String (Value -> Msg action) -> bindings)
+    -> (ComponentContext props bindings action -> Html (Msg action))
+    -> Component action
 register =
     Render.register
 
