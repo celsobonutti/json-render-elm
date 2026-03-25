@@ -20,7 +20,7 @@ baseConfig =
 suite : Test
 suite =
     describe "CatalogSync rule"
-        [ test "reports missing component module and missing registry" <|
+        [ test "reports missing component module, registry, and actions" <|
             \_ ->
                 """module Main exposing (..)
 import Html
@@ -28,20 +28,28 @@ main = Html.text "hello"
 """
                     |> Review.Test.run (CatalogSync.rule baseConfig)
                     |> Review.Test.expectGlobalErrors
-                        [ { message = "Missing component module: Components.Card"
+                        [ { message = "Missing component modules: Card"
                           , details =
-                                [ "The catalog defines a \"Card\" component but no Components.Card module exists."
-                                , "Run elm-review --fix to generate it with the correct props type and decoder."
+                                [ "Create these files: src/Components/Card.elm"
+                                , "Quick stub command:\n\nmkdir -p src/Components && \\\n  echo 'module Components.Card exposing (..)' > src/Components/Card.elm"
+                                , "Then run elm-review --fix to fill them in."
                                 ]
                           }
                         , { message = "Missing registry module: Components.Registry"
                           , details =
-                                [ "No Components.Registry module found."
-                                , "Run elm-review --fix to regenerate it."
+                                [ "Create: src/Components/Registry.elm"
+                                , "Quick stub: echo 'module Components.Registry exposing (..)' > src/Components/Registry.elm"
+                                , "Then run elm-review --fix to fill it in."
+                                ]
+                          }
+                        , { message = "Missing actions module: Components.Actions"
+                          , details =
+                                [ "The catalog defines actions but no Components.Actions module exists."
+                                , "Run elm-review --fix to generate it."
                                 ]
                           }
                         ]
-        , test "reports missing registry module" <|
+        , test "reports missing registry and actions modules" <|
             \_ ->
                 [ """module Components.Card exposing (..)
 type alias CardProps = { title : String }
@@ -54,8 +62,15 @@ view ctx = ()
                     |> Review.Test.expectGlobalErrors
                         [ { message = "Missing registry module: Components.Registry"
                           , details =
-                                [ "No Components.Registry module found."
-                                , "Run elm-review --fix to regenerate it."
+                                [ "Create: src/Components/Registry.elm"
+                                , "Quick stub: echo 'module Components.Registry exposing (..)' > src/Components/Registry.elm"
+                                , "Then run elm-review --fix to fill it in."
+                                ]
+                          }
+                        , { message = "Missing actions module: Components.Actions"
+                          , details =
+                                [ "The catalog defines actions but no Components.Actions module exists."
+                                , "Run elm-review --fix to generate it."
                                 ]
                           }
                         ]
@@ -91,10 +106,12 @@ type Action = Press
                 in
                 [ """module Components.Card exposing (..)
 type alias CardProps = { title : String }
+propsDecoder = identity
 component = ()
 """
                 , """module Components.Button exposing (..)
 type alias ButtonProps = { label : String }
+propsDecoder = identity
 component = ()
 """
                 , """module Components.Registry exposing (registry)
@@ -104,13 +121,33 @@ registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
 """
                 ]
                     |> Review.Test.runOnModules (CatalogSync.rule twoConfig)
-                    |> Review.Test.expectGlobalErrors
-                        [ { message = "Registry is missing components: Button"
-                          , details =
-                                [ "The registry module does not include all catalog components."
-                                , "Run elm-review --fix to regenerate it."
-                                ]
-                          }
+                    |> Review.Test.expectErrorsForModules
+                        [ ( "Components.Registry"
+                          , [ Review.Test.error
+                                { message = "Registry is missing components: Button"
+                                , details =
+                                    [ "The registry module does not include all catalog components."
+                                    , "Accept the fix to regenerate it."
+                                    ]
+                                , under = "module Components.Registry exposing (registry)"
+                                }
+                                |> Review.Test.whenFixed """module Components.Registry exposing (registry)
+
+import Dict
+import JsonRender.Render exposing (Registry)
+import Components.Button
+import Components.Card
+
+
+registry : Registry
+registry =
+    Dict.fromList
+        [ ( "Button", Components.Button.component )
+        , ( "Card", Components.Card.component )
+        ]
+"""
+                            ]
+                          )
                         ]
         , test "reports missing actions module" <|
             \_ ->
