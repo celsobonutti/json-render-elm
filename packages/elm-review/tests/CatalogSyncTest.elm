@@ -7,7 +7,7 @@ import Test exposing (..)
 
 sampleSchemaJson : String
 sampleSchemaJson =
-    """{"components":{"Card":{"props":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]},"description":"A card","slots":["default"]}}}"""
+    """{"components":{"Card":{"props":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]},"description":"A card","slots":["default"]}},"actions":{"press":{"params":{"type":"object","properties":{},"required":[]},"description":"Generic button press"}}}"""
 
 
 baseConfig : CatalogSync.Config
@@ -72,6 +72,9 @@ import Dict
 import Components.Card
 registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
 """
+                , """module Components.Actions exposing (Action(..))
+type Action = Press
+"""
                 ]
                     |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
                     |> Review.Test.expectNoErrors
@@ -109,4 +112,46 @@ registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
                                 ]
                           }
                         ]
+        , test "reports missing actions module" <|
+            \_ ->
+                [ """module Components.Card exposing (..)
+type alias CardProps = { title : String }
+propsDecoder = identity
+component = ()
+view ctx = ()
+"""
+                , """module Components.Registry exposing (registry)
+import Dict
+import Components.Card
+registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
+"""
+                ]
+                    |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
+                    |> Review.Test.expectGlobalErrors
+                        [ { message = "Missing actions module: Components.Actions"
+                          , details =
+                                [ "The catalog defines actions but no Components.Actions module exists."
+                                , "Run elm-review --fix to generate it."
+                                ]
+                          }
+                        ]
+        , test "no errors when component, registry, and actions modules exist" <|
+            \_ ->
+                [ """module Components.Card exposing (..)
+type alias CardProps = { title : String }
+propsDecoder = identity
+component = ()
+view ctx = ()
+"""
+                , """module Components.Registry exposing (registry)
+import Dict
+import Components.Card
+registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
+"""
+                , """module Components.Actions exposing (Action(..))
+type Action = Press
+"""
+                ]
+                    |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
+                    |> Review.Test.expectNoErrors
         ]

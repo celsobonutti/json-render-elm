@@ -37,6 +37,7 @@ type alias ProjectContext =
     , seenModules : Set String
     , registrySeen : Bool
     , registryComponents : Set String
+    , actionsSeen : Bool
     }
 
 
@@ -46,6 +47,7 @@ type alias ModuleContext =
     , moduleName : String
     , isComponentModule : Maybe String
     , isRegistryModule : Bool
+    , isActionsModule : Bool
     , registryEntries : Set String
     , moduleKey : Rule.ModuleKey
     , moduleRange : Maybe Range
@@ -78,6 +80,7 @@ initialProjectContext catalog config =
     , seenModules = Set.empty
     , registrySeen = False
     , registryComponents = Set.empty
+    , actionsSeen = False
     }
 
 
@@ -107,6 +110,9 @@ fromProjectToModule catalog config =
                                 if suffix == "Registry" then
                                     Nothing
 
+                                else if suffix == "Actions" then
+                                    Nothing
+
                                 else if Dict.member suffix cat.components then
                                     Just suffix
 
@@ -124,6 +130,7 @@ fromProjectToModule catalog config =
             , moduleName = moduleStr
             , isComponentModule = componentName
             , isRegistryModule = moduleStr == config.componentsNamespace ++ ".Registry"
+            , isActionsModule = moduleStr == config.componentsNamespace ++ ".Actions"
             , registryEntries = Set.empty
             , moduleKey = moduleKey
             , moduleRange = Nothing
@@ -149,6 +156,7 @@ fromModuleToProject =
                         Set.empty
             , registrySeen = moduleCtx.isRegistryModule
             , registryComponents = moduleCtx.registryEntries
+            , actionsSeen = moduleCtx.isActionsModule
             }
         )
 
@@ -160,6 +168,7 @@ foldProjectContexts a b =
     , seenModules = Set.union a.seenModules b.seenModules
     , registrySeen = a.registrySeen || b.registrySeen
     , registryComponents = Set.union a.registryComponents b.registryComponents
+    , actionsSeen = a.actionsSeen || b.actionsSeen
     }
 
 
@@ -414,5 +423,19 @@ finalEvaluation config projectCtx =
 
                     else
                         []
+
+                missingActionsError =
+                    if not projectCtx.actionsSeen && not (Dict.isEmpty catalog.actions) then
+                        [ Rule.globalError
+                            { message = "Missing actions module: " ++ config.componentsNamespace ++ ".Actions"
+                            , details =
+                                [ "The catalog defines actions but no " ++ config.componentsNamespace ++ ".Actions module exists."
+                                , "Run elm-review --fix to generate it."
+                                ]
+                            }
+                        ]
+
+                    else
+                        []
             in
-            missingModuleError ++ missingRegistryError
+            missingModuleError ++ missingRegistryError ++ missingActionsError
