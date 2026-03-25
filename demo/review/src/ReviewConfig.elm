@@ -45,4 +45,5 @@ config =
         { schemaJson = CatalogData.schemaJson
         , componentsNamespace = "Components"
         }
+    , NoUnused.Variables.rule
     ]
