@@ -1,5 +1,8 @@
 module JsonRender.Internal.ElmCodeGen exposing
-    ( bindingsDecoder
+    ( actionParamsType
+    , actionType
+    , actionsModule
+    , bindingsDecoder
     , bindingsTypeAlias
     , componentModule
     , propsDecoder
@@ -8,7 +11,7 @@ module JsonRender.Internal.ElmCodeGen exposing
     )
 
 import Dict exposing (Dict)
-import JsonRender.Internal.SchemaParser exposing (ComponentSchema, FieldSchema, FieldType(..))
+import JsonRender.Internal.SchemaParser exposing (ActionSchema, ComponentSchema, FieldSchema, FieldType(..))
 import JsonRender.Internal.TypeMapping as TypeMapping
 
 
@@ -165,6 +168,99 @@ componentModule namespace componentName schema =
         ++ "Props "
         ++ componentName
         ++ "Bindings -> Html Msg\nview ctx =\n    ()\n"
+
+
+actionParamsType : String -> ActionSchema -> String
+actionParamsType actionName schema =
+    let
+        fields =
+            Dict.toList schema.params
+                |> List.sortBy Tuple.first
+                |> List.map
+                    (\( name, field ) ->
+                        let
+                            elmType =
+                                if field.required then
+                                    TypeMapping.toElmType field.fieldType
+
+                                else
+                                    "Maybe " ++ TypeMapping.toElmType field.fieldType
+                        in
+                        name ++ " : " ++ elmType
+                    )
+
+        body =
+            case fields of
+                [] ->
+                    "    {}"
+
+                first :: rest ->
+                    "    { "
+                        ++ first
+                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
+                        ++ "\n    }"
+    in
+    "type alias " ++ actionName ++ "Params =\n" ++ body
+
+
+actionType : Dict String ActionSchema -> String
+actionType actions =
+    let
+        variants =
+            Dict.toList actions
+                |> List.sortBy Tuple.first
+                |> List.map
+                    (\( name, schema ) ->
+                        let
+                            capitalName =
+                                TypeMapping.capitalizeFirst name
+                        in
+                        if Dict.isEmpty schema.params then
+                            capitalName
+
+                        else
+                            capitalName ++ " " ++ capitalName ++ "Params"
+                    )
+    in
+    case variants of
+        [] ->
+            "type Action\n    = NoAction"
+
+        first :: rest ->
+            "type Action\n    = "
+                ++ first
+                ++ String.concat (List.map (\v -> "\n    | " ++ v) rest)
+                ++ "\n"
+
+
+actionsModule : String -> Dict String ActionSchema -> String
+actionsModule namespace actions =
+    let
+        paramsTypes =
+            Dict.toList actions
+                |> List.sortBy Tuple.first
+                |> List.filterMap
+                    (\( name, schema ) ->
+                        if Dict.isEmpty schema.params then
+                            Nothing
+
+                        else
+                            Just (actionParamsType (TypeMapping.capitalizeFirst name) schema)
+                    )
+
+        paramsTypesStr =
+            case paramsTypes of
+                [] ->
+                    ""
+
+                _ ->
+                    String.join "\n\n\n" paramsTypes ++ "\n\n\n"
+    in
+    "module "
+        ++ namespace
+        ++ ".Actions exposing (Action(..))\n\n\n"
+        ++ paramsTypesStr
+        ++ actionType actions
 
 
 registryModule : String -> List String -> String

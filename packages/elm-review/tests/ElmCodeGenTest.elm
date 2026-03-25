@@ -3,7 +3,7 @@ module ElmCodeGenTest exposing (..)
 import Dict
 import Expect
 import JsonRender.Internal.ElmCodeGen as ElmCodeGen
-import JsonRender.Internal.SchemaParser exposing (ComponentSchema, FieldSchema, FieldType(..))
+import JsonRender.Internal.SchemaParser exposing (ActionSchema, ComponentSchema, FieldSchema, FieldType(..))
 import Test exposing (..)
 
 
@@ -17,6 +17,30 @@ cardSchema =
     , description = "A card container"
     , slots = [ "default" ]
     }
+
+
+exportAction : ActionSchema
+exportAction =
+    { params =
+        Dict.fromList
+            [ ( "format", { fieldType = FString, required = True } ) ]
+    , description = "Export data"
+    }
+
+
+pressAction : ActionSchema
+pressAction =
+    { params = Dict.empty
+    , description = "Generic button press"
+    }
+
+
+testActions : Dict.Dict String ActionSchema
+testActions =
+    Dict.fromList
+        [ ( "export", exportAction )
+        , ( "press", pressAction )
+        ]
 
 
 suite : Test
@@ -112,4 +136,32 @@ suite =
                     , \c -> String.contains "ComponentContext CardProps CardBindings" c |> Expect.equal True
                     ]
                     code
+        , test "generates action params type alias" <|
+            \_ ->
+                ElmCodeGen.actionParamsType "Export" exportAction
+                    |> Expect.all
+                        [ \c -> String.contains "type alias ExportParams" c |> Expect.equal True
+                        , \c -> String.contains "format : String" c |> Expect.equal True
+                        ]
+        , test "generates Action union type" <|
+            \_ ->
+                ElmCodeGen.actionType testActions
+                    |> Expect.all
+                        [ \c -> String.contains "type Action" c |> Expect.equal True
+                        , \c -> String.contains "Export ExportParams" c |> Expect.equal True
+                        , \c -> String.contains "Press" c |> Expect.equal True
+                        ]
+        , test "action with empty params has no payload" <|
+            \_ ->
+                ElmCodeGen.actionType testActions
+                    |> String.contains "| Press\n"
+                    |> Expect.equal True
+        , test "generates actions module" <|
+            \_ ->
+                ElmCodeGen.actionsModule "Components" testActions
+                    |> Expect.all
+                        [ \c -> String.contains "module Components.Actions" c |> Expect.equal True
+                        , \c -> String.contains "type Action" c |> Expect.equal True
+                        , \c -> String.contains "type alias ExportParams" c |> Expect.equal True
+                        ]
         ]
