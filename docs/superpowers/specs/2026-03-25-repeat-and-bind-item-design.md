@@ -365,9 +365,13 @@ Adding `basePath` to `RepeatContext` and `repeat` to `Element` will break existi
 
 ## Known Limitations
 
-- **`$template` in repeat contexts**: Template expressions (`$template`) resolve `${/path}` against global state only. They do not resolve against repeat item fields. Out of scope for this feature.
+- **`$template` in repeat contexts**: Template expressions (`$template`) resolve `${/path}` against global state only, not repeat item fields. This matches upstream behavior — the core `resolvePropValue` also resolves templates against `ctx.stateModel` only.
 - **`getItemKey` type coverage**: Only tries `string` and `int` decoders for the key field value. Float, bool, or nested object keys fall back to index.
-- **`jsonValueToResolved` does not handle lists/objects**: Pre-existing limitation — `$item "field"` where the field is an array or object resolves to `RNull`. Becomes more visible with `repeat` since items are commonly objects. Out of scope for this feature.
+- **`jsonValueToResolved` does not handle lists/objects**: Elm-specific limitation — `$item "field"` where the field is an array or object resolves to `RNull` because `jsonValueToResolved` only tries primitive decoders. The upstream core returns `unknown` so complex values pass through naturally. This becomes more visible with `repeat` since items are commonly objects. **This is a high-priority fix** — see backlog entry below.
+
+## Backlog
+
+- **URGENT: `jsonValueToResolved` must handle lists and objects** — Add `RList` and `RObject` branches to `jsonValueToResolved` in `Resolve.elm` by decoding `Decode.list Decode.value` and `Decode.keyValuePairs Decode.value` and recursively converting. Without this, `$item` on object/array fields silently returns `RNull`, breaking common repeat patterns where items are objects.
 
 ## Files Changed
 
