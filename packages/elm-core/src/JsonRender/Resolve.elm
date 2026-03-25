@@ -100,6 +100,19 @@ resolvePropValue state repeatCtx prop =
         BindStateExpr path ->
             jsonValueToResolved (State.get path state |> Maybe.withDefault Encode.null)
 
+        BindItemExpr field ->
+            case repeatCtx of
+                Just ctx ->
+                    case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
+                        Ok val ->
+                            jsonValueToResolved val
+
+                        Err _ ->
+                            RNull
+
+                Nothing ->
+                    RNull
+
 
 jsonValueToResolved : Value -> ResolvedValue
 jsonValueToResolved value =

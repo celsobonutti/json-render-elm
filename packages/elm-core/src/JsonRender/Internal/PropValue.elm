@@ -23,6 +23,7 @@ type PropValue
     | IndexExpr
     | TemplateExpr String
     | BindStateExpr String
+    | BindItemExpr String
 
 
 decoder : Decoder PropValue
@@ -34,6 +35,7 @@ decoder =
         , Decode.field "$index" (Decode.succeed IndexExpr)
         , Decode.field "$template" Decode.string |> Decode.map TemplateExpr
         , Decode.field "$bindState" Decode.string |> Decode.map BindStateExpr
+        , Decode.field "$bindItem" Decode.string |> Decode.map BindItemExpr
 
         -- Literals
         , Decode.null NullValue

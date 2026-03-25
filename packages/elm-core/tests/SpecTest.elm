@@ -242,6 +242,36 @@ suite =
 
                     Err err ->
                         Expect.fail (Decode.errorToString err)
+        , test "decodes $bindItem expression" <|
+            \_ ->
+                let
+                    json =
+                        """
+                        {
+                          "root": "t",
+                          "elements": {
+                            "t": {
+                              "type": "Input",
+                              "props": { "checked": { "$bindItem": "completed" } },
+                              "children": []
+                            }
+                          }
+                        }
+                        """
+                in
+                case Decode.decodeString Spec.decoder json of
+                    Ok spec ->
+                        case Dict.get "t" spec.elements of
+                            Just el ->
+                                Expect.equal
+                                    (Just (BindItemExpr "completed"))
+                                    (Dict.get "checked" el.props)
+
+                            Nothing ->
+                                Expect.fail "element not found"
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
         , test "decodes a complex multi-element spec" <|
             \_ ->
                 let
