@@ -75,6 +75,12 @@ encodeAction action =
         Press ->
             Encode.object [ ( "name", Encode.string "press" ) ]
 
+        Export { format } ->
+            Encode.object
+                [ ( "name", Encode.string "export" )
+                , ( "params", Encode.object [ ( "format", Encode.string format ) ] )
+                ]
+
 
 handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
 handleAction action model =

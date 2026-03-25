@@ -147,6 +147,9 @@ handleAction action model =
         Press ->
             ( model, Cmd.none )
 
+        Export _ ->
+            ( model, Cmd.none )
+
 
 
 -- VIEW

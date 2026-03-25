@@ -1,5 +1,11 @@
 module Components.Actions exposing (Action(..))
 
 
+type alias ExportParams =
+    { format : String
+    }
+
+
 type Action
-    = Press
+    = Export ExportParams
+    | Press
