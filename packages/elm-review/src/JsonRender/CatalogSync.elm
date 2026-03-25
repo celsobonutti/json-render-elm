@@ -11,16 +11,15 @@ Workflow:
 
 -}
 
-import Dict exposing (Dict)
+import Dict
 import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Expression as Expression exposing (Expression)
 import Elm.Syntax.Module as Module
 import Elm.Syntax.Node as Node exposing (Node(..))
-import Elm.Syntax.Type as Type
 import Elm.Syntax.Range exposing (Range)
 import Json.Decode as Decode
 import JsonRender.Internal.ElmCodeGen as ElmCodeGen
-import JsonRender.Internal.SchemaParser as SchemaParser exposing (CatalogSchema, ComponentSchema)
+import JsonRender.Internal.SchemaParser as SchemaParser exposing (CatalogSchema)
 import JsonRender.Internal.TypeMapping as TypeMapping
 import Review.Fix as Fix
 import Review.Rule as Rule exposing (Rule)

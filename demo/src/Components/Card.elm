@@ -30,8 +30,8 @@ component =
 view : ComponentContext CardProps () Action -> Html (Msg Action)
 view ctx =
     div [ class "jr-card" ]
-        ([ h3 [ class "jr-card-title" ] [ text ctx.props.title ] ]
-            ++ (case ctx.props.subtitle of
+        (h3 [ class "jr-card-title" ] [ text ctx.props.title ]
+            :: (case ctx.props.subtitle of
                     Just sub ->
                         [ p [ class "jr-card-subtitle" ] [ text sub ] ]
 

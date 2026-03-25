@@ -3,7 +3,7 @@ module SchemaParserTest exposing (..)
 import Dict
 import Expect
 import Json.Decode as Decode
-import JsonRender.Internal.SchemaParser as SchemaParser exposing (ActionSchema, CatalogSchema, ComponentSchema, FieldType(..))
+import JsonRender.Internal.SchemaParser as SchemaParser exposing (FieldType(..))
 import Test exposing (..)
 
 

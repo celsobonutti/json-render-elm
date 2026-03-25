@@ -3,7 +3,7 @@ module ElmCodeGenTest exposing (..)
 import Dict
 import Expect
 import JsonRender.Internal.ElmCodeGen as ElmCodeGen
-import JsonRender.Internal.SchemaParser exposing (ActionSchema, ComponentSchema, FieldSchema, FieldType(..))
+import JsonRender.Internal.SchemaParser exposing (ActionSchema, ComponentSchema, FieldType(..))
 import Test exposing (..)
 
 

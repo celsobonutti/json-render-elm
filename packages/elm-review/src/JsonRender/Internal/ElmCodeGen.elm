@@ -11,7 +11,7 @@ module JsonRender.Internal.ElmCodeGen exposing
     )
 
 import Dict exposing (Dict)
-import JsonRender.Internal.SchemaParser exposing (ActionSchema, ComponentSchema, FieldSchema, FieldType(..))
+import JsonRender.Internal.SchemaParser exposing (ActionSchema, ComponentSchema)
 import JsonRender.Internal.TypeMapping as TypeMapping
 
 

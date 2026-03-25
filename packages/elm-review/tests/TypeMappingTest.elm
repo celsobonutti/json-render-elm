@@ -1,6 +1,5 @@
 module TypeMappingTest exposing (..)
 
-import Dict
 import Expect
 import JsonRender.Internal.SchemaParser exposing (FieldType(..))
 import JsonRender.Internal.TypeMapping as TypeMapping

@@ -46,4 +46,4 @@ view ctx =
                 Nothing ->
                     []
     in
-    div ([ class ("jr-stack " ++ dirClass) ] ++ gapStyle) ctx.children
+    div (class ("jr-stack " ++ dirClass) :: gapStyle) ctx.children

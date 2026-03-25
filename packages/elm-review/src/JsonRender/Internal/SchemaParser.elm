@@ -10,7 +10,7 @@ module JsonRender.Internal.SchemaParser exposing
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (optional, required)
-import Set exposing (Set)
+import Set
 
 
 type alias CatalogSchema =
