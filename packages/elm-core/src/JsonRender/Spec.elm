@@ -1,6 +1,6 @@
 module JsonRender.Spec exposing
-    ( Spec
-    , Element
+    ( Element
+    , Spec
     , decoder
     , propValueDecoder
     )
@@ -9,12 +9,13 @@ module JsonRender.Spec exposing
 
 Re-exports PropValue from Internal.PropValue to provide a public API
 while avoiding circular dependencies with Visibility.
+
 -}
 
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (optional, required)
-import JsonRender.Internal.PropValue as PropValue exposing (PropValue(..))
+import JsonRender.Internal.PropValue as PropValue exposing (PropValue)
 import JsonRender.Visibility exposing (VisibilityCondition)
 
 

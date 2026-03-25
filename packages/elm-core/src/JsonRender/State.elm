@@ -1,9 +1,8 @@
-module JsonRender.State exposing (get, set, push, remove)
+module JsonRender.State exposing (get, push, remove, set)
 
 {-| JSON Pointer (RFC 6901) operations on JSON Values.
 -}
 
-import Array
 import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
 

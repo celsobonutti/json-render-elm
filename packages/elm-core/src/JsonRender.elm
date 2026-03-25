@@ -1,6 +1,6 @@
 module JsonRender exposing
-    ( render
-    , register
+    ( register
+    , render
     , specDecoder
     )
 
@@ -18,7 +18,7 @@ For types, import the specific modules:
 
 import Dict exposing (Dict)
 import Html exposing (Html)
-import Json.Decode as Decode exposing (Decoder)
+import Json.Decode exposing (Decoder)
 import Json.Encode exposing (Value)
 import JsonRender.Actions exposing (Msg)
 import JsonRender.Render as Render exposing (Component, ComponentContext, Registry)

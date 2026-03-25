@@ -2,7 +2,7 @@ module BindTest exposing (..)
 
 import Dict
 import Expect
-import Json.Encode as Encode exposing (Value)
+import Json.Encode exposing (Value)
 import JsonRender.Actions exposing (Msg(..))
 import JsonRender.Bind as Bind
 import Test exposing (..)

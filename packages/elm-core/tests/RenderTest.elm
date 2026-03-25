@@ -7,10 +7,9 @@ import Html.Attributes exposing (class)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender.Internal.PropValue exposing (PropValue(..))
+import JsonRender.Render as Render
+import JsonRender.Resolve as Resolve
 import JsonRender.Spec as Spec
-import JsonRender.Render as Render exposing (Component, Registry)
-import JsonRender.Resolve as Resolve exposing (ResolvedValue(..))
-import JsonRender.Spec exposing (Element, Spec)
 import JsonRender.Visibility exposing (VisibilityCondition(..))
 import Test exposing (..)
 import Test.Html.Query as Query

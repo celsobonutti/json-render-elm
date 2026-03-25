@@ -1,7 +1,7 @@
 module JsonRender.Visibility exposing
     ( VisibilityCondition(..)
-    , evaluate
     , decoder
+    , evaluate
     )
 
 {-| Conditional visibility for spec elements.
@@ -9,7 +9,7 @@ module JsonRender.Visibility exposing
 
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (required)
-import Json.Encode as Encode exposing (Value)
+import Json.Encode exposing (Value)
 import JsonRender.Internal.PropValue as PropValue exposing (PropValue(..))
 import JsonRender.State as State
 
