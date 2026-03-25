@@ -8,6 +8,11 @@ import JsonRender.State as State
 import Test exposing (..)
 
 
+type TestAction
+    = TestPress
+    | TestExport { format : String }
+
+
 suite : Test
 suite =
     describe "JsonRender.Actions"
@@ -20,7 +25,7 @@ suite =
                         }
 
                     ( newModel, _ ) =
-                        Actions.update (SetState "/name" (Encode.string "Bob")) model
+                        Actions.update noOpHandler (SetState "/name" (Encode.string "Bob")) model
                 in
                 State.get "/name" newModel.state
                     |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -34,7 +39,7 @@ suite =
                         }
 
                     ( newModel, _ ) =
-                        Actions.update (PushState "/items" (Encode.string "b")) model
+                        Actions.update noOpHandler (PushState "/items" (Encode.string "b")) model
                 in
                 State.get "/items/1" newModel.state
                     |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -52,18 +57,37 @@ suite =
                         }
 
                     ( newModel, _ ) =
-                        Actions.update (RemoveState "/age") model
+                        Actions.update noOpHandler (RemoveState "/age") model
                 in
                 State.get "/age" newModel.state
                     |> Expect.equal Nothing
-        , test "encodeAction produces correct JSON" <|
+        , test "CustomAction delegates to handler" <|
             \_ ->
                 let
-                    json =
-                        Actions.encodeAction "export" (Encode.object [ ( "format", Encode.string "pdf" ) ])
+                    model =
+                        { spec = Nothing
+                        , state = Encode.object []
+                        }
 
-                    name =
-                        Decode.decodeValue (Decode.field "name" Decode.string) json
+                    handler action m =
+                        case action of
+                            TestExport { format } ->
+                                ( { m | state = Encode.object [ ( "exported", Encode.string format ) ] }
+                                , Cmd.none
+                                )
+
+                            _ ->
+                                ( m, Cmd.none )
+
+                    ( newModel, _ ) =
+                        Actions.update handler (CustomAction (TestExport { format = "pdf" })) model
                 in
-                Expect.equal (Ok "export") name
+                State.get "/exported" newModel.state
+                    |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                    |> Expect.equal (Just "pdf")
         ]
+
+
+noOpHandler : TestAction -> Actions.Model -> ( Actions.Model, Cmd (Msg TestAction) )
+noOpHandler _ model =
+    ( model, Cmd.none )

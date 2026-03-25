@@ -2,13 +2,12 @@ module JsonRender.Actions exposing
     ( Msg(..)
     , Model
     , update
-    , encodeAction
     )
 
 {-| Built-in action handling for json-render specs.
 -}
 
-import Json.Encode as Encode exposing (Value)
+import Json.Encode exposing (Value)
 import JsonRender.Spec exposing (Spec)
 import JsonRender.State as State
 
@@ -19,16 +18,16 @@ type alias Model =
     }
 
 
-type Msg
+type Msg action
     = SpecReceived Value
     | SetState String Value
     | PushState String Value
     | RemoveState String
-    | CustomAction String Value
+    | CustomAction action
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update : (action -> Model -> ( Model, Cmd (Msg action) )) -> Msg action -> Model -> ( Model, Cmd (Msg action) )
+update handleAction msg model =
     case msg of
         SpecReceived _ ->
             ( model, Cmd.none )
@@ -48,13 +47,5 @@ update msg model =
             , Cmd.none
             )
 
-        CustomAction _ _ ->
-            ( model, Cmd.none )
-
-
-encodeAction : String -> Value -> Value
-encodeAction name params =
-    Encode.object
-        [ ( "name", Encode.string name )
-        , ( "params", params )
-        ]
+        CustomAction action ->
+            handleAction action model
