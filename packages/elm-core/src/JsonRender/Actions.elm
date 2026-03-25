@@ -10,7 +10,7 @@ module JsonRender.Actions exposing
 
 import Dict exposing (Dict)
 import Json.Decode as Decode
-import Json.Encode as Encode exposing (Value)
+import Json.Encode exposing (Value)
 import JsonRender.Resolve as Resolve exposing (RepeatContext)
 import JsonRender.Spec exposing (ActionBinding, Spec)
 import JsonRender.State as State

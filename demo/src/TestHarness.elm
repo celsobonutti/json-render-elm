@@ -3,7 +3,6 @@ port module TestHarness exposing (main)
 import Browser
 import Components.Actions exposing (Action(..), decodeAction)
 import Components.Registry exposing (registry)
-import Dict
 import Html exposing (Html, div)
 import Html.Attributes exposing (id)
 import Json.Decode as Decode

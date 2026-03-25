@@ -280,9 +280,6 @@ actionBranch ( name, schema ) =
             allParams =
                 sortedParams ++ optionalParams
 
-            paramNames =
-                List.map Tuple.first allParams
-
             recordFields =
                 List.map
                     (\( pName, _ ) -> pName ++ " = " ++ pName)
