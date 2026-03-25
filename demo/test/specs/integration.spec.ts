@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { sendSpec, setState, getLastAction } from "../helpers"
+import { sendSpec, setState } from "../helpers"
 
 test.describe("Integration: Contact Form", () => {
   test.beforeEach(async ({ page }) => {
@@ -21,10 +21,8 @@ test.describe("Integration: Contact Form", () => {
     await input.fill("Alice")
     await expect(input).toHaveValue("Alice")
 
-    // Click submit — emits custom action
+    // Click submit — triggers Press action (handled in Elm)
     await page.locator(".jr-button").click()
-    const action = await getLastAction(page)
-    expect(action).toEqual({ name: "press", params: null })
 
     // Simulate server response: set submitted = true
     // Must preserve the form.name state that was set by typing
