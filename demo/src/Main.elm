@@ -20,6 +20,9 @@ port sendPrompt : String -> Cmd msg
 port receiveError : (String -> msg) -> Sub msg
 
 
+port downloadJson : Value -> Cmd msg
+
+
 -- json-render-elm bridge ports
 port jsonRenderSpecIn : (Value -> msg) -> Sub msg
 
@@ -148,7 +151,7 @@ handleAction action model =
             ( model, Cmd.none )
 
         Export _ ->
-            ( model, Cmd.none )
+            ( model, downloadJson model.state )
 
 
 
