@@ -8,9 +8,13 @@ import JsonRender.Bind as Bind
 import Test exposing (..)
 
 
+type TestAction
+    = NoAction
+
+
 type alias TestBindings =
-    { name : Maybe (Value -> Msg)
-    , age : Maybe (Value -> Msg)
+    { name : Maybe (Value -> Msg TestAction)
+    , age : Maybe (Value -> Msg TestAction)
     }
 
 

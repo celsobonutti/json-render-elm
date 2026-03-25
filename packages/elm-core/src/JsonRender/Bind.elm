@@ -14,13 +14,13 @@ import JsonRender.Actions exposing (Msg)
 
 {-| A function that decodes a raw bindings dict into a typed bindings record.
 -}
-type alias BindingsDecoder a =
-    Dict String (Value -> Msg) -> a
+type alias BindingsDecoder action a =
+    Dict String (Value -> Msg action) -> a
 
 
 {-| Start a bindings decoder pipeline.
 -}
-succeed : a -> BindingsDecoder a
+succeed : a -> BindingsDecoder action a
 succeed a _ =
     a
 
@@ -31,6 +31,6 @@ Returns `Just setter` if the prop had a `$bindState` expression,
 `Nothing` otherwise.
 
 -}
-bindable : String -> BindingsDecoder (Maybe (Value -> Msg) -> b) -> BindingsDecoder b
+bindable : String -> BindingsDecoder action (Maybe (Value -> Msg action) -> b) -> BindingsDecoder action b
 bindable key prev dict =
     prev dict (Dict.get key dict)
