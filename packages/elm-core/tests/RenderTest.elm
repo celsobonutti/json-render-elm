@@ -416,4 +416,47 @@ suite =
                         Err err ->
                             Expect.fail (Decode.errorToString err)
             ]
+        , describe "repeat rendering"
+            [ test "repeat renders children once per array item" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "list",
+                              "elements": {
+                                "list": {
+                                  "type": "Card",
+                                  "props": { "title": "Todos" },
+                                  "children": ["item"],
+                                  "repeat": { "statePath": "/todos", "key": "id" }
+                                },
+                                "item": {
+                                  "type": "Text",
+                                  "props": { "content": { "$item": "title" } },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        todoState =
+                            Encode.object
+                                [ ( "todos"
+                                  , Encode.list identity
+                                        [ Encode.object [ ( "id", Encode.string "1" ), ( "title", Encode.string "Buy milk" ) ]
+                                        , Encode.object [ ( "id", Encode.string "2" ), ( "title", Encode.string "Walk dog" ) ]
+                                        ]
+                                  )
+                                ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry todoState spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "Buy milk", Selector.text "Walk dog" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            ]
         ]

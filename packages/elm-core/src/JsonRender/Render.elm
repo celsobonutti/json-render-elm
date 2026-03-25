@@ -12,11 +12,15 @@ module JsonRender.Render exposing
 
 import Dict exposing (Dict)
 import Html exposing (Html)
+import Html.Attributes
+import Html.Keyed
+import Json.Decode as Decode
 import Json.Encode exposing (Value)
 import JsonRender.Actions exposing (Msg(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext, ResolvedValue)
-import JsonRender.Spec exposing (Element, Spec)
+import JsonRender.Spec exposing (Element, Repeat, Spec)
+import JsonRender.State as State
 import JsonRender.Visibility as Visibility
 
 
@@ -66,19 +70,117 @@ register propsDecoder bindingsDecoder view =
         )
 
 
-extractBindings : Dict String PropValue -> Dict String (Value -> Msg action)
-extractBindings props =
+extractBindings : Maybe RepeatContext -> Dict String PropValue -> Dict String (Value -> Msg action)
+extractBindings repeatCtx props =
     Dict.foldl
         (\key propValue acc ->
             case propValue of
                 BindStateExpr path ->
                     Dict.insert key (\val -> SetState path val) acc
 
+                BindItemExpr field ->
+                    case repeatCtx of
+                        Just ctx ->
+                            let
+                                path =
+                                    if field == "" then
+                                        ctx.basePath
+
+                                    else
+                                        ctx.basePath ++ "/" ++ field
+                            in
+                            Dict.insert key (\val -> SetState path val) acc
+
+                        Nothing ->
+                            acc
+
                 _ ->
                     acc
         )
         Dict.empty
         props
+
+
+renderChildren : Registry action -> Value -> Maybe RepeatContext -> Spec -> List String -> List (Html (Msg action))
+renderChildren registry state repeatCtx spec childIds =
+    List.filterMap
+        (\id ->
+            Dict.get id spec.elements
+                |> Maybe.map (renderElement registry state repeatCtx spec)
+        )
+        childIds
+
+
+decodeList : Value -> Maybe (List Value)
+decodeList value =
+    Decode.decodeValue (Decode.list Decode.value) value |> Result.toMaybe
+
+
+getItemKey : Maybe String -> Int -> Value -> String
+getItemKey maybeKey index item =
+    case maybeKey of
+        Just keyField ->
+            case Decode.decodeValue (Decode.field keyField Decode.string) item of
+                Ok k ->
+                    k
+
+                Err _ ->
+                    case Decode.decodeValue (Decode.field keyField Decode.int) item of
+                        Ok k ->
+                            String.fromInt k
+
+                        Err _ ->
+                            String.fromInt index
+
+        Nothing ->
+            String.fromInt index
+
+
+renderRepeatedChildren : Registry action -> Value -> Spec -> Element -> Repeat -> List (Html (Msg action))
+renderRepeatedChildren registry state spec element repeat =
+    case State.get repeat.statePath state |> Maybe.andThen decodeList of
+        Just items ->
+            let
+                singleChild =
+                    List.length element.children == 1
+
+                keyedChildren =
+                    List.indexedMap
+                        (\i item ->
+                            let
+                                ctx =
+                                    Just
+                                        { item = item
+                                        , index = i
+                                        , basePath = repeat.statePath ++ "/" ++ String.fromInt i
+                                        }
+
+                                itemKey =
+                                    getItemKey repeat.key i item
+                            in
+                            if singleChild then
+                                List.filterMap
+                                    (\id ->
+                                        Dict.get id spec.elements
+                                            |> Maybe.map (\el -> ( itemKey, renderElement registry state ctx spec el ))
+                                    )
+                                    element.children
+
+                            else
+                                List.filterMap
+                                    (\id ->
+                                        Dict.get id spec.elements
+                                            |> Maybe.map (\el -> ( id ++ "-" ++ String.fromInt i ++ "-" ++ itemKey, renderElement registry state ctx spec el ))
+                                    )
+                                    element.children
+                        )
+                        items
+                        |> List.concat
+            in
+            [ Html.Keyed.node "div" [ Html.Attributes.style "display" "contents" ] keyedChildren ]
+
+        Nothing ->
+            []
 
 
 render : Registry action -> Value -> Spec -> Html (Msg action)
@@ -114,15 +216,15 @@ renderElementInner registry state repeatCtx spec element =
                     Resolve.resolveProps state repeatCtx element.props
 
                 bindings =
-                    extractBindings element.props
+                    extractBindings repeatCtx element.props
 
                 children =
-                    List.filterMap
-                        (\id ->
-                            Dict.get id spec.elements
-                                |> Maybe.map (renderElement registry state repeatCtx spec)
-                        )
-                        element.children
+                    case element.repeat of
+                        Just repeat ->
+                            renderRepeatedChildren registry state spec element repeat
+
+                        Nothing ->
+                            renderChildren registry state repeatCtx spec element.children
             in
             componentFn
                 { props = resolved
