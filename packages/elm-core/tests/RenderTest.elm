@@ -458,5 +458,210 @@ suite =
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)
+            , test "repeat with empty array renders no children" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "list",
+                              "elements": {
+                                "list": {
+                                  "type": "Card",
+                                  "props": { "title": "Empty" },
+                                  "children": ["item"],
+                                  "repeat": { "statePath": "/todos" }
+                                },
+                                "item": {
+                                  "type": "Text",
+                                  "props": { "content": { "$item": "title" } },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        emptyState =
+                            Encode.object [ ( "todos", Encode.list identity [] ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry emptyState spec
+                                |> Query.fromHtml
+                                |> Expect.all
+                                    [ Query.has [ Selector.text "Empty" ]
+                                    , Query.hasNot [ Selector.tag "span" ]
+                                    ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "repeat with missing state path renders no children" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "list",
+                              "elements": {
+                                "list": {
+                                  "type": "Card",
+                                  "props": { "title": "Missing" },
+                                  "children": ["item"],
+                                  "repeat": { "statePath": "/nonexistent" }
+                                },
+                                "item": {
+                                  "type": "Text",
+                                  "props": { "content": "should not appear" },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry Encode.null spec
+                                |> Query.fromHtml
+                                |> Expect.all
+                                    [ Query.has [ Selector.text "Missing" ]
+                                    , Query.hasNot [ Selector.text "should not appear" ]
+                                    ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$bindItem produces SetState with index-based path" <|
+                \_ ->
+                    let
+                        bindRegistry : Render.Registry TestAction
+                        bindRegistry =
+                            Dict.fromList
+                                [ ( "Card"
+                                  , Render.register
+                                        (\props ->
+                                            Resolve.succeed identity
+                                                |> Resolve.required "title" Resolve.string
+                                                |> (\d -> d props)
+                                        )
+                                        (\_ -> ())
+                                        (\ctx ->
+                                            div [ class "card" ]
+                                                [ text ctx.props
+                                                , div [] ctx.children
+                                                ]
+                                        )
+                                  )
+                                , ( "Input"
+                                  , Render.register
+                                        (\props ->
+                                            Resolve.succeed identity
+                                                |> Resolve.required "value" Resolve.string
+                                                |> (\d -> d props)
+                                        )
+                                        (\bindings ->
+                                            { value = Dict.get "value" bindings }
+                                        )
+                                        (\ctx ->
+                                            div []
+                                                [ text ctx.props
+                                                , case ctx.bindings.value of
+                                                    Just _ ->
+                                                        text "[bound]"
+
+                                                    Nothing ->
+                                                        text "[unbound]"
+                                                ]
+                                        )
+                                  )
+                                ]
+
+                        json =
+                            """
+                            {
+                              "root": "list",
+                              "elements": {
+                                "list": {
+                                  "type": "Card",
+                                  "props": { "title": "Todos" },
+                                  "children": ["item"],
+                                  "repeat": { "statePath": "/todos", "key": "id" }
+                                },
+                                "item": {
+                                  "type": "Input",
+                                  "props": { "value": { "$bindItem": "name" } },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        todoState =
+                            Encode.object
+                                [ ( "todos"
+                                  , Encode.list identity
+                                        [ Encode.object [ ( "id", Encode.string "1" ), ( "name", Encode.string "Alice" ) ]
+                                        ]
+                                  )
+                                ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render bindRegistry todoState spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "Alice", Selector.text "[bound]" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "nested repeats shadow outer context" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "outer",
+                              "elements": {
+                                "outer": {
+                                  "type": "Card",
+                                  "props": { "title": "Groups" },
+                                  "children": ["inner"],
+                                  "repeat": { "statePath": "/groups" }
+                                },
+                                "inner": {
+                                  "type": "Card",
+                                  "props": { "title": { "$item": "name" } },
+                                  "children": ["leaf"],
+                                  "repeat": { "statePath": "/items" }
+                                },
+                                "leaf": {
+                                  "type": "Text",
+                                  "props": { "content": { "$item": "label" } },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        nestedState =
+                            Encode.object
+                                [ ( "groups"
+                                  , Encode.list identity
+                                        [ Encode.object [ ( "name", Encode.string "Group A" ) ]
+                                        ]
+                                  )
+                                , ( "items"
+                                  , Encode.list identity
+                                        [ Encode.object [ ( "label", Encode.string "Item X" ) ]
+                                        , Encode.object [ ( "label", Encode.string "Item Y" ) ]
+                                        ]
+                                  )
+                                ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry nestedState spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "Item X", Selector.text "Item Y" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
             ]
         ]
