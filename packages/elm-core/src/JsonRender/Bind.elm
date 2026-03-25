@@ -27,7 +27,7 @@ succeed a _ =
 
 {-| Extract a binding setter for the given prop name.
 
-Returns `Just setter` if the prop had a `$bindState` expression,
+Returns `Just setter` if the prop had a `$bindState` or `$bindItem` expression,
 `Nothing` otherwise.
 
 -}

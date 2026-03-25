@@ -10,9 +10,8 @@ import { defineSchema } from "@json-render/core";
  * Differences from React/Vue/Svelte schemas:
  * - No `slots` — uses `hasChildren` boolean instead
  * - No `on` field on elements — actions are handled via Elm's `emit` + ports
- * - No `repeat` field — not yet supported (backlog)
  * - No `state` on spec — Elm model owns state
- * - Expressions: $state, $item, $index, $template (read-only), $bindState (two-way binding)
+ * - Expressions: $state, $item, $index, $template (read-only), $bindState, $bindItem (two-way binding)
  */
 export const schema = defineSchema(
   (s) => ({
@@ -31,6 +30,8 @@ export const schema = defineSchema(
           children: s.array(s.string()),
           /** Visibility condition */
           visible: s.any(),
+          /** Repeat over a state array: { statePath: "/path", key?: "fieldName" } */
+          repeat: s.any(),
         }),
       ),
     }),
@@ -84,7 +85,8 @@ export const schema = defineSchema(
       'The "visible" field goes on the ELEMENT object, NOT inside "props". Correct: {"type":"Card","props":{},"visible":{"$state":"/show"},"children":[...]}.',
 
       // Expression support
-      'Dynamic props: use { "$state": "/path" } to read from state, { "$bindState": "/path" } for two-way binding (read and write), { "$item": "field" } in repeat contexts, { "$index": true } for loop index, { "$template": "Hello ${/name}" } for string interpolation.',
+      'Dynamic props: use { "$state": "/path" } to read from state, { "$bindState": "/path" } for two-way binding (read and write), { "$item": "field" } to read from repeat item (use "" for whole item), { "$index": true } for repeat index, { "$bindItem": "field" } for two-way binding to repeat item field, { "$template": "Hello ${/name}" } for string interpolation.',
+      'Use "repeat": { "statePath": "/arrayPath", "key": "id" } on an element to render its children once per array item. Props on child elements can use $item and $bindItem to access item fields. The "key" field is optional but recommended for stable rendering when items change.',
 
       // Design quality
       "Design with visual hierarchy: use container components to group content, proper spacing, and status indicators. ONLY use components from the AVAILABLE COMPONENTS list.",
