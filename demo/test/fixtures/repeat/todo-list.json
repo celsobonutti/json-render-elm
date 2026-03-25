@@ -1,0 +1,16 @@
+{
+  "root": "list",
+  "elements": {
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["item"],
+      "repeat": { "statePath": "/todos", "key": "id" }
+    },
+    "item": {
+      "type": "Text",
+      "props": { "content": { "$item": "title" } },
+      "children": []
+    }
+  }
+}

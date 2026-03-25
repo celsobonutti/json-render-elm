@@ -1,0 +1,21 @@
+{
+  "root": "list",
+  "elements": {
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["title", "badge"],
+      "repeat": { "statePath": "/items", "key": "id" }
+    },
+    "title": {
+      "type": "Text",
+      "props": { "content": { "$item": "name" } },
+      "children": []
+    },
+    "badge": {
+      "type": "Badge",
+      "props": { "label": { "$item": "status" } },
+      "children": []
+    }
+  }
+}
