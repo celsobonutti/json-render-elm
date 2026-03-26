@@ -870,4 +870,111 @@ suite =
                         Err err ->
                             Expect.fail (Decode.errorToString err)
             ]
+        , describe "$computed with $bindState"
+            [ test "$computed reads same state as $bindState input" <|
+                \_ ->
+                    let
+                        bindComputedRegistry : Render.Registry msg
+                        bindComputedRegistry =
+                            { components =
+                                Dict.fromList
+                                    [ ( "Input"
+                                      , Render.register
+                                            (\props ->
+                                                Resolve.succeed identity
+                                                    |> Resolve.required "value" Resolve.string
+                                                    |> (\d -> d props)
+                                            )
+                                            (\bindings ->
+                                                { value = Dict.get "value" bindings }
+                                            )
+                                            (\ctx ->
+                                                div [ class "input" ]
+                                                    [ text ctx.props
+                                                    , case ctx.bindings.value of
+                                                        Just _ ->
+                                                            text "[bound]"
+
+                                                        Nothing ->
+                                                            text "[unbound]"
+                                                    ]
+                                            )
+                                      )
+                                    , ( "Text"
+                                      , Render.register
+                                            (\props ->
+                                                Resolve.succeed identity
+                                                    |> Resolve.required "content" Resolve.string
+                                                    |> (\d -> d props)
+                                            )
+                                            (\_ -> ())
+                                            (\ctx -> div [ class "display" ] [ text ctx.props ])
+                                      )
+                                    , ( "Stack"
+                                      , Render.register
+                                            (\_ -> Ok ())
+                                            (\_ -> ())
+                                            (\ctx -> div [ class "stack" ] ctx.children)
+                                      )
+                                    ]
+                            , functions =
+                                Dict.fromList
+                                    [ ( "shout"
+                                      , \args ->
+                                            case Dict.get "text" args of
+                                                Just (Resolve.RString s) ->
+                                                    Resolve.RString (String.toUpper s)
+
+                                                _ ->
+                                                    Resolve.RError "shout: expected string arg 'text'"
+                                      )
+                                    ]
+                            }
+
+                        json =
+                            """
+                            {
+                              "root": "stack",
+                              "elements": {
+                                "stack": {
+                                  "type": "Stack",
+                                  "props": {},
+                                  "children": ["input", "display"]
+                                },
+                                "input": {
+                                  "type": "Input",
+                                  "props": { "value": { "$bindState": "/name" } },
+                                  "children": []
+                                },
+                                "display": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$computed": "shout",
+                                      "args": { "text": { "$state": "/name" } }
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "name", Encode.string "alice" ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render bindComputedRegistry state spec
+                                |> Query.fromHtml
+                                |> Expect.all
+                                    [ Query.find [ Selector.class "input" ]
+                                        >> Query.has [ Selector.text "alice", Selector.text "[bound]" ]
+                                    , Query.find [ Selector.class "display" ]
+                                        >> Query.has [ Selector.text "ALICE" ]
+                                    ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            ]
         ]

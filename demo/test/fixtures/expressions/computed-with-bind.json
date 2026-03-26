@@ -1,0 +1,28 @@
+{
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["input", "display"]
+    },
+    "input": {
+      "type": "Input",
+      "props": {
+        "label": "Name",
+        "value": { "$bindState": "/name" }
+      },
+      "children": []
+    },
+    "display": {
+      "type": "Text",
+      "props": {
+        "content": {
+          "$computed": "shout",
+          "args": { "text": { "$state": "/name" } }
+        }
+      },
+      "children": []
+    }
+  }
+}

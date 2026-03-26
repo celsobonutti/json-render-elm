@@ -60,6 +60,33 @@ test.describe("Expressions", () => {
     await expect(page.locator("body")).toContainText("Props error")
   })
 
+  test("$computed updates when bound state changes via input", async ({ page }) => {
+    await setState(page, { name: "alice" })
+    await sendSpec(page, "expressions/computed-with-bind.json")
+
+    // Initial: input shows "alice", computed shows "ALICE"
+    await expect(page.locator(".jr-input")).toHaveValue("alice")
+    await expect(page.locator(".jr-text")).toHaveText("ALICE")
+
+    // Type new value: computed display updates reactively
+    const input = page.locator(".jr-input")
+    await input.clear()
+    await input.fill("bob")
+    await expect(page.locator(".jr-text")).toHaveText("BOB")
+  })
+
+  test("$computed shows empty result when bound input is cleared", async ({ page }) => {
+    await setState(page, { name: "hello" })
+    await sendSpec(page, "expressions/computed-with-bind.json")
+
+    await expect(page.locator(".jr-text")).toHaveText("HELLO")
+
+    // Clear input: computed result becomes empty string (shouted "")
+    const input = page.locator(".jr-input")
+    await input.clear()
+    await expect(page.locator(".jr-text")).toHaveText("")
+  })
+
   test("$bindItem updates item state on input change", async ({ page }) => {
     await setState(page, {
       items: [
