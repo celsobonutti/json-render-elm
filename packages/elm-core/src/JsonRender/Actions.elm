@@ -11,7 +11,7 @@ module JsonRender.Actions exposing
 
 import Dict exposing (Dict)
 import Json.Decode as Decode
-import Json.Encode as Encode exposing (Value)
+import Json.Encode exposing (Value)
 import JsonRender.Resolve as Resolve exposing (RepeatContext)
 import JsonRender.Spec exposing (ActionBinding, EventHandler(..), Spec)
 import JsonRender.State as State
@@ -239,14 +239,7 @@ collectTriggeredHandlers oldState newState spec =
 
 statePathChanged : String -> Value -> Value -> Bool
 statePathChanged path oldState newState =
-    let
-        oldVal =
-            State.get path oldState |> Maybe.map (Encode.encode 0)
-
-        newVal =
-            State.get path newState |> Maybe.map (Encode.encode 0)
-    in
-    oldVal /= newVal
+    State.get path oldState /= State.get path newState
 
 
 executeHandlers : ActionConfig action -> List EventHandler -> Model -> ( Model, Cmd (Msg action) )
