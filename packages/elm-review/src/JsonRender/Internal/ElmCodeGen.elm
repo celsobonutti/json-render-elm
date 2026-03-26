@@ -6,6 +6,7 @@ module JsonRender.Internal.ElmCodeGen exposing
     , bindingsTypeAlias
     , componentModule
     , decodeActionFunction
+    , functionsModule
     , propsDecoder
     , propsTypeAlias
     , registryModule
@@ -413,6 +414,204 @@ actionsModule namespace actions =
         ++ "\n\n"
         ++ decodeActionFunction actions
         ++ "\n"
+
+
+functionsModule : String -> Dict String SchemaParser.FunctionSchema -> String
+functionsModule namespace functions =
+    let
+        sortedFunctions =
+            Dict.toList functions |> List.sortBy Tuple.first
+
+        paramsTypes =
+            List.map
+                (\( name, schema ) ->
+                    functionParamsType (TypeMapping.capitalizeFirst name) schema
+                )
+                sortedFunctions
+
+        functionsType =
+            functionRecordType sortedFunctions
+
+        functionsValue =
+            functionRecordValue sortedFunctions
+
+        toFunctionDictCode =
+            toFunctionDict sortedFunctions
+    in
+    "module "
+        ++ namespace
+        ++ ".Functions exposing (Functions, functions, toFunctionDict)\n\n"
+        ++ "import Dict exposing (Dict)\n"
+        ++ "import JsonRender.Resolve as Resolve exposing (ResolvedValue(..))\n\n\n"
+        ++ String.join "\n\n\n" paramsTypes
+        ++ "\n\n\n"
+        ++ functionsType
+        ++ "\n\n\n"
+        ++ functionsValue
+        ++ "\n\n\n"
+        ++ toFunctionDictCode
+        ++ "\n"
+
+
+functionParamsType : String -> SchemaParser.FunctionSchema -> String
+functionParamsType capitalName schema =
+    let
+        fields =
+            Dict.toList schema.params
+                |> List.sortBy Tuple.first
+                |> List.map
+                    (\( name, field ) ->
+                        let
+                            elmType =
+                                if field.required then
+                                    TypeMapping.toElmType field.fieldType
+
+                                else
+                                    "Maybe " ++ TypeMapping.toElmType field.fieldType
+                        in
+                        name ++ " : " ++ elmType
+                    )
+
+        body =
+            case fields of
+                [] ->
+                    "    {}"
+
+                first :: rest ->
+                    "    { "
+                        ++ first
+                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
+                        ++ "\n    }"
+    in
+    "type alias " ++ capitalName ++ "Params =\n" ++ body
+
+
+functionRecordType : List ( String, SchemaParser.FunctionSchema ) -> String
+functionRecordType functions =
+    let
+        fields =
+            List.map
+                (\( name, schema ) ->
+                    let
+                        capitalName =
+                            TypeMapping.capitalizeFirst name
+
+                        returnType =
+                            TypeMapping.toElmType schema.returnType
+                    in
+                    name ++ " : " ++ capitalName ++ "Params -> " ++ returnType
+                )
+                functions
+
+        body =
+            case fields of
+                [] ->
+                    "    {}"
+
+                first :: rest ->
+                    "    { "
+                        ++ first
+                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
+                        ++ "\n    }"
+    in
+    "type alias Functions =\n" ++ body
+
+
+functionRecordValue : List ( String, SchemaParser.FunctionSchema ) -> String
+functionRecordValue functions =
+    let
+        fields =
+            List.map (\( name, _ ) -> name ++ " = ()") functions
+
+        body =
+            case fields of
+                [] ->
+                    "    {}"
+
+                first :: rest ->
+                    "    { "
+                        ++ first
+                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
+                        ++ "\n    }"
+    in
+    "functions : Functions\nfunctions =\n" ++ body
+
+
+toFunctionDict : List ( String, SchemaParser.FunctionSchema ) -> String
+toFunctionDict functions =
+    let
+        entries =
+            List.map toFunctionDictEntry functions
+
+        entriesStr =
+            case entries of
+                [] ->
+                    "        []"
+
+                first :: rest ->
+                    "        [ "
+                        ++ String.trimLeft first
+                        ++ String.concat (List.map (\e -> "\n        , " ++ String.trimLeft e) rest)
+                        ++ "\n        ]"
+    in
+    "toFunctionDict : Functions -> Dict String (Dict String ResolvedValue -> ResolvedValue)\n"
+        ++ "toFunctionDict fns =\n"
+        ++ "    Dict.fromList\n"
+        ++ entriesStr
+
+
+toFunctionDictEntry : ( String, SchemaParser.FunctionSchema ) -> String
+toFunctionDictEntry ( name, schema ) =
+    let
+        capitalName =
+            TypeMapping.capitalizeFirst name
+
+        sortedParams =
+            Dict.toList schema.params
+                |> List.sortBy Tuple.first
+
+        pipelineSteps =
+            List.map
+                (\( pName, field ) ->
+                    let
+                        extractor =
+                            TypeMapping.toResolvedValueExtractor field.fieldType
+                    in
+                    if field.required then
+                        "                    |> Resolve.required \"" ++ pName ++ "\" " ++ extractor
+
+                    else
+                        "                    |> Resolve.optional \"" ++ pName ++ "\" " ++ extractor ++ " Nothing"
+                )
+                sortedParams
+
+        wrapper =
+            TypeMapping.toResolvedValueWrapper schema.returnType
+    in
+    "( \""
+        ++ name
+        ++ "\"\n"
+        ++ "          , \\args ->\n"
+        ++ "                let\n"
+        ++ "                    result =\n"
+        ++ "                        Resolve.succeed "
+        ++ capitalName
+        ++ "Params\n"
+        ++ String.join "\n" pipelineSteps
+        ++ "\n"
+        ++ "                in\n"
+        ++ "                case result args of\n"
+        ++ "                    Ok params ->\n"
+        ++ "                        "
+        ++ wrapper
+        ++ " (fns."
+        ++ name
+        ++ " params)\n\n"
+        ++ "                    Err err ->\n"
+        ++ "                        RError (\""
+        ++ name
+        ++ ": \" ++ err)\n"
+        ++ "          )"
 
 
 registryModule : String -> List String -> String

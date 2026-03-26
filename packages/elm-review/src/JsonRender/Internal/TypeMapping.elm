@@ -4,6 +4,7 @@ module JsonRender.Internal.TypeMapping exposing
     , toElmType
     , toJsonDecoder
     , toResolvedValueExtractor
+    , toResolvedValueWrapper
     )
 
 import JsonRender.Internal.SchemaParser exposing (FieldType(..))
@@ -82,6 +83,25 @@ toResolvedValueExtractor fieldType =
 
         _ ->
             "ResolvedValue.string"
+
+
+toResolvedValueWrapper : FieldType -> String
+toResolvedValueWrapper fieldType =
+    case fieldType of
+        FString ->
+            "RString"
+
+        FInt ->
+            "RInt"
+
+        FFloat ->
+            "RFloat"
+
+        FBool ->
+            "RBool"
+
+        _ ->
+            "RString"
 
 
 enumTypeDeclaration : String -> List String -> String
