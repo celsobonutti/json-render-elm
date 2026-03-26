@@ -90,7 +90,7 @@ suite =
             \_ ->
                 let
                     code =
-                        ElmCodeGen.registryModule "Components" [ "Card", "Button" ]
+                        ElmCodeGen.registryModule "Components" [ "Card", "Button" ] False
                 in
                 Expect.all
                     [ \c -> String.contains "module Components.Registry" c |> Expect.equal True

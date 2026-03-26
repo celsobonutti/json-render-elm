@@ -141,10 +141,13 @@ import Components.Card
 
 registry : Registry
 registry =
-    Dict.fromList
+    { components =
+        Dict.fromList
         [ ( "Button", Components.Button.component )
         , ( "Card", Components.Card.component )
         ]
+    , functions = Dict.empty
+    }
 """
                             ]
                           )

@@ -39,6 +39,7 @@ type alias ProjectContext =
     , registrySeen : Bool
     , registryComponents : Set String
     , actionsSeen : Bool
+    , functionsSeen : Bool
     }
 
 
@@ -49,6 +50,7 @@ type alias ModuleContext =
     , isComponentModule : Maybe String
     , isRegistryModule : Bool
     , isActionsModule : Bool
+    , isFunctionsModule : Bool
     , registryEntries : Set String
     , moduleKey : Rule.ModuleKey
     , moduleRange : Maybe Range
@@ -82,6 +84,7 @@ initialProjectContext catalog config =
     , registrySeen = False
     , registryComponents = Set.empty
     , actionsSeen = False
+    , functionsSeen = False
     }
 
 
@@ -114,6 +117,9 @@ fromProjectToModule catalog config =
                                 else if suffix == "Actions" then
                                     Nothing
 
+                                else if suffix == "Functions" then
+                                    Nothing
+
                                 else if Dict.member suffix cat.components then
                                     Just suffix
 
@@ -132,6 +138,7 @@ fromProjectToModule catalog config =
             , isComponentModule = componentName
             , isRegistryModule = moduleStr == config.componentsNamespace ++ ".Registry"
             , isActionsModule = moduleStr == config.componentsNamespace ++ ".Actions"
+            , isFunctionsModule = moduleStr == config.componentsNamespace ++ ".Functions"
             , registryEntries = Set.empty
             , moduleKey = moduleKey
             , moduleRange = Nothing
@@ -158,6 +165,7 @@ fromModuleToProject =
             , registrySeen = moduleCtx.isRegistryModule
             , registryComponents = moduleCtx.registryEntries
             , actionsSeen = moduleCtx.isActionsModule
+            , functionsSeen = moduleCtx.isFunctionsModule
             }
         )
 
@@ -170,6 +178,7 @@ foldProjectContexts a b =
     , registrySeen = a.registrySeen || b.registrySeen
     , registryComponents = Set.union a.registryComponents b.registryComponents
     , actionsSeen = a.actionsSeen || b.actionsSeen
+    , functionsSeen = a.functionsSeen || b.functionsSeen
     }
 
 
@@ -213,6 +222,7 @@ declarationListVisitor declarations context =
                                             ElmCodeGen.registryModule
                                                 context.config.componentsNamespace
                                                 (Dict.keys catalog.components |> List.sort)
+                                                (not (Dict.isEmpty catalog.functions))
                                     in
                                     [ Rule.errorWithFix
                                         { message = "Registry is missing components: " ++ String.join ", " (Set.toList missing)
@@ -266,6 +276,45 @@ declarationListVisitor declarations context =
                                         , details =
                                             [ "The Actions module does not match the catalog actions."
                                             , "Accept the fix to regenerate it."
+                                            ]
+                                        }
+                                        range
+                                        [ Fix.replaceRangeBy fullRange generatedCode ]
+                                    ]
+
+                                Nothing ->
+                                    []
+                in
+                ( errors, context )
+
+            else if context.isFunctionsModule then
+                let
+                    hasToFunctionDict =
+                        List.any (hasFunction "toFunctionDict") declarations
+
+                    errors =
+                        if hasToFunctionDict then
+                            []
+
+                        else
+                            case context.moduleRange of
+                                Just range ->
+                                    let
+                                        fullRange =
+                                            { start = range.start
+                                            , end = lastDeclarationEnd declarations range
+                                            }
+
+                                        generatedCode =
+                                            ElmCodeGen.functionsModule
+                                                context.config.componentsNamespace
+                                                catalog.functions
+                                    in
+                                    [ Rule.errorWithFix
+                                        { message = "Functions module is missing toFunctionDict"
+                                        , details =
+                                            [ "This module should contain function types and a toFunctionDict converter."
+                                            , "Accept the fix to generate the correct types and converter."
                                             ]
                                         }
                                         range
@@ -509,5 +558,19 @@ finalEvaluation config projectCtx =
 
                     else
                         []
+
+                missingFunctionsError =
+                    if not projectCtx.functionsSeen && not (Dict.isEmpty catalog.functions) then
+                        [ Rule.globalError
+                            { message = "Missing functions module: " ++ config.componentsNamespace ++ ".Functions"
+                            , details =
+                                [ "The catalog defines functions but no " ++ config.componentsNamespace ++ ".Functions module exists."
+                                , "Run elm-review --fix to generate it."
+                                ]
+                            }
+                        ]
+
+                    else
+                        []
             in
-            missingModuleError ++ missingRegistryError ++ missingActionsError
+            missingModuleError ++ missingRegistryError ++ missingActionsError ++ missingFunctionsError

@@ -614,13 +614,20 @@ toFunctionDictEntry ( name, schema ) =
         ++ "          )"
 
 
-registryModule : String -> List String -> String
-registryModule namespace componentNames =
+registryModule : String -> List String -> Bool -> String
+registryModule namespace componentNames hasFunctions =
     let
         imports =
             List.map
                 (\name -> "import " ++ namespace ++ "." ++ name)
                 componentNames
+
+        functionsImport =
+            if hasFunctions then
+                "import " ++ namespace ++ ".Functions\n"
+
+            else
+                ""
 
         entries =
             List.map
@@ -645,14 +652,24 @@ registryModule namespace componentNames =
                         ++ String.trimLeft first
                         ++ String.concat (List.map (\e -> "\n        , " ++ String.trimLeft e) rest)
                         ++ "\n        ]"
+
+        functionsField =
+            if hasFunctions then
+                "    , functions = " ++ namespace ++ ".Functions.toFunctionDict " ++ namespace ++ ".Functions.functions\n"
+
+            else
+                "    , functions = Dict.empty\n"
     in
     "module "
         ++ namespace
         ++ ".Registry exposing (registry)\n\n"
         ++ "import Dict\n"
         ++ "import JsonRender.Render exposing (Registry)\n"
+        ++ functionsImport
         ++ String.join "\n" imports
         ++ "\n\n\n"
-        ++ "registry : Registry\nregistry =\n    Dict.fromList\n"
+        ++ "registry : Registry\nregistry =\n    { components =\n        Dict.fromList\n"
         ++ entriesStr
         ++ "\n"
+        ++ functionsField
+        ++ "    }\n"
