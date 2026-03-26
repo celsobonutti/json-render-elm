@@ -1,0 +1,22 @@
+{
+  "state": { "input": "hello", "output": "initial" },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["output-label"],
+      "watch": {
+        "/input": {
+          "action": "setState",
+          "params": { "path": "/output", "value": "watcher-fired" }
+        }
+      }
+    },
+    "output-label": {
+      "type": "Text",
+      "props": { "content": { "$state": "/output" } },
+      "children": []
+    }
+  }
+}

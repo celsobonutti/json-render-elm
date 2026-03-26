@@ -6,6 +6,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender.Actions as Actions exposing (Msg(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
+import JsonRender.Spec as Spec
 import JsonRender.State as State
 import Test exposing (..)
 
@@ -406,5 +407,219 @@ suite =
                     State.get "/x" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
                         |> Expect.equal (Just 1)
+            ]
+        , describe "checkWatchers"
+            [ test "fires watcher action when watched path changes" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": { "content": "ok" },
+                                  "children": [],
+                                  "watch": {
+                                    "/source": {
+                                      "action": "setState",
+                                      "params": { "path": "/derived", "value": "changed" }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            let
+                                oldState =
+                                    Encode.object [ ( "source", Encode.string "a" ), ( "derived", Encode.string "" ) ]
+
+                                model =
+                                    { spec = Just spec
+                                    , state = Encode.object [ ( "source", Encode.string "b" ), ( "derived", Encode.string "" ) ]
+                                    }
+
+                                ( newModel, _ ) =
+                                    Actions.checkWatchers testActionConfig oldState model
+                            in
+                            State.get "/derived" newModel.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "changed")
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "does not fire watcher when watched path is unchanged" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": { "content": "ok" },
+                                  "children": [],
+                                  "watch": {
+                                    "/source": {
+                                      "action": "setState",
+                                      "params": { "path": "/derived", "value": "changed" }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            let
+                                oldState =
+                                    Encode.object [ ( "source", Encode.string "same" ), ( "derived", Encode.string "original" ) ]
+
+                                model =
+                                    { spec = Just spec
+                                    , state = Encode.object [ ( "source", Encode.string "same" ), ( "derived", Encode.string "original" ) ]
+                                    }
+
+                                ( newModel, _ ) =
+                                    Actions.checkWatchers testActionConfig oldState model
+                            in
+                            State.get "/derived" newModel.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "original")
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "fires chained watcher actions" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": { "content": "ok" },
+                                  "children": [],
+                                  "watch": {
+                                    "/trigger": [
+                                      { "action": "setState", "params": { "path": "/a", "value": "one" } },
+                                      { "action": "setState", "params": { "path": "/b", "value": "two" } }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            let
+                                oldState =
+                                    Encode.object [ ( "trigger", Encode.bool False ) ]
+
+                                model =
+                                    { spec = Just spec
+                                    , state = Encode.object [ ( "trigger", Encode.bool True ) ]
+                                    }
+
+                                ( newModel, _ ) =
+                                    Actions.checkWatchers testActionConfig oldState model
+                            in
+                            Expect.all
+                                [ \m ->
+                                    State.get "/a" m.state
+                                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                        |> Expect.equal (Just "one")
+                                , \m ->
+                                    State.get "/b" m.state
+                                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                        |> Expect.equal (Just "two")
+                                ]
+                                newModel
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "cascading watchers fire in sequence" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": { "content": "ok" },
+                                  "children": [],
+                                  "watch": {
+                                    "/a": { "action": "setState", "params": { "path": "/b", "value": "from-a" } },
+                                    "/b": { "action": "setState", "params": { "path": "/c", "value": "from-b" } }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            let
+                                oldState =
+                                    Encode.object
+                                        [ ( "a", Encode.string "old" )
+                                        , ( "b", Encode.string "" )
+                                        , ( "c", Encode.string "" )
+                                        ]
+
+                                model =
+                                    { spec = Just spec
+                                    , state =
+                                        Encode.object
+                                            [ ( "a", Encode.string "new" )
+                                            , ( "b", Encode.string "" )
+                                            , ( "c", Encode.string "" )
+                                            ]
+                                    }
+
+                                ( newModel, _ ) =
+                                    Actions.checkWatchers testActionConfig oldState model
+                            in
+                            Expect.all
+                                [ \m ->
+                                    State.get "/b" m.state
+                                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                        |> Expect.equal (Just "from-a")
+                                , \m ->
+                                    State.get "/c" m.state
+                                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                        |> Expect.equal (Just "from-b")
+                                ]
+                                newModel
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "does not fire watchers without a spec" <|
+                \_ ->
+                    let
+                        oldState =
+                            Encode.object [ ( "x", Encode.int 1 ) ]
+
+                        model =
+                            { spec = Nothing
+                            , state = Encode.object [ ( "x", Encode.int 2 ) ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.checkWatchers testActionConfig oldState model
+                    in
+                    State.get "/x" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
+                        |> Expect.equal (Just 2)
             ]
         ]

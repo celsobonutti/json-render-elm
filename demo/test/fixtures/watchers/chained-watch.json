@@ -1,0 +1,43 @@
+{
+  "state": { "country": "US", "city": "", "status": "" },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["country-label", "city-label", "status-label", "change-btn"],
+      "watch": {
+        "/country": [
+          { "action": "setState", "params": { "path": "/city", "value": "cleared" } },
+          { "action": "setState", "params": { "path": "/status", "value": "updated" } }
+        ]
+      }
+    },
+    "country-label": {
+      "type": "Text",
+      "props": { "content": { "$state": "/country" } },
+      "children": []
+    },
+    "city-label": {
+      "type": "Text",
+      "props": { "content": { "$state": "/city" } },
+      "children": []
+    },
+    "status-label": {
+      "type": "Text",
+      "props": { "content": { "$state": "/status" } },
+      "children": []
+    },
+    "change-btn": {
+      "type": "Button",
+      "props": { "label": "Change Country" },
+      "children": [],
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": { "path": "/country", "value": "Canada" }
+        }
+      }
+    }
+  }
+}

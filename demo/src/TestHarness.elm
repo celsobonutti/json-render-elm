@@ -66,14 +66,20 @@ update msg model =
 
         JsonRenderMsg actionMsg ->
             let
+                oldState =
+                    model.renderState
+
                 actionsModel =
                     { spec = model.spec, state = model.renderState }
 
-                ( newActionsModel, cmd ) =
+                ( afterAction, cmd ) =
                     Actions.update actionConfig actionMsg actionsModel
+
+                ( afterWatchers, watcherCmd ) =
+                    Actions.checkWatchers actionConfig oldState afterAction
             in
-            ( { model | renderState = newActionsModel.state }
-            , Cmd.map JsonRenderMsg cmd
+            ( { model | renderState = afterWatchers.state }
+            , Cmd.map JsonRenderMsg (Cmd.batch [ cmd, watcherCmd ])
             )
 
 

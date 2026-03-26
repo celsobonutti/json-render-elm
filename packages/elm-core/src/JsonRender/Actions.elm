@@ -2,6 +2,7 @@ module JsonRender.Actions exposing
     ( ActionConfig
     , Model
     , Msg(..)
+    , checkWatchers
     , update
     )
 
@@ -10,9 +11,9 @@ module JsonRender.Actions exposing
 
 import Dict exposing (Dict)
 import Json.Decode as Decode
-import Json.Encode exposing (Value)
+import Json.Encode as Encode exposing (Value)
 import JsonRender.Resolve as Resolve exposing (RepeatContext)
-import JsonRender.Spec exposing (ActionBinding, Spec)
+import JsonRender.Spec exposing (ActionBinding, EventHandler(..), Spec)
 import JsonRender.State as State
 
 
@@ -174,3 +175,106 @@ executeOneAction config repeatCtx binding model =
 
                 Err _ ->
                     ( model, Cmd.none )
+
+
+{-| Check all watchers in the spec after a state change. Compares old state vs
+new state at each watched path. If any changed, executes the watcher's actions
+and re-checks (up to 10 iterations to prevent infinite loops).
+-}
+checkWatchers : ActionConfig action -> Value -> Model -> ( Model, Cmd (Msg action) )
+checkWatchers config oldState model =
+    checkWatchersLoop config 10 oldState model
+
+
+checkWatchersLoop : ActionConfig action -> Int -> Value -> Model -> ( Model, Cmd (Msg action) )
+checkWatchersLoop config remaining oldState model =
+    if remaining <= 0 then
+        ( model, Cmd.none )
+
+    else
+        case model.spec of
+            Nothing ->
+                ( model, Cmd.none )
+
+            Just spec ->
+                let
+                    triggered =
+                        collectTriggeredHandlers oldState model.state spec
+                in
+                if List.isEmpty triggered then
+                    ( model, Cmd.none )
+
+                else
+                    let
+                        stateBeforeWatchers =
+                            model.state
+
+                        ( modelAfterWatchers, cmd ) =
+                            executeHandlers config triggered model
+
+                        ( finalModel, moreCmd ) =
+                            checkWatchersLoop config (remaining - 1) stateBeforeWatchers modelAfterWatchers
+                    in
+                    ( finalModel, Cmd.batch [ cmd, moreCmd ] )
+
+
+collectTriggeredHandlers : Value -> Value -> Spec -> List EventHandler
+collectTriggeredHandlers oldState newState spec =
+    Dict.foldl
+        (\_ element acc ->
+            Dict.foldl
+                (\path handler innerAcc ->
+                    if statePathChanged path oldState newState then
+                        handler :: innerAcc
+
+                    else
+                        innerAcc
+                )
+                acc
+                element.watch
+        )
+        []
+        spec.elements
+
+
+statePathChanged : String -> Value -> Value -> Bool
+statePathChanged path oldState newState =
+    let
+        oldVal =
+            State.get path oldState |> Maybe.map (Encode.encode 0)
+
+        newVal =
+            State.get path newState |> Maybe.map (Encode.encode 0)
+    in
+    oldVal /= newVal
+
+
+executeHandlers : ActionConfig action -> List EventHandler -> Model -> ( Model, Cmd (Msg action) )
+executeHandlers config handlers model =
+    List.foldl
+        (\handler ( accModel, accCmd ) ->
+            let
+                bindings =
+                    case handler of
+                        SingleAction binding ->
+                            [ binding ]
+
+                        ChainedActions bs ->
+                            bs
+
+                ( newModel, newCmd ) =
+                    List.foldl
+                        (\binding ( m, c ) ->
+                            let
+                                ( m2, c2 ) =
+                                    executeOneAction config Nothing binding m
+                            in
+                            ( m2, Cmd.batch [ c, c2 ] )
+                        )
+                        ( accModel, Cmd.none )
+                        bindings
+            in
+            ( newModel, Cmd.batch [ accCmd, newCmd ] )
+        )
+        ( model, Cmd.none )
+        handlers
