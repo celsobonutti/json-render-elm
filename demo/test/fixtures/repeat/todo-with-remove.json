@@ -1,4 +1,5 @@
 {
+  "state": { "todos": [{ "id": "1", "title": "Buy milk" }, { "id": "2", "title": "Walk dog" }], "selectedForRemoval": null },
   "root": "app",
   "elements": {
     "app": {

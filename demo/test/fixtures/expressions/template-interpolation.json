@@ -1,4 +1,5 @@
 {
+  "state": { "user": { "name": "Bob" } },
   "root": "t",
   "elements": {
     "t": {

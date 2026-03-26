@@ -1,4 +1,5 @@
 {
+  "state": { "clicked": false },
   "root": "stack",
   "elements": {
     "stack": {
@@ -21,7 +22,7 @@
       "type": "Text",
       "props": { "content": "Clicked!" },
       "children": [],
-      "visible": { "truthy": "/clicked" }
+      "visible": { "$state": "/clicked" }
     }
   }
 }

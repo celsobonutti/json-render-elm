@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { sendSpec, setState, getLastAction } from "../helpers"
+import { sendSpec, getLastAction } from "../helpers"
 
 test.describe("on field - event handling", () => {
   test.beforeEach(async ({ page }) => {
@@ -10,7 +10,6 @@ test.describe("on field - event handling", () => {
   test("button with on.press setState updates state and shows text", async ({
     page,
   }) => {
-    await setState(page, { clicked: false })
     await sendSpec(page, "on/button-set-state.json")
 
     // Status text should be hidden initially
@@ -27,9 +26,6 @@ test.describe("on field - event handling", () => {
   test("button with on.press pushState adds item to list", async ({
     page,
   }) => {
-    await setState(page, {
-      items: [{ id: "1", title: "Existing Item" }],
-    })
     await sendSpec(page, "on/button-push-state.json")
 
     // One item initially
@@ -46,11 +42,6 @@ test.describe("on field - event handling", () => {
   })
 
   test("chained actions execute in order", async ({ page }) => {
-    await setState(page, {
-      newTodo: "Buy milk",
-      todos: [],
-      loading: false,
-    })
     await sendSpec(page, "on/chained-actions.json")
 
     // No todo items initially
@@ -98,10 +89,6 @@ test.describe("on field - event handling", () => {
   test("expression params resolve current state at execution time", async ({
     page,
   }) => {
-    await setState(page, {
-      inputValue: "",
-      collected: [],
-    })
     await sendSpec(page, "on/expression-params.json")
 
     // Type a value into the input

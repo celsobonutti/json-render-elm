@@ -8,13 +8,6 @@ test.describe("Repeat", () => {
   })
 
   test("renders children once per array item", async ({ page }) => {
-    await setState(page, {
-      todos: [
-        { id: "1", title: "Buy milk" },
-        { id: "2", title: "Walk dog" },
-        { id: "3", title: "Write code" },
-      ],
-    })
     await sendSpec(page, "repeat/todo-list.json")
 
     const items = page.locator(".jr-text")
@@ -25,19 +18,13 @@ test.describe("Repeat", () => {
   })
 
   test("renders nothing for empty array", async ({ page }) => {
+    await sendSpec(page, "repeat/todo-list.json")
     await setState(page, { todos: [] })
-    await sendSpec(page, "repeat/todo-list.json", { waitForVisible: false })
 
     await expect(page.locator(".jr-text")).toHaveCount(0)
   })
 
   test("renders multiple children per iteration", async ({ page }) => {
-    await setState(page, {
-      items: [
-        { id: "1", name: "Alice", status: "active" },
-        { id: "2", name: "Bob", status: "inactive" },
-      ],
-    })
     await sendSpec(page, "repeat/multi-child.json")
 
     const texts = page.locator(".jr-text")
@@ -52,11 +39,8 @@ test.describe("Repeat", () => {
   })
 
   test("updates DOM when state array changes", async ({ page }) => {
-    await setState(page, {
-      todos: [{ id: "1", title: "Buy milk" }],
-    })
     await sendSpec(page, "repeat/todo-list.json")
-    await expect(page.locator(".jr-text")).toHaveCount(1)
+    await expect(page.locator(".jr-text")).toHaveCount(3)
 
     await setState(page, {
       todos: [
@@ -75,11 +59,8 @@ test.describe("Repeat with on-driven interactions", () => {
   })
 
   test("add todo via button click with chained actions", async ({ page }) => {
-    await setState(page, {
-      newTodo: "Buy milk",
-      todos: [],
-    })
     await sendSpec(page, "repeat/todo-interactive.json")
+    await setState(page, { newTodo: "Buy milk", todos: [] })
 
     // Input shows initial value
     const input = page.locator(".jr-input")
@@ -100,10 +81,6 @@ test.describe("Repeat with on-driven interactions", () => {
   })
 
   test("add multiple todos via repeated button clicks", async ({ page }) => {
-    await setState(page, {
-      newTodo: "",
-      todos: [],
-    })
     await sendSpec(page, "repeat/todo-interactive.json")
 
     const input = page.locator(".jr-input")
@@ -127,13 +104,6 @@ test.describe("Repeat with on-driven interactions", () => {
   test("per-item button captures $item from repeat context", async ({
     page,
   }) => {
-    await setState(page, {
-      todos: [
-        { id: "1", title: "Buy milk" },
-        { id: "2", title: "Walk dog" },
-      ],
-      selectedForRemoval: null,
-    })
     await sendSpec(page, "repeat/todo-with-remove.json")
 
     // Two todo rows should render

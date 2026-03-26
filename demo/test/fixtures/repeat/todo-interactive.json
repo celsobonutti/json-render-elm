@@ -1,4 +1,5 @@
 {
+  "state": { "newTodo": "", "todos": [] },
   "root": "app",
   "elements": {
     "app": {

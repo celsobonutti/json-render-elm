@@ -1,4 +1,5 @@
 {
+  "state": { "form": { "name": "" }, "submitted": false },
   "root": "form",
   "elements": {
     "form": {
@@ -18,13 +19,19 @@
     "submit-btn": {
       "type": "Button",
       "props": { "label": "Send" },
-      "children": []
+      "children": [],
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": { "path": "/submitted", "value": true }
+        }
+      }
     },
     "success-msg": {
       "type": "Text",
       "props": { "content": { "$template": "Thanks, ${/form/name}!" } },
       "children": [],
-      "visible": { "truthy": "/submitted" }
+      "visible": { "$state": "/submitted" }
     }
   }
 }

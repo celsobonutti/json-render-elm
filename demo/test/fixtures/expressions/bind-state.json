@@ -1,4 +1,5 @@
 {
+  "state": { "form": { "name": "Alice" } },
   "root": "input-1",
   "elements": {
     "input-1": {

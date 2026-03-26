@@ -1,4 +1,5 @@
 {
+  "state": { "items": [{ "id": "1", "title": "Existing Item" }] },
   "root": "stack",
   "elements": {
     "stack": {

@@ -1,4 +1,5 @@
 {
+  "state": { "inputValue": "", "collected": [] },
   "root": "stack",
   "elements": {
     "stack": {

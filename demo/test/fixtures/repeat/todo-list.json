@@ -1,4 +1,5 @@
 {
+  "state": { "todos": [{ "id": "1", "title": "Buy milk" }, { "id": "2", "title": "Walk dog" }, { "id": "3", "title": "Write code" }] },
   "root": "list",
   "elements": {
     "list": {

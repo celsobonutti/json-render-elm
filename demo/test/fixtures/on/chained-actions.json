@@ -1,4 +1,5 @@
 {
+  "state": { "newTodo": "Buy milk", "todos": [], "loading": false },
   "root": "stack",
   "elements": {
     "stack": {
@@ -43,7 +44,7 @@
       "type": "Text",
       "props": { "content": "Loading..." },
       "children": [],
-      "visible": { "truthy": "/loading" }
+      "visible": { "$state": "/loading" }
     }
   }
 }

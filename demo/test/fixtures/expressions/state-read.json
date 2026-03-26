@@ -1,4 +1,5 @@
 {
+  "state": { "greeting": "Hello Alice" },
   "root": "t",
   "elements": {
     "t": {
