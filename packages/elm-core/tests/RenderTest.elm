@@ -74,6 +74,15 @@ testRegistry =
                         _ ->
                             Resolve.RError "shout: expected string arg 'text'"
               )
+            , ( "wrap"
+              , \args ->
+                    case Dict.get "text" args of
+                        Just (Resolve.RString s) ->
+                            Resolve.RString ("[" ++ s ++ "]")
+
+                        _ ->
+                            Resolve.RError "wrap: expected string arg 'text'"
+              )
             ]
     }
 
@@ -670,6 +679,193 @@ suite =
                                     , Selector.text "Fill in the form"
                                     , Selector.text "Submit"
                                     ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            ]
+        , describe "nested $computed expressions"
+            [ test "$computed with $state arg" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$computed": "shout",
+                                      "args": { "text": { "$state": "/greeting" } }
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "greeting", Encode.string "hello" ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "HELLO" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "nested $computed (one as arg to another)" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$computed": "wrap",
+                                      "args": {
+                                        "text": {
+                                          "$computed": "shout",
+                                          "args": { "text": "hello" }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry Encode.null spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "[HELLO]" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$computed inside $cond then branch" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$state": "/loud" },
+                                      "$then": {
+                                        "$computed": "shout",
+                                        "args": { "text": "hello" }
+                                      },
+                                      "$else": "hello"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "loud", Encode.bool True ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "HELLO" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$computed as $cond condition (truthy result)" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": {
+                                        "$computed": "shout",
+                                        "args": { "text": "yes" }
+                                      },
+                                      "$then": "truthy",
+                                      "$else": "falsy"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry Encode.null spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "truthy" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$computed with $item arg inside repeat" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "card",
+                              "elements": {
+                                "card": {
+                                  "type": "Card",
+                                  "props": { "title": "Items" },
+                                  "children": ["item"],
+                                  "repeat": { "statePath": "/items", "key": "id" }
+                                },
+                                "item": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$computed": "shout",
+                                      "args": { "text": { "$item": "name" } }
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object
+                                [ ( "items"
+                                  , Encode.list identity
+                                        [ Encode.object [ ( "id", Encode.string "1" ), ( "name", Encode.string "alice" ) ]
+                                        , Encode.object [ ( "id", Encode.string "2" ), ( "name", Encode.string "bob" ) ]
+                                        ]
+                                  )
+                                ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "ALICE", Selector.text "BOB" ]
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)
