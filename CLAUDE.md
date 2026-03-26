@@ -182,7 +182,8 @@ Each agent works in an isolated git worktree. After all three complete, integrat
 Features not yet implemented, roughly prioritized:
 
 - **Named slots** — `ComponentContext props slots` with typed slot records decoded same way as props. The spec's `children` becomes `Dict String (List String)` keyed by slot name.
-
+- **Export catalog schema generator** — move `generate-catalog-schema.ts` logic into `@json-render/elm` as a `generateCatalogSchema(catalog)` export. Same for the elm-review data generator. Users shouldn't have to copy demo scripts.
+- **ElmCodeGen AST refactor** — replace string concatenation in `ElmCodeGen.elm` with `the-sett/elm-syntax-dsl` for AST-based code generation. See `docs/superpowers/specs/2026-03-26-elm-codegen-refactor.md`.
 - **Form validation** — `validateForm` built-in action
 - **Streaming optimizations** — incremental patches instead of full spec snapshots
 
