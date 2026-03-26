@@ -28,6 +28,7 @@ actions with a decoder that turns action name + resolved params into an action.
 type alias ActionConfig action =
     { handleAction : action -> Model -> ( Model, Cmd (Msg action) )
     , decodeAction : String -> Dict String Value -> Result String action
+    , functions : Resolve.FunctionDict
     }
 
 
@@ -85,17 +86,30 @@ update config msg model =
             ( model, Cmd.none )
 
 
+{-| Look up a path param, accepting both "statePath" and "path" since the
+json-render prompt uses both names depending on context.
+-}
+getPathParam : Dict String Value -> Maybe Value
+getPathParam params =
+    case Dict.get "statePath" params of
+        Just val ->
+            Just val
+
+        Nothing ->
+            Dict.get "path" params
+
+
 {-| Execute a single action binding: resolve params, then dispatch built-in or custom.
 -}
 executeOneAction : ActionConfig action -> Maybe RepeatContext -> ActionBinding -> Model -> ( Model, Cmd (Msg action) )
 executeOneAction config repeatCtx binding model =
     let
         resolvedParams =
-            Resolve.resolveActionParams model.state repeatCtx binding.params
+            Resolve.resolveActionParamsWith config.functions model.state repeatCtx binding.params
     in
     case binding.action of
         "setState" ->
-            case ( Dict.get "path" resolvedParams, Dict.get "value" resolvedParams ) of
+            case ( getPathParam resolvedParams, Dict.get "value" resolvedParams ) of
                 ( Just pathVal, Just value ) ->
                     case Decode.decodeValue Decode.string pathVal of
                         Ok path ->
@@ -110,7 +124,7 @@ executeOneAction config repeatCtx binding model =
                     ( model, Cmd.none )
 
         "pushState" ->
-            case ( Dict.get "path" resolvedParams, Dict.get "value" resolvedParams ) of
+            case ( getPathParam resolvedParams, Dict.get "value" resolvedParams ) of
                 ( Just pathVal, Just value ) ->
                     case Decode.decodeValue Decode.string pathVal of
                         Ok path ->
@@ -125,11 +139,25 @@ executeOneAction config repeatCtx binding model =
                     ( model, Cmd.none )
 
         "removeState" ->
-            case Dict.get "path" resolvedParams of
+            case getPathParam resolvedParams of
                 Just pathVal ->
                     case Decode.decodeValue Decode.string pathVal of
                         Ok path ->
-                            ( { model | state = State.remove path model.state }
+                            let
+                                fullPath =
+                                    case Dict.get "index" resolvedParams of
+                                        Just indexVal ->
+                                            case Decode.decodeValue Decode.int indexVal of
+                                                Ok idx ->
+                                                    path ++ "/" ++ String.fromInt idx
+
+                                                Err _ ->
+                                                    path
+
+                                        Nothing ->
+                                            path
+                            in
+                            ( { model | state = State.remove fullPath model.state }
                             , Cmd.none
                             )
 

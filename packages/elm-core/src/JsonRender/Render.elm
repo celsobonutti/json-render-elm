@@ -45,7 +45,9 @@ type Component msg
 
 
 type alias Registry msg =
-    Dict String (Component msg)
+    { components : Dict String (Component msg)
+    , functions : Resolve.FunctionDict
+    }
 
 
 register :
@@ -245,11 +247,11 @@ renderElement registry state repeatCtx spec element =
 
 renderElementInner : Registry (Msg action) -> Value -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
 renderElementInner registry state repeatCtx spec element =
-    case Dict.get element.type_ registry of
+    case Dict.get element.type_ registry.components of
         Just (Component componentFn) ->
             let
                 resolved =
-                    Resolve.resolveProps state repeatCtx element.props
+                    Resolve.resolvePropsWith registry.functions state repeatCtx element.props
 
                 bindings =
                     extractBindings repeatCtx element.props

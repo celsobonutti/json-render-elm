@@ -7,6 +7,7 @@ import Html exposing (Html, button, div, h1, p, pre, span, text, textarea)
 import Html.Attributes exposing (class, disabled, placeholder, rows, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Json.Decode as Decode
+import Dict
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions as Actions
 import JsonRender.Render as Render
@@ -31,6 +32,9 @@ port downloadJson : Value -> Cmd msg
 
 
 port jsonRenderSpecIn : (Value -> msg) -> Sub msg
+
+
+port jsonRenderStateIn : (Value -> msg) -> Sub msg
 
 
 
@@ -76,6 +80,7 @@ type Msg
     = UpdatePrompt String
     | Submit
     | SpecReceived Value
+    | StateReceived Value
     | ErrorReceived String
     | Reset
     | ToggleJson
@@ -117,6 +122,9 @@ update msg model =
                     , Cmd.none
                     )
 
+        StateReceived val ->
+            ( { model | renderState = val }, Cmd.none )
+
         ErrorReceived err ->
             ( { model | state = Idle, error = Just err }, Cmd.none )
 
@@ -153,6 +161,7 @@ actionConfig : Actions.ActionConfig Action
 actionConfig =
     { handleAction = handleAction
     , decodeAction = decodeAction
+    , functions = Dict.empty
     }
 
 
@@ -298,6 +307,7 @@ subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
         [ jsonRenderSpecIn SpecReceived
+        , jsonRenderStateIn StateReceived
         , receiveError ErrorReceived
         ]
 

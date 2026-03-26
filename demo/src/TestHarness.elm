@@ -3,6 +3,7 @@ port module TestHarness exposing (main)
 import Browser
 import Components.Actions exposing (Action(..), decodeAction)
 import Components.Registry exposing (registry)
+import Dict
 import Html exposing (Html, div)
 import Html.Attributes exposing (id)
 import Json.Decode as Decode
@@ -19,6 +20,9 @@ port jsonRenderStateIn : (Value -> msg) -> Sub msg
 
 
 port testActionOut : Value -> Cmd msg
+
+
+port testDecodeErrorOut : String -> Cmd msg
 
 
 type alias Model =
@@ -50,8 +54,8 @@ update msg model =
                 Ok spec ->
                     ( { model | spec = Just spec }, Cmd.none )
 
-                Err _ ->
-                    ( model, Cmd.none )
+                Err err ->
+                    ( model, testDecodeErrorOut (Decode.errorToString err) )
 
         StateReceived val ->
             ( { model | renderState = val }, Cmd.none )
@@ -73,6 +77,7 @@ actionConfig : Actions.ActionConfig Action
 actionConfig =
     { handleAction = handleAction
     , decodeAction = decodeAction
+    , functions = Dict.empty
     }
 
 

@@ -19,49 +19,63 @@ import Test.Html.Selector as Selector
 
 testRegistry : Render.Registry msg
 testRegistry =
-    Dict.fromList
-        [ ( "Card"
-          , Render.register
-                (\props ->
-                    Resolve.succeed identity
-                        |> Resolve.required "title" Resolve.string
-                        |> (\d -> d props)
-                )
-                (\_ -> ())
-                (\ctx ->
-                    div [ class "card" ]
-                        [ text ctx.props
-                        , div [] ctx.children
-                        ]
-                )
-          )
-        , ( "Text"
-          , Render.register
-                (\props ->
-                    Resolve.succeed identity
-                        |> Resolve.required "content" Resolve.string
-                        |> (\d -> d props)
-                )
-                (\_ -> ())
-                (\ctx -> text ctx.props)
-          )
-        , ( "Button"
-          , Render.register
-                (\props ->
-                    Resolve.succeed identity
-                        |> Resolve.required "label" Resolve.string
-                        |> (\d -> d props)
-                )
-                (\_ -> ())
-                (\ctx ->
-                    Html.button
-                        [ class "button"
-                        , onClick (ctx.emit "press")
-                        ]
-                        [ text ctx.props ]
-                )
-          )
-        ]
+    { components =
+        Dict.fromList
+            [ ( "Card"
+              , Render.register
+                    (\props ->
+                        Resolve.succeed identity
+                            |> Resolve.required "title" Resolve.string
+                            |> (\d -> d props)
+                    )
+                    (\_ -> ())
+                    (\ctx ->
+                        div [ class "card" ]
+                            [ text ctx.props
+                            , div [] ctx.children
+                            ]
+                    )
+              )
+            , ( "Text"
+              , Render.register
+                    (\props ->
+                        Resolve.succeed identity
+                            |> Resolve.required "content" Resolve.string
+                            |> (\d -> d props)
+                    )
+                    (\_ -> ())
+                    (\ctx -> text ctx.props)
+              )
+            , ( "Button"
+              , Render.register
+                    (\props ->
+                        Resolve.succeed identity
+                            |> Resolve.required "label" Resolve.string
+                            |> (\d -> d props)
+                    )
+                    (\_ -> ())
+                    (\ctx ->
+                        Html.button
+                            [ class "button"
+                            , onClick (ctx.emit "press")
+                            ]
+                            [ text ctx.props ]
+                    )
+              )
+            ]
+    , functions =
+        Dict.fromList
+            [ ( "shout"
+              , \args ->
+                    case Dict.get "text" args of
+                        Just (Resolve.RString s) ->
+                            Resolve.RString (String.toUpper s)
+
+                        _ ->
+                            Resolve.RError "shout: expected string arg 'text'"
+              )
+            ]
+    }
 
 
 suite : Test
@@ -172,30 +186,33 @@ suite =
                 let
                     bindRegistry : Render.Registry msg
                     bindRegistry =
-                        Dict.fromList
-                            [ ( "Input"
-                              , Render.register
-                                    (\props ->
-                                        Resolve.succeed identity
-                                            |> Resolve.required "value" Resolve.string
-                                            |> (\d -> d props)
-                                    )
-                                    (\bindings ->
-                                        { value = Dict.get "value" bindings }
-                                    )
-                                    (\ctx ->
-                                        div []
-                                            [ text ctx.props
-                                            , case ctx.bindings.value of
-                                                Just _ ->
-                                                    text "[bound]"
+                        { components =
+                            Dict.fromList
+                                [ ( "Input"
+                                  , Render.register
+                                        (\props ->
+                                            Resolve.succeed identity
+                                                |> Resolve.required "value" Resolve.string
+                                                |> (\d -> d props)
+                                        )
+                                        (\bindings ->
+                                            { value = Dict.get "value" bindings }
+                                        )
+                                        (\ctx ->
+                                            div []
+                                                [ text ctx.props
+                                                , case ctx.bindings.value of
+                                                    Just _ ->
+                                                        text "[bound]"
 
-                                                Nothing ->
-                                                    text "[unbound]"
-                                            ]
-                                    )
-                              )
-                            ]
+                                                    Nothing ->
+                                                        text "[unbound]"
+                                                ]
+                                        )
+                                  )
+                                ]
+                        , functions = Dict.empty
+                        }
 
                     formState =
                         Encode.object
@@ -348,7 +365,7 @@ suite =
                                   "type": "Text",
                                   "props": { "content": "Secret" },
                                   "children": [],
-                                  "visible": { "truthy": "/show" }
+                                  "visible": { "$state": "/show" }
                                 }
                               }
                             }
@@ -377,7 +394,7 @@ suite =
                                   "type": "Text",
                                   "props": { "content": "Visible" },
                                   "children": [],
-                                  "visible": { "truthy": "/show" }
+                                  "visible": { "$state": "/show" }
                                 }
                               }
                             }
@@ -411,7 +428,7 @@ suite =
                                   "type": "Text",
                                   "props": { "content": { "$template": "Hello, ${/user/name}!" } },
                                   "children": [],
-                                  "visible": { "truthy": "/showGreeting" }
+                                  "visible": { "$state": "/showGreeting" }
                                 }
                               }
                             }
@@ -431,6 +448,66 @@ suite =
                                     [ Selector.text "Contact Us"
                                     , Selector.text "Hello, Alice!"
                                     ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "resolves $computed expression from JSON spec" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$computed": "shout",
+                                      "args": { "text": { "$state": "/greeting" } }
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "greeting", Encode.string "hello" ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "HELLO" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "unknown $computed shows error" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": { "$computed": "nonexistent", "args": {} }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry Encode.null spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "Props error" ]
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)

@@ -13,12 +13,15 @@ import JsonRender.Render exposing (Registry)
 
 registry : Registry msg
 registry =
-    Dict.fromList
-        [ ( "Badge", Components.Badge.component )
-        , ( "Button", Components.Button.component )
-        , ( "Card", Components.Card.component )
-        , ( "Image", Components.Image.component )
-        , ( "Input", Components.Input.component )
-        , ( "Stack", Components.Stack.component )
-        , ( "Text", Components.Text.component )
-        ]
+    { components =
+        Dict.fromList
+            [ ( "Badge", Components.Badge.component )
+            , ( "Button", Components.Button.component )
+            , ( "Card", Components.Card.component )
+            , ( "Image", Components.Image.component )
+            , ( "Input", Components.Input.component )
+            , ( "Stack", Components.Stack.component )
+            , ( "Text", Components.Text.component )
+            ]
+    , functions = Dict.empty
+    }

@@ -19,6 +19,7 @@ testActionConfig : Actions.ActionConfig TestAction
 testActionConfig =
     { handleAction = \_ model -> ( model, Cmd.none )
     , decodeAction = decodeTestAction
+    , functions = Dict.empty
     }
 
 
@@ -114,6 +115,7 @@ suite =
                                         _ ->
                                             ( m, Cmd.none )
                             , decodeAction = decodeTestAction
+                            , functions = Dict.empty
                             }
 
                         ( newModel, _ ) =
@@ -222,6 +224,7 @@ suite =
                                         _ ->
                                             ( m, Cmd.none )
                             , decodeAction = decodeTestAction
+                            , functions = Dict.empty
                             }
 
                         binding =
