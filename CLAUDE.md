@@ -46,6 +46,11 @@ cd demo && npm run catalog
 cd demo && npm run elm-review:fix
 ```
 
+## Design Principles
+
+### Follow the Core Spec
+This project implements the [json-render](https://json-render.dev) core specification. When designing new features, follow the core spec's semantics. Expressions compose: `$computed` args can use any expression type (`$state`, `$item`, `$computed`, etc.), and any prop that accepts an expression accepts all expression types uniformly.
+
 ## Architecture Decisions
 
 ### Port-Driven, Full-Spec Snapshots
@@ -70,21 +75,33 @@ Expressions are `PropValue` variants resolved at render time:
 - `$state` — read from state path (read-only)
 - `$bindState` — read + write to state path (two-way binding)
 - `$template` — string interpolation with `${/path}` syntax
-- `$item` — read field from repeat context item (requires `repeat`, not yet implemented)
-- `$index` — current repeat index (requires `repeat`, not yet implemented)
+- `$item` — read field from repeat context item
+- `$index` — current repeat index
+- `$cond` — conditional expression: `{ "$cond": <condition>, "$then": <value>, "$else": <value> }`. Condition is any PropValue evaluated for truthiness; `$then`/`$else` are PropValues resolved based on the result.
 
 `$bindState` resolves to the current value (like `$state`) AND provides a setter function via `ComponentContext.bindings`. The setter produces `SetState path value` messages.
 
 ### Visibility Conditions
-Elements can have a `visible` field with conditions: `Truthy`, `Equals`, `NotEquals`, `Not`, `And`, `Or`. JSON shape: `{ "truthy": "/path" }`, `{ "equals": { "path": "...", "value": ... } }`, `{ "and": [...] }`, etc.
+Elements can have a `visible` field with conditions matching the json-render core prompt format:
+- `{ "$state": "/path" }` — truthy check
+- `{ "$state": "/path", "not": true }` — falsy check
+- `{ "$state": "/path", "eq": <value> }` — equals
+- `{ "$state": "/path", "neq": <value> }` — not equals
+- `{ "$and": [...] }` — explicit AND
+- `{ "$or": [...] }` — OR
+- `[cond, cond]` — implicit AND (list of conditions)
+- `true` / `false` — always visible/hidden
+
+### State on Spec
+The JS bridge extracts the `state` field from incoming specs and sends it to Elm via the `jsonRenderStateIn` port as initial render state.
 
 ### Elm Schema vs React/Vue/Svelte
 Our `defineSchema` in `packages/js-bridge/src/schema.ts` differs from other renderers:
-- No `on` field on elements — actions via `emit` + ports
-- No `repeat` field — not yet supported
-- No `state` on spec — Elm model owns state
 - Three built-in actions: `setState`, `pushState`, `removeState` (no `validateForm`)
-- Expressions: `$state`, `$item`, `$index`, `$template`, `$bindState` (no `$computed`, no `$bindItem`)
+- Action params accept both `statePath` and `path` as the path parameter name
+- `removeState` supports an `index` param for removing array items by index
+- Expressions: `$state`, `$item`, `$index`, `$template`, `$bindState`, `$bindItem`, `$cond` (no `$computed`)
+- Props error rendering: components show a visible error when props fail to decode instead of rendering nothing
 
 ### elm-review CatalogSync
 The CatalogSync rule validates component modules against a catalog JSON Schema. It:
@@ -153,8 +170,6 @@ Note: the `testRegistry` in `RenderTest.elm` uses simplified class names (`.card
 
 Features not yet implemented, roughly prioritized:
 
-- **`repeat`** — iterate over state arrays with `repeat: { statePath, key }` on elements. Required before `$item`/`$index` work in practice.
-- **`$bindItem`** — two-way binding within repeat contexts. Implement alongside `repeat`.
 - **Named slots** — `ComponentContext props slots` with typed slot records decoded same way as props. The spec's `children` becomes `Dict String (List String)` keyed by slot name.
 - **`$computed`** — registered transformation functions
 - **Form validation** — `validateForm` built-in action
