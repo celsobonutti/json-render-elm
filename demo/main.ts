@@ -14,6 +14,89 @@ const app = Elm.Main!.init({ node: root })
 // Set up the json-render-elm bridge (handles spec-in port)
 const bridge = createElmBridge(app)
 
+// --- Fixture catalog sidebar ---
+
+const fixtures = import.meta.glob<{ default: unknown }>(
+  "./test/fixtures/**/*.json",
+  { eager: false }
+)
+
+type FixtureMap = Record<string, string[]>
+
+function buildCatalog(): FixtureMap {
+  const catalog: FixtureMap = {}
+  const prefix = "./test/fixtures/"
+  for (const path of Object.keys(fixtures).sort()) {
+    const relative = path.slice(prefix.length) // "repeat/todo-list.json"
+    const slash = relative.indexOf("/")
+    if (slash === -1) continue
+    const category = relative.slice(0, slash)
+    const name = relative.slice(slash + 1).replace(/\.json$/, "")
+    if (!catalog[category]) catalog[category] = []
+    catalog[category].push(name)
+  }
+  return catalog
+}
+
+function renderCatalog() {
+  const catalog = buildCatalog()
+  const listEl = document.querySelector(".catalog-list")
+  if (!listEl) return
+
+  for (const [category, items] of Object.entries(catalog)) {
+    const section = document.createElement("div")
+    section.className = "catalog-category"
+
+    const header = document.createElement("button")
+    header.className = "catalog-category-header"
+    header.innerHTML = `<span class="arrow">\u25BE</span> ${category}`
+    header.addEventListener("click", () => {
+      section.classList.toggle("collapsed")
+    })
+    section.appendChild(header)
+
+    const itemsContainer = document.createElement("div")
+    itemsContainer.className = "catalog-items"
+    for (const name of items) {
+      const btn = document.createElement("button")
+      btn.className = "catalog-item"
+      btn.textContent = name
+      btn.dataset.fixture = `${category}/${name}`
+      btn.addEventListener("click", () => loadFixture(`${category}/${name}`))
+      itemsContainer.appendChild(btn)
+    }
+    section.appendChild(itemsContainer)
+
+    listEl.appendChild(section)
+  }
+}
+
+let activeFixture: string | null = null
+
+async function loadFixture(name: string) {
+  const path = `./test/fixtures/${name}.json`
+  const loader = fixtures[path]
+  if (!loader) return
+  const mod = await loader()
+  bridge.sendSpec(mod.default)
+
+  // Highlight active fixture
+  activeFixture = name
+  document.querySelectorAll(".catalog-item").forEach((el) => {
+    el.classList.toggle("active", (el as HTMLElement).dataset.fixture === name)
+  })
+}
+
+// Toggle sidebar
+const layout = document.getElementById("layout")!
+const toggleBtn = document.getElementById("catalog-toggle")!
+const closeBtn = document.querySelector(".catalog-close")!
+
+toggleBtn.addEventListener("click", () => layout.classList.add("catalog-open"))
+closeBtn.addEventListener("click", () => layout.classList.remove("catalog-open"))
+
+renderCatalog()
+
 // Export action: download current state as JSON file
 app.ports.downloadJson.subscribe((state: unknown) => {
   const json = JSON.stringify(state, null, 2)
