@@ -1,0 +1,15 @@
+{
+  "root": "t",
+  "elements": {
+    "t": {
+      "type": "Text",
+      "props": {
+        "content": {
+          "$computed": "shout",
+          "args": { "text": "hello world" }
+        }
+      },
+      "children": []
+    }
+  }
+}

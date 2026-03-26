@@ -1,0 +1,15 @@
+{
+  "root": "t",
+  "elements": {
+    "t": {
+      "type": "Text",
+      "props": {
+        "content": {
+          "$computed": "nonexistent",
+          "args": {}
+        }
+      },
+      "children": []
+    }
+  }
+}
