@@ -466,6 +466,18 @@ extractEntriesFromExpression expr acc =
                 acc
                 items
 
+        Expression.RecordExpr fields ->
+            List.foldl
+                (\(Node _ ( Node _ fieldName, Node _ fieldExpr )) innerAcc ->
+                    if fieldName == "components" then
+                        extractEntriesFromExpression fieldExpr innerAcc
+
+                    else
+                        innerAcc
+                )
+                acc
+                fields
+
         _ ->
             acc
 

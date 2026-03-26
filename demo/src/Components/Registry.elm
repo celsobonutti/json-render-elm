@@ -3,6 +3,7 @@ module Components.Registry exposing (registry)
 import Components.Badge
 import Components.Button
 import Components.Card
+import Components.Functions
 import Components.Image
 import Components.Input
 import Components.Stack
@@ -23,5 +24,5 @@ registry =
             , ( "Stack", Components.Stack.component )
             , ( "Text", Components.Text.component )
             ]
-    , functions = Dict.empty
+    , functions = Components.Functions.toFunctionDict Components.Functions.functions
     }

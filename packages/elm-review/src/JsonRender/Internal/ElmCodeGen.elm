@@ -442,7 +442,7 @@ functionsModule namespace functions =
         ++ namespace
         ++ ".Functions exposing (Functions, functions, toFunctionDict)\n\n"
         ++ "import Dict exposing (Dict)\n"
-        ++ "import JsonRender.Resolve as Resolve exposing (ResolvedValue(..))\n\n\n"
+        ++ "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue(..))\n\n\n"
         ++ String.join "\n\n\n" paramsTypes
         ++ "\n\n\n"
         ++ functionsType
@@ -578,10 +578,10 @@ toFunctionDictEntry ( name, schema ) =
                             TypeMapping.toResolvedValueExtractor field.fieldType
                     in
                     if field.required then
-                        "                    |> Resolve.required \"" ++ pName ++ "\" " ++ extractor
+                        "                        |> ResolvedValue.required \"" ++ pName ++ "\" " ++ extractor
 
                     else
-                        "                    |> Resolve.optional \"" ++ pName ++ "\" " ++ extractor ++ " Nothing"
+                        "                        |> ResolvedValue.optional \"" ++ pName ++ "\" " ++ extractor ++ " Nothing"
                 )
                 sortedParams
 
@@ -594,7 +594,7 @@ toFunctionDictEntry ( name, schema ) =
         ++ "          , \\args ->\n"
         ++ "                let\n"
         ++ "                    result =\n"
-        ++ "                        Resolve.succeed "
+        ++ "                        ResolvedValue.succeed "
         ++ capitalName
         ++ "Params\n"
         ++ String.join "\n" pipelineSteps
@@ -668,7 +668,7 @@ registryModule namespace componentNames hasFunctions =
         ++ functionsImport
         ++ String.join "\n" imports
         ++ "\n\n\n"
-        ++ "registry : Registry\nregistry =\n    { components =\n        Dict.fromList\n"
+        ++ "registry : Registry msg\nregistry =\n    { components =\n        Dict.fromList\n"
         ++ entriesStr
         ++ "\n"
         ++ functionsField

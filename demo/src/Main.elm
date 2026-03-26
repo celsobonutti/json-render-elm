@@ -161,7 +161,7 @@ actionConfig : Actions.ActionConfig Action
 actionConfig =
     { handleAction = handleAction
     , decodeAction = decodeAction
-    , functions = Dict.empty
+    , functions = registry.functions
     }
 
 
