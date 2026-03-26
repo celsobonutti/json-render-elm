@@ -65,8 +65,16 @@ register propsDecoder bindingsDecoder view =
                         , emit = raw.emit
                         }
 
-                Err _ ->
-                    Html.text ""
+                Err err ->
+                    Html.div
+                        [ Html.Attributes.style "background" "#fee2e2"
+                        , Html.Attributes.style "color" "#991b1b"
+                        , Html.Attributes.style "padding" "8px 12px"
+                        , Html.Attributes.style "border-radius" "4px"
+                        , Html.Attributes.style "font-size" "13px"
+                        , Html.Attributes.style "font-family" "monospace"
+                        ]
+                        [ Html.text ("Props error: " ++ err) ]
         )
 
 
@@ -213,11 +221,23 @@ renderElement : Registry (Msg action) -> Value -> Maybe RepeatContext -> Spec ->
 renderElement registry state repeatCtx spec element =
     case element.visible of
         Just condition ->
-            if Visibility.evaluate state repeatCtx condition then
-                renderElementInner registry state repeatCtx spec element
+            case Visibility.evaluate state repeatCtx condition of
+                Ok True ->
+                    renderElementInner registry state repeatCtx spec element
 
-            else
-                Html.text ""
+                Ok False ->
+                    Html.text ""
+
+                Err err ->
+                    Html.div
+                        [ Html.Attributes.style "background" "#fee2e2"
+                        , Html.Attributes.style "color" "#991b1b"
+                        , Html.Attributes.style "padding" "8px 12px"
+                        , Html.Attributes.style "border-radius" "4px"
+                        , Html.Attributes.style "font-size" "13px"
+                        , Html.Attributes.style "font-family" "monospace"
+                        ]
+                        [ Html.text ("Visibility error: " ++ err) ]
 
         Nothing ->
             renderElementInner registry state repeatCtx spec element

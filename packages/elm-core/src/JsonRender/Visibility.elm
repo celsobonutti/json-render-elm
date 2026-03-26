@@ -5,10 +5,22 @@ module JsonRender.Visibility exposing
     )
 
 {-| Conditional visibility for spec elements.
+
+JSON format (matches json-render core prompt):
+
+  - `{ "$state": "/path" }` — truthy check
+  - `{ "$state": "/path", "not": true }` — falsy check
+  - `{ "$state": "/path", "eq": <value> }` — equals
+  - `{ "$state": "/path", "neq": <value> }` — not equals
+  - Any condition can add `"not": true` to invert
+  - `[cond, cond]` — implicit AND (list of conditions)
+  - `{ "$and": [cond, cond] }` — explicit AND
+  - `{ "$or": [cond, cond] }` — OR
+  - `true` / `false` — always visible/hidden
+
 -}
 
 import Json.Decode as Decode exposing (Decoder)
-import Json.Decode.Pipeline exposing (required)
 import Json.Encode exposing (Value)
 import JsonRender.Internal.PropValue as PropValue exposing (PropValue(..))
 import JsonRender.State as State
@@ -30,41 +42,68 @@ type alias RepeatContext =
     }
 
 
-evaluate : Value -> Maybe RepeatContext -> VisibilityCondition -> Bool
+evaluate : Value -> Maybe RepeatContext -> VisibilityCondition -> Result String Bool
 evaluate state repeatCtx condition =
     case condition of
         Truthy path ->
             case State.get path state of
                 Just val ->
-                    isTruthy val
+                    Ok (isTruthy val)
 
                 Nothing ->
-                    False
+                    Ok False
 
         Equals path expected ->
             case State.get path state of
                 Just val ->
-                    propValueMatchesJson expected val
+                    Ok (propValueMatchesJson expected val)
 
                 Nothing ->
-                    False
+                    Ok False
 
         NotEquals path expected ->
             case State.get path state of
                 Just val ->
-                    not (propValueMatchesJson expected val)
+                    Ok (not (propValueMatchesJson expected val))
 
                 Nothing ->
-                    True
+                    Ok True
 
         Not inner ->
-            not (evaluate state repeatCtx inner)
+            evaluate state repeatCtx inner
+                |> Result.map not
 
         And conditions ->
-            List.all (evaluate state repeatCtx) conditions
+            List.foldl
+                (\c acc ->
+                    case acc of
+                        Err err ->
+                            Err err
+
+                        Ok True ->
+                            evaluate state repeatCtx c
+
+                        Ok False ->
+                            Ok False
+                )
+                (Ok True)
+                conditions
 
         Or conditions ->
-            List.any (evaluate state repeatCtx) conditions
+            List.foldl
+                (\c acc ->
+                    case acc of
+                        Err err ->
+                            Err err
+
+                        Ok True ->
+                            Ok True
+
+                        Ok False ->
+                            evaluate state repeatCtx c
+                )
+                (Ok False)
+                conditions
 
 
 isTruthy : Value -> Bool
@@ -94,7 +133,12 @@ isTruthy value =
                                             False
 
                                         Err _ ->
-                                            True
+                                            case Decode.decodeValue (Decode.list Decode.value) value of
+                                                Ok items ->
+                                                    not (List.isEmpty items)
+
+                                                Err _ ->
+                                                    True
 
 
 propValueMatchesJson : PropValue -> Value -> Bool
@@ -122,18 +166,62 @@ propValueMatchesJson propVal jsonVal =
 decoder : Decoder VisibilityCondition
 decoder =
     Decode.oneOf
-        [ Decode.field "equals"
-            (Decode.succeed Equals
-                |> required "path" Decode.string
-                |> required "value" PropValue.decoder
+        [ -- { "$state": "/path", ... }
+          stateConditionDecoder
+
+        -- { "$and": [...] }
+        , Decode.field "$and" (Decode.lazy (\_ -> Decode.list decoder) |> Decode.map And)
+
+        -- { "$or": [...] }
+        , Decode.field "$or" (Decode.lazy (\_ -> Decode.list decoder) |> Decode.map Or)
+
+        -- [cond, cond] — implicit AND
+        , Decode.list (Decode.lazy (\_ -> decoder)) |> Decode.map And
+
+        -- true / false — literal booleans
+        , Decode.bool
+            |> Decode.map
+                (\b ->
+                    if b then
+                        And []
+
+                    else
+                        Or []
+                )
+        ]
+
+
+{-| Decode a `{ "$state": "/path", ... }` condition.
+Optional modifiers: "eq", "neq", "not".
+-}
+stateConditionDecoder : Decoder VisibilityCondition
+stateConditionDecoder =
+    Decode.field "$state" Decode.string
+        |> Decode.andThen
+            (\path ->
+                Decode.oneOf
+                    [ Decode.field "eq" PropValue.decoder
+                        |> Decode.andThen (\val -> maybeNot (Equals path val))
+                    , Decode.field "neq" PropValue.decoder
+                        |> Decode.andThen (\val -> maybeNot (NotEquals path val))
+                    , maybeNot (Truthy path)
+                    ]
             )
-        , Decode.field "notEquals"
-            (Decode.succeed NotEquals
-                |> required "path" Decode.string
-                |> required "value" PropValue.decoder
-            )
-        , Decode.field "truthy" (Decode.string |> Decode.map Truthy)
-        , Decode.field "not" (Decode.lazy (\_ -> decoder) |> Decode.map Not)
-        , Decode.field "and" (Decode.lazy (\_ -> Decode.list decoder) |> Decode.map And)
-        , Decode.field "or" (Decode.lazy (\_ -> Decode.list decoder) |> Decode.map Or)
+
+
+{-| Wrap a condition in Not if the "not" field is true.
+-}
+maybeNot : VisibilityCondition -> Decoder VisibilityCondition
+maybeNot condition =
+    Decode.oneOf
+        [ Decode.field "not" Decode.bool
+            |> Decode.andThen
+                (\isNot ->
+                    if isNot then
+                        Decode.succeed (Not condition)
+
+                    else
+                        Decode.succeed condition
+                )
+        , Decode.succeed condition
         ]
