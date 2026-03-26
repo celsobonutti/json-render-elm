@@ -78,6 +78,7 @@ Expressions are `PropValue` variants resolved at render time:
 - `$item` — read field from repeat context item
 - `$index` — current repeat index
 - `$cond` — conditional expression: `{ "$cond": <condition>, "$then": <value>, "$else": <value> }`. Condition is any PropValue evaluated for truthiness; `$then`/`$else` are PropValues resolved based on the result.
+- `$computed` — registered transformation function: `{ "$computed": "funcName", "args": { ... } }`. Args can contain any expression type. Functions are registered in `FunctionDict` and threaded through the registry.
 
 `$bindState` resolves to the current value (like `$state`) AND provides a setter function via `ComponentContext.bindings`. The setter produces `SetState path value` messages.
 
@@ -100,7 +101,7 @@ Our `defineSchema` in `packages/js-bridge/src/schema.ts` differs from other rend
 - Three built-in actions: `setState`, `pushState`, `removeState` (no `validateForm`)
 - Action params accept both `statePath` and `path` as the path parameter name
 - `removeState` supports an `index` param for removing array items by index
-- Expressions: `$state`, `$item`, `$index`, `$template`, `$bindState`, `$bindItem`, `$cond` (no `$computed`)
+- Expressions: `$state`, `$item`, `$index`, `$template`, `$bindState`, `$bindItem`, `$cond`, `$computed`
 - Props error rendering: components show a visible error when props fail to decode instead of rendering nothing
 
 ### elm-review CatalogSync
@@ -166,12 +167,22 @@ All demo components use the `jr-` prefix:
 
 Note: the `testRegistry` in `RenderTest.elm` uses simplified class names (`.card`, not `.jr-card`). Playwright tests use the real demo component classes.
 
+## Plan Execution Strategy
+
+When implementing plans from brainstorming, dispatch three parallel agent teams split by package:
+
+1. **elm-lib agent** — `packages/elm-core/` work (types, decoders, resolution, rendering, unit tests)
+2. **elm-review agent** — `packages/elm-review/` work (schema parsing, code generation, CatalogSync rules)
+3. **ts agent** — `packages/js-bridge/` + `demo/` work (schema, bridge, catalog, Playwright e2e tests, fixtures)
+
+Each agent works in an isolated git worktree. After all three complete, integrate their branches and run the full test suite. Tasks that require all packages (e.g., e2e tests that need elm-core + elm-review + demo changes) are done in a final integration pass after merging.
+
 ## Backlog
 
 Features not yet implemented, roughly prioritized:
 
 - **Named slots** — `ComponentContext props slots` with typed slot records decoded same way as props. The spec's `children` becomes `Dict String (List String)` keyed by slot name.
-- **`$computed`** — registered transformation functions
+
 - **Form validation** — `validateForm` built-in action
 - **Streaming optimizations** — incremental patches instead of full spec snapshots
 
