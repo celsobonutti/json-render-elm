@@ -621,5 +621,81 @@ suite =
                     State.get "/x" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
                         |> Expect.equal (Just 2)
+            , test "watcher inside repeat fires with $item context for each item" <|
+                \_ ->
+                    let
+                        -- Watcher sets each item's "done" field to true when /trigger changes
+                        -- $item("done") resolves to the state path /items/0/done, /items/1/done, etc.
+                        json =
+                            """
+                            {
+                              "root": "list",
+                              "elements": {
+                                "list": {
+                                  "type": "Stack",
+                                  "props": { "direction": "vertical" },
+                                  "children": ["item"],
+                                  "repeat": { "statePath": "/items", "key": "id" }
+                                },
+                                "item": {
+                                  "type": "Text",
+                                  "props": { "content": "ok" },
+                                  "children": [],
+                                  "watch": {
+                                    "/trigger": {
+                                      "action": "setState",
+                                      "params": { "path": { "$item": "done" }, "value": true }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            let
+                                oldState =
+                                    Encode.object
+                                        [ ( "trigger", Encode.bool False )
+                                        , ( "items"
+                                          , Encode.list identity
+                                                [ Encode.object [ ( "id", Encode.string "1" ), ( "done", Encode.bool False ) ]
+                                                , Encode.object [ ( "id", Encode.string "2" ), ( "done", Encode.bool False ) ]
+                                                ]
+                                          )
+                                        ]
+
+                                model =
+                                    { spec = Just spec
+                                    , state =
+                                        Encode.object
+                                            [ ( "trigger", Encode.bool True )
+                                            , ( "items"
+                                              , Encode.list identity
+                                                    [ Encode.object [ ( "id", Encode.string "1" ), ( "done", Encode.bool False ) ]
+                                                    , Encode.object [ ( "id", Encode.string "2" ), ( "done", Encode.bool False ) ]
+                                                    ]
+                                              )
+                                            ]
+                                    }
+
+                                ( newModel, _ ) =
+                                    Actions.checkWatchers testActionConfig oldState model
+                            in
+                            Expect.all
+                                [ \m ->
+                                    State.get "/items/0/done" m.state
+                                        |> Maybe.andThen (Decode.decodeValue Decode.bool >> Result.toMaybe)
+                                        |> Expect.equal (Just True)
+                                , \m ->
+                                    State.get "/items/1/done" m.state
+                                        |> Maybe.andThen (Decode.decodeValue Decode.bool >> Result.toMaybe)
+                                        |> Expect.equal (Just True)
+                                ]
+                                newModel
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
             ]
         ]

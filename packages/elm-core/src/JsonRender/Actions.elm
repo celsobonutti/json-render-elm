@@ -13,7 +13,7 @@ import Dict exposing (Dict)
 import Json.Decode as Decode
 import Json.Encode exposing (Value)
 import JsonRender.Resolve as Resolve exposing (RepeatContext)
-import JsonRender.Spec exposing (ActionBinding, EventHandler(..), Spec)
+import JsonRender.Spec exposing (ActionBinding, EventHandler(..), Spec, WatcherEntry)
 import JsonRender.State as State
 
 
@@ -177,97 +177,125 @@ executeOneAction config repeatCtx binding model =
                     ( model, Cmd.none )
 
 
-{-| Check all watchers in the spec after a state change. Compares old state vs
-new state at each watched path. If any changed, executes the watcher's actions
-and re-checks (up to 10 iterations to prevent infinite loops).
+{-| Check pre-computed watchers after a state change. Scans the flat watcher
+list on the spec (O(W), typically tiny). When a watcher triggers on a repeated
+element, expands to all items in the repeat array with proper RepeatContext.
+Cascades up to 10 iterations to prevent infinite loops.
 -}
 checkWatchers : ActionConfig action -> Value -> Model -> ( Model, Cmd (Msg action) )
 checkWatchers config oldState model =
-    checkWatchersLoop config 10 oldState model
+    case model.spec of
+        Nothing ->
+            ( model, Cmd.none )
+
+        Just spec ->
+            if List.isEmpty spec.watchers then
+                ( model, Cmd.none )
+
+            else
+                checkWatchersLoop config 10 oldState spec.watchers model
 
 
-checkWatchersLoop : ActionConfig action -> Int -> Value -> Model -> ( Model, Cmd (Msg action) )
-checkWatchersLoop config remaining oldState model =
+checkWatchersLoop : ActionConfig action -> Int -> Value -> List WatcherEntry -> Model -> ( Model, Cmd (Msg action) )
+checkWatchersLoop config remaining oldState watchers model =
     if remaining <= 0 then
         ( model, Cmd.none )
 
     else
-        case model.spec of
-            Nothing ->
-                ( model, Cmd.none )
+        let
+            triggered =
+                collectTriggered oldState model.state watchers
+        in
+        if List.isEmpty triggered then
+            ( model, Cmd.none )
 
-            Just spec ->
-                let
-                    triggered =
-                        collectTriggeredHandlers oldState model.state spec
-                in
-                if List.isEmpty triggered then
-                    ( model, Cmd.none )
-
-                else
-                    let
-                        stateBeforeWatchers =
-                            model.state
-
-                        ( modelAfterWatchers, cmd ) =
-                            executeHandlers config triggered model
-
-                        ( finalModel, moreCmd ) =
-                            checkWatchersLoop config (remaining - 1) stateBeforeWatchers modelAfterWatchers
-                    in
-                    ( finalModel, Cmd.batch [ cmd, moreCmd ] )
-
-
-collectTriggeredHandlers : Value -> Value -> Spec -> List EventHandler
-collectTriggeredHandlers oldState newState spec =
-    Dict.foldl
-        (\_ element acc ->
-            Dict.foldl
-                (\path handler innerAcc ->
-                    if statePathChanged path oldState newState then
-                        handler :: innerAcc
-
-                    else
-                        innerAcc
-                )
-                acc
-                element.watch
-        )
-        []
-        spec.elements
-
-
-statePathChanged : String -> Value -> Value -> Bool
-statePathChanged path oldState newState =
-    State.get path oldState /= State.get path newState
-
-
-executeHandlers : ActionConfig action -> List EventHandler -> Model -> ( Model, Cmd (Msg action) )
-executeHandlers config handlers model =
-    List.foldl
-        (\handler ( accModel, accCmd ) ->
+        else
             let
-                bindings =
-                    case handler of
-                        SingleAction binding ->
-                            [ binding ]
+                stateBeforeWatchers =
+                    model.state
 
-                        ChainedActions bs ->
-                            bs
+                ( modelAfterWatchers, cmd ) =
+                    executeTriggered config model.state triggered model
 
+                ( finalModel, moreCmd ) =
+                    checkWatchersLoop config (remaining - 1) stateBeforeWatchers watchers modelAfterWatchers
+            in
+            ( finalModel, Cmd.batch [ cmd, moreCmd ] )
+
+
+collectTriggered : Value -> Value -> List WatcherEntry -> List WatcherEntry
+collectTriggered oldState newState watchers =
+    List.filter (\entry -> State.get entry.path oldState /= State.get entry.path newState) watchers
+
+
+executeTriggered : ActionConfig action -> Value -> List WatcherEntry -> Model -> ( Model, Cmd (Msg action) )
+executeTriggered config state triggered model =
+    List.foldl
+        (\entry ( accModel, accCmd ) ->
+            let
                 ( newModel, newCmd ) =
-                    List.foldl
-                        (\binding ( m, c ) ->
-                            let
-                                ( m2, c2 ) =
-                                    executeOneAction config Nothing binding m
-                            in
-                            ( m2, Cmd.batch [ c, c2 ] )
-                        )
-                        ( accModel, Cmd.none )
-                        bindings
+                    case entry.repeatAncestor of
+                        Nothing ->
+                            executeHandler config Nothing entry.handler accModel
+
+                        Just ancestor ->
+                            executeHandlerForRepeat config state ancestor entry.handler accModel
             in
             ( newModel, Cmd.batch [ accCmd, newCmd ] )
         )
         ( model, Cmd.none )
-        handlers
+        triggered
+
+
+executeHandler : ActionConfig action -> Maybe RepeatContext -> EventHandler -> Model -> ( Model, Cmd (Msg action) )
+executeHandler config repeatCtx handler model =
+    let
+        bindings =
+            case handler of
+                SingleAction binding ->
+                    [ binding ]
+
+                ChainedActions bs ->
+                    bs
+    in
+    List.foldl
+        (\binding ( m, c ) ->
+            let
+                ( m2, c2 ) =
+                    executeOneAction config repeatCtx binding m
+            in
+            ( m2, Cmd.batch [ c, c2 ] )
+        )
+        ( model, Cmd.none )
+        bindings
+
+
+executeHandlerForRepeat : ActionConfig action -> Value -> { statePath : String, key : Maybe String } -> EventHandler -> Model -> ( Model, Cmd (Msg action) )
+executeHandlerForRepeat config state ancestor handler model =
+    case State.get ancestor.statePath state |> Maybe.andThen decodeList of
+        Just items ->
+            List.foldl
+                (\( index, item ) ( accModel, accCmd ) ->
+                    let
+                        repeatCtx =
+                            Just
+                                { item = item
+                                , index = index
+                                , basePath = ancestor.statePath ++ "/" ++ String.fromInt index
+                                }
+
+                        ( newModel, newCmd ) =
+                            executeHandler config repeatCtx handler accModel
+                    in
+                    ( newModel, Cmd.batch [ accCmd, newCmd ] )
+                )
+                ( model, Cmd.none )
+                (List.indexedMap Tuple.pair items)
+
+        Nothing ->
+            ( model, Cmd.none )
+
+
+decodeList : Value -> Maybe (List Value)
+decodeList value =
+    Decode.decodeValue (Decode.list Decode.value) value |> Result.toMaybe

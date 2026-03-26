@@ -45,4 +45,24 @@ test.describe("Watchers", () => {
     // Output should remain "initial" — watcher should NOT have fired
     await expect(page.locator(".jr-text")).toHaveText("initial")
   })
+
+  test("watcher inside repeat fires for each item with $item context", async ({
+    page,
+  }) => {
+    await sendSpec(page, "watchers/repeat-item-watch.json")
+
+    // Initial: shows titles
+    const texts = page.locator(".jr-text")
+    await expect(texts).toHaveCount(2)
+    await expect(texts.nth(0)).toHaveText("Buy milk")
+    await expect(texts.nth(1)).toHaveText("Walk dog")
+
+    // Click "Mark All Done" — sets /markAll to true
+    // Watcher on each repeated item fires, setting each item's done to true
+    await page.locator(".jr-button").click()
+
+    // Both items should now show "DONE"
+    await expect(texts.nth(0)).toHaveText("DONE")
+    await expect(texts.nth(1)).toHaveText("DONE")
+  })
 })
