@@ -11,7 +11,7 @@ import { defineSchema } from "@json-render/core";
  * - No `slots` — uses `hasChildren` boolean instead
  * - No `repeat` field — not yet supported (backlog)
  * - No `state` on spec — Elm model owns state
- * - Expressions: $state, $item, $index, $template (read-only), $bindState (two-way binding)
+ * - Expressions: $state, $item, $index, $template (read-only), $bindState (two-way binding), $computed (registered functions)
  */
 export const schema = defineSchema(
   (s) => ({
@@ -56,6 +56,15 @@ export const schema = defineSchema(
         /** Description for AI generation hints */
         description: s.string(),
       }),
+      /** Computed function definitions (optional) */
+      functions: s.map({
+        /** Zod schema for function params */
+        params: s.zod(),
+        /** Zod schema for return type */
+        returnType: s.zod(),
+        /** Description for AI generation hints */
+        description: s.string(),
+      }),
     }),
   }),
   {
@@ -86,7 +95,7 @@ export const schema = defineSchema(
       'The "on" field goes on the ELEMENT object, NOT inside "props". Use it to bind events to actions: {"on":{"press":{"action":"setState","params":{"path":"/clicked","value":true}}}}. Chain multiple actions with an array: {"on":{"press":[{"action":"setState",...},{"action":"myAction",...}]}}.',
 
       // Expression support
-      'Dynamic props: use { "$state": "/path" } to read from state, { "$bindState": "/path" } for two-way binding (read and write), { "$item": "field" } in repeat contexts, { "$index": true } for loop index, { "$template": "Hello ${/name}" } for string interpolation.',
+      'Dynamic props: use { "$state": "/path" } to read from state, { "$bindState": "/path" } for two-way binding (read and write), { "$item": "field" } in repeat contexts, { "$index": true } for loop index, { "$template": "Hello ${/name}" } for string interpolation, { "$computed": "funcName", "args": { "argName": <expression> } } for computed values from registered functions.',
 
       // Design quality
       "Design with visual hierarchy: use container components to group content, proper spacing, and status indicators. ONLY use components from the AVAILABLE COMPONENTS list.",
