@@ -307,4 +307,30 @@ suite =
                     in
                     Expect.err result
             ]
+        , describe "RError propagation"
+            [ test "pipeline required propagates RError" <|
+                \_ ->
+                    let
+                        props =
+                            Dict.fromList [ ( "title", RError "test error" ) ]
+
+                        result =
+                            Resolve.succeed identity
+                                |> Resolve.required "title" Resolve.string
+                                |> (\d -> d props)
+                    in
+                    Expect.equal (Err "field 'title': test error") result
+            , test "pipeline optional propagates RError" <|
+                \_ ->
+                    let
+                        props =
+                            Dict.fromList [ ( "title", RError "bad value" ) ]
+
+                        result =
+                            Resolve.succeed identity
+                                |> Resolve.optional "title" Resolve.string Nothing
+                                |> (\d -> d props)
+                    in
+                    Expect.equal (Err "bad value") result
+            ]
         ]

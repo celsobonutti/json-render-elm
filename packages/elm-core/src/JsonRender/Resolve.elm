@@ -31,6 +31,7 @@ type ResolvedValue
     | RNull
     | RList (List ResolvedValue)
     | RObject (Dict String ResolvedValue)
+    | RError String
 
 
 type alias RepeatContext =
@@ -78,14 +79,56 @@ resolvedToValue resolved =
                 |> List.map (\( k, v ) -> ( k, resolvedToValue v ))
                 |> Encode.object
 
+        RError err ->
+            Encode.string ("ERROR: " ++ err)
+
 
 {-| Resolve action params: resolve each PropValue to a JSON Value.
+In action params, `$item` resolves to the absolute state path (e.g. "/todos/0/completed")
+rather than the field's value, per the json-render prompt spec.
 -}
 resolveActionParams : Value -> Maybe RepeatContext -> Dict String PropValue -> Dict String Value
 resolveActionParams state repeatCtx params =
     params
-        |> resolveProps state repeatCtx
+        |> Dict.map (\_ v -> resolveActionParamValue state repeatCtx v)
         |> Dict.map (\_ v -> resolvedToValue v)
+
+
+{-| Like resolvePropValue but $item resolves to the absolute state path.
+$cond conditions still use value-based resolution for truthiness checks.
+-}
+resolveActionParamValue : Value -> Maybe RepeatContext -> PropValue -> ResolvedValue
+resolveActionParamValue state repeatCtx prop =
+    case prop of
+        ItemExpr field ->
+            case repeatCtx of
+                Just ctx ->
+                    if field == "" then
+                        RString ctx.basePath
+
+                    else
+                        RString (ctx.basePath ++ "/" ++ field)
+
+                Nothing ->
+                    RNull
+
+        ConditionalExpr cond thenVal elseVal ->
+            let
+                condResolved =
+                    resolvePropValue state repeatCtx cond
+            in
+            case isResolvedTruthy condResolved of
+                Ok True ->
+                    resolveActionParamValue state repeatCtx thenVal
+
+                Ok False ->
+                    resolveActionParamValue state repeatCtx elseVal
+
+                Err err ->
+                    RError err
+
+        _ ->
+            resolvePropValue state repeatCtx prop
 
 
 resolvePropValue : Value -> Maybe RepeatContext -> PropValue -> ResolvedValue
@@ -162,6 +205,49 @@ resolvePropValue state repeatCtx prop =
 
                 Nothing ->
                     RNull
+
+        ConditionalExpr cond thenVal elseVal ->
+            let
+                condResolved =
+                    resolvePropValue state repeatCtx cond
+            in
+            case isResolvedTruthy condResolved of
+                Ok True ->
+                    resolvePropValue state repeatCtx thenVal
+
+                Ok False ->
+                    resolvePropValue state repeatCtx elseVal
+
+                Err err ->
+                    RError err
+
+
+isResolvedTruthy : ResolvedValue -> Result String Bool
+isResolvedTruthy resolved =
+    case resolved of
+        RBool b ->
+            Ok b
+
+        RString s ->
+            Ok (s /= "")
+
+        RInt n ->
+            Ok (n /= 0)
+
+        RFloat f ->
+            Ok (f /= 0.0)
+
+        RNull ->
+            Ok False
+
+        RList items ->
+            Ok (not (List.isEmpty items))
+
+        RObject _ ->
+            Ok True
+
+        RError err ->
+            Err err
 
 
 jsonValueToResolved : Value -> ResolvedValue
@@ -285,8 +371,13 @@ optional key extract default prev props =
                         Ok extracted ->
                             Ok (f (Just extracted))
 
-                        Err _ ->
-                            Ok (f default)
+                        Err err ->
+                            case val of
+                                RError _ ->
+                                    Err err
+
+                                _ ->
+                                    Ok (f default)
 
                 Nothing ->
                     Ok (f default)
@@ -301,6 +392,9 @@ string val =
         RString s ->
             Ok s
 
+        RError err ->
+            Err err
+
         _ ->
             Err "expected string"
 
@@ -310,6 +404,9 @@ int val =
     case val of
         RInt i ->
             Ok i
+
+        RError err ->
+            Err err
 
         _ ->
             Err "expected int"
@@ -324,6 +421,9 @@ float val =
         RInt i ->
             Ok (toFloat i)
 
+        RError err ->
+            Err err
+
         _ ->
             Err "expected float"
 
@@ -333,6 +433,9 @@ bool val =
     case val of
         RBool b ->
             Ok b
+
+        RError err ->
+            Err err
 
         _ ->
             Err "expected bool"
