@@ -45,7 +45,8 @@ main = Html.text "hello"
                         , { message = "Missing actions module: Components.Actions"
                           , details =
                                 [ "The catalog defines actions but no Components.Actions module exists."
-                                , "Run elm-review --fix to generate it."
+                                , "Quick stub:\n\nmkdir -p src/Components && echo 'module Components.Actions exposing (..)' > src/Components/Actions.elm"
+                                , "Then run elm-review --fix to fill it in."
                                 ]
                           }
                         ]
@@ -70,7 +71,8 @@ view ctx = ()
                         , { message = "Missing actions module: Components.Actions"
                           , details =
                                 [ "The catalog defines actions but no Components.Actions module exists."
-                                , "Run elm-review --fix to generate it."
+                                , "Quick stub:\n\nmkdir -p src/Components && echo 'module Components.Actions exposing (..)' > src/Components/Actions.elm"
+                                , "Then run elm-review --fix to fill it in."
                                 ]
                           }
                         ]
@@ -171,7 +173,8 @@ registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
                         [ { message = "Missing actions module: Components.Actions"
                           , details =
                                 [ "The catalog defines actions but no Components.Actions module exists."
-                                , "Run elm-review --fix to generate it."
+                                , "Quick stub:\n\nmkdir -p src/Components && echo 'module Components.Actions exposing (..)' > src/Components/Actions.elm"
+                                , "Then run elm-review --fix to fill it in."
                                 ]
                           }
                         ]

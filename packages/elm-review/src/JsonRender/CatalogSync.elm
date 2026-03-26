@@ -547,11 +547,16 @@ finalEvaluation config projectCtx =
 
                 missingActionsError =
                     if not projectCtx.actionsSeen && not (Dict.isEmpty catalog.actions) then
+                        let
+                            nsPath =
+                                String.replace "." "/" config.componentsNamespace
+                        in
                         [ Rule.globalError
                             { message = "Missing actions module: " ++ config.componentsNamespace ++ ".Actions"
                             , details =
                                 [ "The catalog defines actions but no " ++ config.componentsNamespace ++ ".Actions module exists."
-                                , "Run elm-review --fix to generate it."
+                                , "Quick stub:\n\nmkdir -p src/" ++ nsPath ++ " && echo 'module " ++ config.componentsNamespace ++ ".Actions exposing (..)' > src/" ++ nsPath ++ "/Actions.elm"
+                                , "Then run elm-review --fix to fill it in."
                                 ]
                             }
                         ]
@@ -561,11 +566,16 @@ finalEvaluation config projectCtx =
 
                 missingFunctionsError =
                     if not projectCtx.functionsSeen && not (Dict.isEmpty catalog.functions) then
+                        let
+                            nsPath =
+                                String.replace "." "/" config.componentsNamespace
+                        in
                         [ Rule.globalError
                             { message = "Missing functions module: " ++ config.componentsNamespace ++ ".Functions"
                             , details =
                                 [ "The catalog defines functions but no " ++ config.componentsNamespace ++ ".Functions module exists."
-                                , "Run elm-review --fix to generate it."
+                                , "Quick stub:\n\nmkdir -p src/" ++ nsPath ++ " && echo 'module " ++ config.componentsNamespace ++ ".Functions exposing (..)' > src/" ++ nsPath ++ "/Functions.elm"
+                                , "Then run elm-review --fix to fill it in."
                                 ]
                             }
                         ]
