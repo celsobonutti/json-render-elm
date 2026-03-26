@@ -1,8 +1,11 @@
 module JsonRender.Resolve exposing
-    ( ResolvedValue(..)
+    ( FunctionDict
+    , ResolvedValue(..)
     , RepeatContext
     , resolveActionParams
+    , resolveActionParamsWith
     , resolveProps
+    , resolvePropsWith
     , resolvedToValue
     , succeed
     , required
@@ -41,13 +44,22 @@ type alias RepeatContext =
     }
 
 
+type alias FunctionDict =
+    Dict String (Dict String ResolvedValue -> ResolvedValue)
+
+
 type alias PropsDecoder a =
     Dict String ResolvedValue -> Result String a
 
 
+resolvePropsWith : FunctionDict -> Value -> Maybe RepeatContext -> Dict String PropValue -> Dict String ResolvedValue
+resolvePropsWith functions state repeatCtx props =
+    Dict.map (\_ v -> resolvePropValueWith functions state repeatCtx v) props
+
+
 resolveProps : Value -> Maybe RepeatContext -> Dict String PropValue -> Dict String ResolvedValue
-resolveProps state repeatCtx props =
-    Dict.map (\_ v -> resolvePropValue state repeatCtx v) props
+resolveProps =
+    resolvePropsWith Dict.empty
 
 
 {-| Convert a ResolvedValue back to a JSON Value. Inverse of jsonValueToResolved.
@@ -87,18 +99,23 @@ resolvedToValue resolved =
 In action params, `$item` resolves to the absolute state path (e.g. "/todos/0/completed")
 rather than the field's value, per the json-render prompt spec.
 -}
-resolveActionParams : Value -> Maybe RepeatContext -> Dict String PropValue -> Dict String Value
-resolveActionParams state repeatCtx params =
+resolveActionParamsWith : FunctionDict -> Value -> Maybe RepeatContext -> Dict String PropValue -> Dict String Value
+resolveActionParamsWith functions state repeatCtx params =
     params
-        |> Dict.map (\_ v -> resolveActionParamValue state repeatCtx v)
+        |> Dict.map (\_ v -> resolveActionParamValueWith functions state repeatCtx v)
         |> Dict.map (\_ v -> resolvedToValue v)
 
 
-{-| Like resolvePropValue but $item resolves to the absolute state path.
+resolveActionParams : Value -> Maybe RepeatContext -> Dict String PropValue -> Dict String Value
+resolveActionParams =
+    resolveActionParamsWith Dict.empty
+
+
+{-| Like resolvePropValueWith but $item resolves to the absolute state path.
 $cond conditions still use value-based resolution for truthiness checks.
 -}
-resolveActionParamValue : Value -> Maybe RepeatContext -> PropValue -> ResolvedValue
-resolveActionParamValue state repeatCtx prop =
+resolveActionParamValueWith : FunctionDict -> Value -> Maybe RepeatContext -> PropValue -> ResolvedValue
+resolveActionParamValueWith functions state repeatCtx prop =
     case prop of
         ItemExpr field ->
             case repeatCtx of
@@ -115,24 +132,29 @@ resolveActionParamValue state repeatCtx prop =
         ConditionalExpr cond thenVal elseVal ->
             let
                 condResolved =
-                    resolvePropValue state repeatCtx cond
+                    resolvePropValueWith functions state repeatCtx cond
             in
             case isResolvedTruthy condResolved of
                 Ok True ->
-                    resolveActionParamValue state repeatCtx thenVal
+                    resolveActionParamValueWith functions state repeatCtx thenVal
 
                 Ok False ->
-                    resolveActionParamValue state repeatCtx elseVal
+                    resolveActionParamValueWith functions state repeatCtx elseVal
 
                 Err err ->
                     RError err
 
         _ ->
-            resolvePropValue state repeatCtx prop
+            resolvePropValueWith functions state repeatCtx prop
 
 
 resolvePropValue : Value -> Maybe RepeatContext -> PropValue -> ResolvedValue
-resolvePropValue state repeatCtx prop =
+resolvePropValue =
+    resolvePropValueWith Dict.empty
+
+
+resolvePropValueWith : FunctionDict -> Value -> Maybe RepeatContext -> PropValue -> ResolvedValue
+resolvePropValueWith functions state repeatCtx prop =
     case prop of
         StringValue s ->
             RString s
@@ -150,10 +172,10 @@ resolvePropValue state repeatCtx prop =
             RNull
 
         ListValue items ->
-            RList (List.map (resolvePropValue state repeatCtx) items)
+            RList (List.map (resolvePropValueWith functions state repeatCtx) items)
 
         ObjectValue obj ->
-            RObject (Dict.map (\_ v -> resolvePropValue state repeatCtx v) obj)
+            RObject (Dict.map (\_ v -> resolvePropValueWith functions state repeatCtx v) obj)
 
         StateExpr path ->
             jsonValueToResolved (State.get path state |> Maybe.withDefault Encode.null)
@@ -209,20 +231,54 @@ resolvePropValue state repeatCtx prop =
         ConditionalExpr cond thenVal elseVal ->
             let
                 condResolved =
-                    resolvePropValue state repeatCtx cond
+                    resolvePropValueWith functions state repeatCtx cond
             in
             case isResolvedTruthy condResolved of
                 Ok True ->
-                    resolvePropValue state repeatCtx thenVal
+                    resolvePropValueWith functions state repeatCtx thenVal
 
                 Ok False ->
-                    resolvePropValue state repeatCtx elseVal
+                    resolvePropValueWith functions state repeatCtx elseVal
 
                 Err err ->
                     RError err
 
-        ComputedExpr name _ ->
-            RError ("$computed not yet supported: " ++ name)
+        ComputedExpr name args ->
+            let
+                resolvedArgs =
+                    Dict.map (\_ v -> resolvePropValueWith functions state repeatCtx v) args
+            in
+            case findError resolvedArgs of
+                Just err ->
+                    err
+
+                Nothing ->
+                    case Dict.get name functions of
+                        Just fn ->
+                            fn resolvedArgs
+
+                        Nothing ->
+                            RError ("Unknown function: " ++ name)
+
+
+findError : Dict String ResolvedValue -> Maybe ResolvedValue
+findError dict =
+    Dict.foldl
+        (\_ v acc ->
+            case acc of
+                Just _ ->
+                    acc
+
+                Nothing ->
+                    case v of
+                        RError _ ->
+                            Just v
+
+                        _ ->
+                            Nothing
+        )
+        Nothing
+        dict
 
 
 isResolvedTruthy : ResolvedValue -> Result String Bool

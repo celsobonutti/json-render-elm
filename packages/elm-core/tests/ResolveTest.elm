@@ -333,4 +333,98 @@ suite =
                     in
                     Expect.equal (Err "bad value") result
             ]
+        , describe "$computed resolution"
+            [ test "resolves $computed with registered function" <|
+                \_ ->
+                    let
+                        functions =
+                            Dict.fromList
+                                [ ( "double"
+                                  , \args ->
+                                        case Dict.get "n" args of
+                                            Just (RInt n) ->
+                                                RInt (n * 2)
+
+                                            _ ->
+                                                RError "double: missing arg 'n'"
+                                  )
+                                ]
+
+                        props =
+                            Dict.fromList [ ( "result", ComputedExpr "double" (Dict.fromList [ ( "n", IntValue 5 ) ]) ) ]
+
+                        resolved =
+                            Resolve.resolvePropsWith functions state Nothing props
+                    in
+                    Expect.equal
+                        (Just (RInt 10))
+                        (Dict.get "result" resolved)
+            , test "$computed with $state arg" <|
+                \_ ->
+                    let
+                        functions =
+                            Dict.fromList
+                                [ ( "greet"
+                                  , \args ->
+                                        case Dict.get "name" args of
+                                            Just (RString name) ->
+                                                RString ("Hello " ++ name)
+
+                                            _ ->
+                                                RError "greet: missing arg 'name'"
+                                  )
+                                ]
+
+                        props =
+                            Dict.fromList [ ( "msg", ComputedExpr "greet" (Dict.fromList [ ( "name", StateExpr "/user/name" ) ]) ) ]
+
+                        resolved =
+                            Resolve.resolvePropsWith functions state Nothing props
+                    in
+                    Expect.equal
+                        (Just (RString "Hello Alice"))
+                        (Dict.get "msg" resolved)
+            , test "unknown function returns RError" <|
+                \_ ->
+                    let
+                        props =
+                            Dict.fromList [ ( "val", ComputedExpr "unknown" Dict.empty ) ]
+
+                        resolved =
+                            Resolve.resolvePropsWith Dict.empty state Nothing props
+                    in
+                    Expect.equal
+                        (Just (RError "Unknown function: unknown"))
+                        (Dict.get "val" resolved)
+            , test "RError in arg propagates without calling function" <|
+                \_ ->
+                    let
+                        functions =
+                            Dict.fromList
+                                [ ( "identity"
+                                  , \args ->
+                                        case Dict.get "x" args of
+                                            Just v ->
+                                                v
+
+                                            _ ->
+                                                RError "identity: missing arg"
+                                  )
+                                ]
+
+                        props =
+                            Dict.fromList
+                                [ ( "val"
+                                  , ComputedExpr "identity"
+                                        (Dict.fromList [ ( "x", ComputedExpr "missing" Dict.empty ) ])
+                                  )
+                                ]
+
+                        resolved =
+                            Resolve.resolvePropsWith functions state Nothing props
+                    in
+                    Expect.equal
+                        (Just (RError "Unknown function: missing"))
+                        (Dict.get "val" resolved)
+            ]
         ]
