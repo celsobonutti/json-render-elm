@@ -267,7 +267,7 @@ suite =
                               "type": "Text",
                               "props": { "content": { "$template": "Hello ${/form/name}!" } },
                               "children": [],
-                              "visible": { "truthy": "/showGreeting" }
+                              "visible": { "$state": "/showGreeting" }
                             }
                           }
                         }
@@ -560,6 +560,129 @@ suite =
 
                                 Nothing ->
                                     Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            ]
+        , describe "$computed decoding"
+            [ test "decodes $computed expression in props" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$computed": "formatCurrency",
+                                      "args": {
+                                        "amount": { "$state": "/price" }
+                                      }
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "t" spec.elements of
+                                Just el ->
+                                    Expect.equal
+                                        (Just
+                                            (ComputedExpr "formatCurrency"
+                                                (Dict.fromList [ ( "amount", StateExpr "/price" ) ])
+                                            )
+                                        )
+                                        (Dict.get "content" el.props)
+
+                                Nothing ->
+                                    Expect.fail "element t not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "decodes $computed with no args" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": { "$computed": "getTimestamp" }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "t" spec.elements of
+                                Just el ->
+                                    Expect.equal
+                                        (Just (ComputedExpr "getTimestamp" Dict.empty))
+                                        (Dict.get "content" el.props)
+
+                                Nothing ->
+                                    Expect.fail "element t not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "decodes nested $computed in args" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$computed": "format",
+                                      "args": {
+                                        "value": {
+                                          "$computed": "add",
+                                          "args": { "a": 1, "b": 2 }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "t" spec.elements of
+                                Just el ->
+                                    case Dict.get "content" el.props of
+                                        Just (ComputedExpr "format" args) ->
+                                            case Dict.get "value" args of
+                                                Just (ComputedExpr "add" _) ->
+                                                    Expect.pass
+
+                                                _ ->
+                                                    Expect.fail "nested $computed not decoded"
+
+                                        _ ->
+                                            Expect.fail "outer $computed not decoded"
+
+                                Nothing ->
+                                    Expect.fail "element t not found"
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)

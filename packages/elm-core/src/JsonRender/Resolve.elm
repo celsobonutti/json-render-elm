@@ -221,6 +221,9 @@ resolvePropValue state repeatCtx prop =
                 Err err ->
                     RError err
 
+        ComputedExpr name _ ->
+            RError ("$computed not yet supported: " ++ name)
+
 
 isResolvedTruthy : ResolvedValue -> Result String Bool
 isResolvedTruthy resolved =

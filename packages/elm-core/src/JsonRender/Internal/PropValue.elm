@@ -24,6 +24,8 @@ type PropValue
     | TemplateExpr String
     | BindStateExpr String
     | BindItemExpr String
+    | ConditionalExpr PropValue PropValue PropValue
+    | ComputedExpr String (Dict String PropValue)
 
 
 decoder : Decoder PropValue
@@ -36,6 +38,19 @@ decoder =
         , Decode.field "$template" Decode.string |> Decode.map TemplateExpr
         , Decode.field "$bindState" Decode.string |> Decode.map BindStateExpr
         , Decode.field "$bindItem" Decode.string |> Decode.map BindItemExpr
+        , Decode.map3 ConditionalExpr
+            (Decode.field "$cond" (Decode.lazy (\_ -> decoder)))
+            (Decode.field "$then" (Decode.lazy (\_ -> decoder)))
+            (Decode.field "$else" (Decode.lazy (\_ -> decoder)))
+        , Decode.field "$computed" Decode.string
+            |> Decode.andThen
+                (\name ->
+                    Decode.oneOf
+                        [ Decode.field "args" (Decode.lazy (\_ -> Decode.dict decoder))
+                        , Decode.succeed Dict.empty
+                        ]
+                        |> Decode.map (ComputedExpr name)
+                )
 
         -- Literals
         , Decode.null NullValue
