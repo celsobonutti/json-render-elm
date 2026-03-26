@@ -4,6 +4,7 @@ module JsonRender.Internal.SchemaParser exposing
     , ComponentSchema
     , FieldSchema
     , FieldType(..)
+    , FunctionSchema
     , decoder
     )
 
@@ -16,11 +17,19 @@ import Set
 type alias CatalogSchema =
     { components : Dict String ComponentSchema
     , actions : Dict String ActionSchema
+    , functions : Dict String FunctionSchema
     }
 
 
 type alias ActionSchema =
     { params : Dict String FieldSchema
+    , description : String
+    }
+
+
+type alias FunctionSchema =
+    { params : Dict String FieldSchema
+    , returnType : FieldType
     , description : String
     }
 
@@ -54,12 +63,21 @@ decoder =
     Decode.succeed CatalogSchema
         |> required "components" (Decode.dict componentDecoder)
         |> optional "actions" (Decode.dict actionDecoder) Dict.empty
+        |> optional "functions" (Decode.dict functionDecoder) Dict.empty
 
 
 actionDecoder : Decoder ActionSchema
 actionDecoder =
     Decode.succeed (\params description -> ActionSchema params description)
         |> required "params" propsObjectDecoder
+        |> required "description" Decode.string
+
+
+functionDecoder : Decoder FunctionSchema
+functionDecoder =
+    Decode.succeed FunctionSchema
+        |> required "params" propsObjectDecoder
+        |> required "returnType" fieldTypeDecoder
         |> required "description" Decode.string
 
 
