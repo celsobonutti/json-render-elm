@@ -1,0 +1,209 @@
+{
+  "root": "main",
+  "elements": {
+    "main": {
+      "type": "Card",
+      "props": {
+        "title": "My To-Do List",
+        "subtitle": "Stay organized and get things done"
+      },
+      "children": [
+        "add-row",
+        "divider-text",
+        "todo-list"
+      ]
+    },
+    "add-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 8
+      },
+      "children": [
+        "new-todo-input",
+        "add-btn"
+      ]
+    },
+    "new-todo-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Add a new task...",
+        "label": "New Task",
+        "value": {
+          "$bindState": "/newTodoText"
+        }
+      },
+      "children": []
+    },
+    "add-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Add",
+        "variant": "primary"
+      },
+      "on": {
+        "press": {
+          "action": "pushState",
+          "params": {
+            "statePath": "/todos",
+            "value": {
+              "id": "$id",
+              "title": {
+                "$state": "/newTodoText"
+              },
+              "completed": false
+            },
+            "clearStatePath": "/newTodoText"
+          }
+        }
+      },
+      "children": []
+    },
+    "divider-text": {
+      "type": "Text",
+      "props": {
+        "content": "Tasks",
+        "size": "sm"
+      },
+      "children": []
+    },
+    "todo-list": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 6
+      },
+      "repeat": {
+        "statePath": "/todos",
+        "key": "id"
+      },
+      "children": [
+        "todo-item"
+      ]
+    },
+    "todo-item": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 8
+      },
+      "children": [
+        "todo-badge",
+        "todo-title",
+        "todo-toggle-btn",
+        "todo-delete-btn"
+      ]
+    },
+    "todo-badge": {
+      "type": "Badge",
+      "props": {
+        "label": {
+          "$cond": {
+            "$item": "completed"
+          },
+          "$then": "Done",
+          "$else": "Todo"
+        },
+        "color": {
+          "$cond": {
+            "$item": "completed"
+          },
+          "$then": "green",
+          "$else": "yellow"
+        }
+      },
+      "children": []
+    },
+    "todo-title": {
+      "type": "Text",
+      "props": {
+        "content": {
+          "$item": "title"
+        },
+        "size": "md"
+      },
+      "children": []
+    },
+    "todo-toggle-btn": {
+      "type": "Button",
+      "props": {
+        "label": {
+          "$cond": {
+            "$item": "completed"
+          },
+          "$then": "Unmark",
+          "$else": "Complete"
+        },
+        "variant": {
+          "$cond": {
+            "$item": "completed"
+          },
+          "$then": "secondary",
+          "$else": "primary"
+        }
+      },
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": {
+            "statePath": {
+              "$item": "completed"
+            },
+            "value": {
+              "$cond": {
+                "$item": "completed"
+              },
+              "$then": false,
+              "$else": true
+            }
+          }
+        }
+      },
+      "children": []
+    },
+    "todo-delete-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Delete",
+        "variant": "danger"
+      },
+      "on": {
+        "press": {
+          "action": "removeState",
+          "params": {
+            "statePath": "/todos",
+            "index": {
+              "$index": true
+            }
+          }
+        }
+      },
+      "children": []
+    }
+  },
+  "state": {
+    "newTodoText": "",
+    "todos": [
+      {
+        "id": "1",
+        "title": "Buy groceries",
+        "completed": true
+      },
+      {
+        "id": "2",
+        "title": "Read a book for 30 minutes",
+        "completed": false
+      },
+      {
+        "id": "3",
+        "title": "Go for a morning run",
+        "completed": false
+      },
+      {
+        "id": "4",
+        "title": "Review project proposal",
+        "completed": true
+      }
+    ]
+  }
+}

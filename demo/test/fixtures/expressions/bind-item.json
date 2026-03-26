@@ -1,0 +1,19 @@
+{
+  "state": { "items": [{ "id": "1", "label": "First", "text": "hello" }, { "id": "2", "label": "Second", "text": "world" }] },
+  "root": "list",
+  "elements": {
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 8 },
+      "repeat": { "statePath": "/items", "key": "id" },
+      "children": ["item-input"]
+    },
+    "item-input": {
+      "type": "Input",
+      "props": {
+        "label": { "$item": "label" },
+        "value": { "$bindItem": "text" }
+      }
+    }
+  }
+}

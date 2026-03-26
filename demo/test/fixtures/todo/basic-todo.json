@@ -1,0 +1,182 @@
+{
+  "root": "main",
+  "elements": {
+    "main": {
+      "type": "Card",
+      "props": {
+        "title": "My To-Do List"
+      },
+      "children": [
+        "add-row",
+        "todo-list"
+      ]
+    },
+    "add-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 8
+      },
+      "children": [
+        "new-todo-input",
+        "add-btn"
+      ]
+    },
+    "new-todo-input": {
+      "type": "Input",
+      "props": {
+        "placeholder": "Add a new to-do...",
+        "label": "New Task",
+        "value": {
+          "$bindState": "/newTodoText"
+        }
+      },
+      "children": []
+    },
+    "add-btn": {
+      "type": "Button",
+      "props": {
+        "label": "Add",
+        "variant": "primary"
+      },
+      "on": {
+        "press": {
+          "action": "pushState",
+          "params": {
+            "statePath": "/todos",
+            "value": {
+              "id": "$id",
+              "title": {
+                "$state": "/newTodoText"
+              },
+              "completed": false
+            },
+            "clearStatePath": "/newTodoText"
+          }
+        }
+      },
+      "children": []
+    },
+    "todo-list": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 6
+      },
+      "repeat": {
+        "statePath": "/todos",
+        "key": "id"
+      },
+      "children": [
+        "todo-item"
+      ]
+    },
+    "todo-item": {
+      "type": "Card",
+      "props": {
+        "title": { "$item": "title" }
+      },
+      "children": [
+        "todo-row"
+      ]
+    },
+    "todo-row": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 8
+      },
+      "children": [
+        "todo-checkbox",
+        "todo-title",
+        "todo-delete"
+      ]
+    },
+    "todo-checkbox": {
+      "type": "Button",
+      "props": {
+        "label": {
+          "$cond": {
+            "$item": "completed"
+          },
+          "$then": "☑",
+          "$else": "☐"
+        },
+        "variant": {
+          "$cond": {
+            "$item": "completed"
+          },
+          "$then": "primary",
+          "$else": "secondary"
+        }
+      },
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": {
+            "statePath": {
+              "$item": "completed"
+            },
+            "value": {
+              "$cond": {
+                "$item": "completed"
+              },
+              "$then": false,
+              "$else": true
+            }
+          }
+        }
+      },
+      "children": []
+    },
+    "todo-title": {
+      "type": "Text",
+      "props": {
+        "content": {
+          "$item": "title"
+        },
+        "size": "md"
+      },
+      "children": []
+    },
+    "todo-delete": {
+      "type": "Button",
+      "props": {
+        "label": "Delete",
+        "variant": "danger"
+      },
+      "on": {
+        "press": {
+          "action": "removeState",
+          "params": {
+            "statePath": "/todos",
+            "index": {
+              "$index": true
+            }
+          }
+        }
+      },
+      "children": []
+    }
+  },
+  "state": {
+    "newTodoText": "",
+    "todos": [
+      {
+        "id": "1",
+        "title": "Buy groceries",
+        "completed": false
+      },
+      {
+        "id": "2",
+        "title": "Walk the dog",
+        "completed": true
+      },
+      {
+        "id": "3",
+        "title": "Read a book",
+        "completed": false
+      }
+    ]
+  }
+}

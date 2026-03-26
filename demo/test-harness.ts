@@ -15,3 +15,7 @@ const bridge = createElmBridge(app)
 app.ports.testActionOut.subscribe((action: unknown) => {
   ;(window as any).__lastAction = action
 })
+
+app.ports.testDecodeErrorOut.subscribe((error: string) => {
+  ;(window as any).__lastDecodeError = error
+})
