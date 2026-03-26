@@ -190,5 +190,27 @@
       },
       "description": "Export data in a given format"
     }
+  },
+  "functions": {
+    "shout": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "returnType": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "string"
+      },
+      "description": "Convert text to uppercase"
+    }
   }
 }

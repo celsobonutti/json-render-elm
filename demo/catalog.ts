@@ -82,4 +82,11 @@ export const catalog = defineCatalog(schema, {
       description: "Export data in a given format",
     },
   },
+  functions: {
+    shout: {
+      params: z.object({ text: z.string() }),
+      returnType: z.string(),
+      description: "Convert text to uppercase",
+    },
+  },
 });

@@ -19,6 +19,12 @@ interface CatalogSchemaAction {
   description: string;
 }
 
+interface CatalogSchemaFunction {
+  params: object;
+  returnType: object;
+  description: string;
+}
+
 const components: Record<string, CatalogSchemaComponent> = {};
 for (const name of catalog.componentNames) {
   const def =
@@ -42,8 +48,27 @@ for (const name of Object.keys(catalog.data.actions)) {
   };
 }
 
+const functions: Record<string, CatalogSchemaFunction> = {};
+if (catalog.data.functions) {
+  for (const name of Object.keys(catalog.data.functions)) {
+    const def =
+      catalog.data.functions[name as keyof typeof catalog.data.functions];
+    if (!def) continue;
+    functions[name] = {
+      params: def.params.toJSONSchema(),
+      returnType: def.returnType.toJSONSchema(),
+      description: def.description ?? "",
+    };
+  }
+}
+
+const output: Record<string, unknown> = { components, actions };
+if (Object.keys(functions).length > 0) {
+  output.functions = functions;
+}
+
 writeFileSync(
   "catalog-schema.json",
-  JSON.stringify({ components, actions }, null, 2) + "\n",
+  JSON.stringify(output, null, 2) + "\n",
 );
 console.log("Generated catalog-schema.json");
