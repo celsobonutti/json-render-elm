@@ -141,7 +141,7 @@ import Components.Button
 import Components.Card
 
 
-registry : Registry
+registry : Registry msg
 registry =
     { components =
         Dict.fromList

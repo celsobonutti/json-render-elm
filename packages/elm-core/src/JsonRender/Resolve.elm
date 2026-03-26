@@ -1,19 +1,20 @@
 module JsonRender.Resolve exposing
     ( FunctionDict
-    , ResolvedValue(..)
     , RepeatContext
+    , ResolvedValue(..)
+    , bool
+    , float
+    , int
+    , optional
+    , required
     , resolveActionParams
     , resolveActionParamsWith
+    , resolvePropValue
     , resolveProps
     , resolvePropsWith
     , resolvedToValue
-    , succeed
-    , required
-    , optional
     , string
-    , int
-    , float
-    , bool
+    , succeed
     )
 
 {-| Expression evaluation and pipeline-style prop decoders.

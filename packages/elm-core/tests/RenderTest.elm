@@ -107,6 +107,7 @@ suite =
                                     }
                                   )
                                 ]
+                        , state = Nothing
                         }
                 in
                 Render.render testRegistry Encode.null spec
@@ -138,6 +139,7 @@ suite =
                                     }
                                   )
                                 ]
+                        , state = Nothing
                         }
                 in
                 Render.render testRegistry Encode.null spec
@@ -160,6 +162,7 @@ suite =
                                     }
                                   )
                                 ]
+                        , state = Nothing
                         }
                 in
                 Render.render testRegistry Encode.null spec
@@ -185,6 +188,7 @@ suite =
                                     }
                                   )
                                 ]
+                        , state = Nothing
                         }
                 in
                 Render.render testRegistry state spec
@@ -244,6 +248,7 @@ suite =
                                     }
                                   )
                                 ]
+                        , state = Nothing
                         }
                 in
                 Render.render bindRegistry formState spec

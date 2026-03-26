@@ -51,7 +51,12 @@ update msg model =
         SpecReceived val ->
             case Decode.decodeValue Spec.decoder val of
                 Ok spec ->
-                    ( { model | spec = Just spec }, Cmd.none )
+                    ( { model
+                        | spec = Just spec
+                        , renderState = Maybe.withDefault model.renderState spec.state
+                      }
+                    , Cmd.none
+                    )
 
                 Err err ->
                     ( model, testDecodeErrorOut (Decode.errorToString err) )
