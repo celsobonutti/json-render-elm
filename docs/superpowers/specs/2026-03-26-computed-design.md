@@ -237,6 +237,10 @@ registry =
     }
 ```
 
+## Known Limitations
+
+- **`$computed` in visibility `eq`/`neq` values** — `Visibility.evaluate` uses `propValueMatchesJson` which compares PropValues literally, not by resolving them. A `$computed` (or `$state`) in an `eq` value won't be resolved. This is a pre-existing limitation — no expressions are evaluated in visibility comparison values today. Can be addressed in a future task if needed.
+
 ## Out of Scope
 
 - **Memoization/caching** — functions called fresh each render, same as all expression resolution
