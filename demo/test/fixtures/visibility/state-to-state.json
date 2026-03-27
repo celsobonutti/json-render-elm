@@ -1,0 +1,17 @@
+{
+  "state": { "count": 3, "limit": 10 },
+  "root": "wrapper",
+  "elements": {
+    "wrapper": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["msg"]
+    },
+    "msg": {
+      "type": "Text",
+      "props": { "content": "Under limit" },
+      "children": [],
+      "visible": { "$state": "/count", "lt": { "$state": "/limit" } }
+    }
+  }
+}

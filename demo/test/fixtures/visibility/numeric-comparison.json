@@ -1,0 +1,17 @@
+{
+  "state": { "count": 10 },
+  "root": "wrapper",
+  "elements": {
+    "wrapper": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["msg"]
+    },
+    "msg": {
+      "type": "Text",
+      "props": { "content": "Count is high" },
+      "children": [],
+      "visible": { "$state": "/count", "gt": 5 }
+    }
+  }
+}
