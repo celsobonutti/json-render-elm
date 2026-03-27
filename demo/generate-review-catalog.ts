@@ -1,24 +1,15 @@
 #!/usr/bin/env npx tsx
 /**
  * Generates review/src/CatalogData.elm from catalog-schema.json.
- * Embeds the catalog schema as a compact Elm string for ReviewConfig.elm.
  *
  * Usage: npx tsx generate-catalog-schema.ts && npx tsx generate-review-catalog.ts
  * Or:    npm run catalog
  */
 import { readFileSync, writeFileSync } from "fs"
+import { generateElmReviewCatalog } from "../packages/js-bridge/src/index.ts"
 
 const schema = JSON.parse(readFileSync("catalog-schema.json", "utf-8"))
-const compact = JSON.stringify(schema)
-const escaped = compact.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-
-const elm = `module CatalogData exposing (schemaJson)
-
-
-schemaJson : String
-schemaJson =
-    "${escaped}"
-`
+const elm = generateElmReviewCatalog(schema)
 
 writeFileSync("review/src/CatalogData.elm", elm)
 console.log("Generated review/src/CatalogData.elm")
