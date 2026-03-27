@@ -10,7 +10,6 @@ import { defineSchema } from "@json-render/core";
  * Differences from React/Vue/Svelte schemas:
  * - No `slots` — uses `hasChildren` boolean instead
  * - No `repeat` field — not yet supported (backlog)
- * - No `state` on spec — Elm model owns state
  * - Expressions: $state, $item, $index, $template (read-only), $bindState (two-way binding), $computed (registered functions)
  */
 export const schema = defineSchema(
@@ -32,6 +31,8 @@ export const schema = defineSchema(
           visible: s.any(),
           /** Event handlers mapping event names to action bindings */
           on: s.any(),
+          /** Watchers mapping state paths to action bindings that fire on change */
+          watch: s.any(),
         }),
       ),
     }),
@@ -93,6 +94,7 @@ export const schema = defineSchema(
       // Field placement
       'The "visible" field goes on the ELEMENT object, NOT inside "props". Correct: {"type":"Card","props":{},"visible":{"$state":"/show"},"children":[...]}.',
       'The "on" field goes on the ELEMENT object, NOT inside "props". Use it to bind events to actions: {"on":{"press":{"action":"setState","params":{"path":"/clicked","value":true}}}}. Chain multiple actions with an array: {"on":{"press":[{"action":"setState",...},{"action":"myAction",...}]}}.',
+      'The "watch" field goes on the ELEMENT object. It maps state paths to actions that fire when the value at that path changes (not on initial render). Same format as "on" actions: {"watch":{"/form/country":{"action":"setState","params":{"path":"/form/city","value":""}}}}. Use for cascading updates and derived state.',
 
       // Expression support
       'Dynamic props: use { "$state": "/path" } to read from state, { "$bindState": "/path" } for two-way binding (read and write), { "$item": "field" } in repeat contexts, { "$index": true } for loop index, { "$template": "Hello ${/name}" } for string interpolation, { "$computed": "funcName", "args": { "argName": <expression> } } for computed values from registered functions.',

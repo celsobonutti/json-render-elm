@@ -1,0 +1,51 @@
+{
+  "state": {
+    "markAll": false,
+    "items": [
+      { "id": "1", "title": "Buy milk", "done": false },
+      { "id": "2", "title": "Walk dog", "done": false }
+    ]
+  },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["mark-btn", "list"]
+    },
+    "mark-btn": {
+      "type": "Button",
+      "props": { "label": "Mark All Done" },
+      "children": [],
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": { "path": "/markAll", "value": true }
+        }
+      }
+    },
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["item"],
+      "repeat": { "statePath": "/items", "key": "id" }
+    },
+    "item": {
+      "type": "Text",
+      "props": {
+        "content": {
+          "$cond": { "$item": "done" },
+          "$then": "DONE",
+          "$else": { "$item": "title" }
+        }
+      },
+      "children": [],
+      "watch": {
+        "/markAll": {
+          "action": "setState",
+          "params": { "path": { "$item": "done" }, "value": true }
+        }
+      }
+    }
+  }
+}

@@ -12,7 +12,7 @@ import Dict exposing (Dict)
 import Json.Decode as Decode
 import Json.Encode exposing (Value)
 import JsonRender.Resolve as Resolve exposing (RepeatContext)
-import JsonRender.Spec exposing (ActionBinding, Spec)
+import JsonRender.Spec exposing (ActionBinding, EventHandler(..), Spec)
 import JsonRender.State as State
 
 
@@ -40,6 +40,7 @@ type Msg action
     | CustomAction action
     | ExecuteAction ActionBinding (Maybe RepeatContext)
     | ExecuteChain (List ActionBinding) (Maybe RepeatContext)
+    | WatcherTriggered EventHandler (Maybe RepeatContext)
     | ActionError String
 
 
@@ -71,6 +72,27 @@ update config msg model =
             executeOneAction config repeatCtx binding model
 
         ExecuteChain bindings repeatCtx ->
+            List.foldl
+                (\binding ( accModel, accCmd ) ->
+                    let
+                        ( newModel, newCmd ) =
+                            executeOneAction config repeatCtx binding accModel
+                    in
+                    ( newModel, Cmd.batch [ accCmd, newCmd ] )
+                )
+                ( model, Cmd.none )
+                bindings
+
+        WatcherTriggered handler repeatCtx ->
+            let
+                bindings =
+                    case handler of
+                        SingleAction binding ->
+                            [ binding ]
+
+                        ChainedActions bs ->
+                            bs
+            in
             List.foldl
                 (\binding ( accModel, accCmd ) ->
                     let

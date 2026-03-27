@@ -1,0 +1,38 @@
+{
+  "state": { "category": "electronics", "filter": "all" },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["category-label", "filter-label", "change-btn"],
+      "watch": {
+        "/category": {
+          "action": "setState",
+          "params": { "path": "/filter", "value": "reset" }
+        }
+      }
+    },
+    "category-label": {
+      "type": "Text",
+      "props": { "content": { "$state": "/category" } },
+      "children": []
+    },
+    "filter-label": {
+      "type": "Text",
+      "props": { "content": { "$state": "/filter" } },
+      "children": []
+    },
+    "change-btn": {
+      "type": "Button",
+      "props": { "label": "Change Category" },
+      "children": [],
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": { "path": "/category", "value": "books" }
+        }
+      }
+    }
+  }
+}

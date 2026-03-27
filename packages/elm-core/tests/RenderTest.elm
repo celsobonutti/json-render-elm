@@ -104,6 +104,7 @@ suite =
                                     , visible = Nothing
                                     , repeat = Nothing
                                     , on = Dict.empty
+                                    , watch = Dict.empty
                                     }
                                   )
                                 ]
@@ -127,6 +128,7 @@ suite =
                                     , visible = Nothing
                                     , repeat = Nothing
                                     , on = Dict.empty
+                                    , watch = Dict.empty
                                     }
                                   )
                                 , ( "inner"
@@ -136,6 +138,7 @@ suite =
                                     , visible = Nothing
                                     , repeat = Nothing
                                     , on = Dict.empty
+                                    , watch = Dict.empty
                                     }
                                   )
                                 ]
@@ -159,6 +162,7 @@ suite =
                                     , visible = Nothing
                                     , repeat = Nothing
                                     , on = Dict.empty
+                                    , watch = Dict.empty
                                     }
                                   )
                                 ]
@@ -185,6 +189,7 @@ suite =
                                     , visible = Just (Truthy "/show")
                                     , repeat = Nothing
                                     , on = Dict.empty
+                                    , watch = Dict.empty
                                     }
                                   )
                                 ]
@@ -245,6 +250,7 @@ suite =
                                     , visible = Nothing
                                     , repeat = Nothing
                                     , on = Dict.empty
+                                    , watch = Dict.empty
                                     }
                                   )
                                 ]

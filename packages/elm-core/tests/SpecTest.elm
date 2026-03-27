@@ -687,4 +687,132 @@ suite =
                         Err err ->
                             Expect.fail (Decode.errorToString err)
             ]
+        , describe "watch field"
+            [ test "decodes element with watch containing single action" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "sel",
+                              "elements": {
+                                "sel": {
+                                  "type": "Select",
+                                  "props": { "label": "Country" },
+                                  "children": [],
+                                  "watch": {
+                                    "/form/country": {
+                                      "action": "setState",
+                                      "params": { "path": "/form/city", "value": "" }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "sel" spec.elements of
+                                Just el ->
+                                    case Dict.get "/form/country" el.watch of
+                                        Just (SingleAction binding) ->
+                                            Expect.equal "setState" binding.action
+
+                                        Just (ChainedActions _) ->
+                                            Expect.fail "expected SingleAction, got ChainedActions"
+
+                                        Nothing ->
+                                            Expect.fail "watcher not found"
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "decodes element with watch containing chained actions" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "sel",
+                              "elements": {
+                                "sel": {
+                                  "type": "Select",
+                                  "props": { "label": "Country" },
+                                  "children": [],
+                                  "watch": {
+                                    "/form/country": [
+                                      { "action": "loadCities", "params": { "country": { "$state": "/form/country" } } },
+                                      { "action": "setState", "params": { "path": "/form/city", "value": "" } }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "sel" spec.elements of
+                                Just el ->
+                                    case Dict.get "/form/country" el.watch of
+                                        Just (ChainedActions bindings) ->
+                                            Expect.equal 2 (List.length bindings)
+
+                                        _ ->
+                                            Expect.fail "expected ChainedActions"
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "decodes element without watch as empty dict" <|
+                \_ ->
+                    case Decode.decodeString Spec.decoder specJson of
+                        Ok spec ->
+                            case Dict.get "card-1" spec.elements of
+                                Just el ->
+                                    Expect.equal Dict.empty el.watch
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "decodes element with multiple watched paths" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": { "content": "ok" },
+                                  "children": [],
+                                  "watch": {
+                                    "/a": { "action": "setState", "params": { "path": "/x", "value": 1 } },
+                                    "/b": { "action": "setState", "params": { "path": "/y", "value": 2 } }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "t" spec.elements of
+                                Just el ->
+                                    Expect.equal 2 (Dict.size el.watch)
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            ]
         ]
