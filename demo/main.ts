@@ -1,5 +1,4 @@
 import "./style.css"
-import "../packages/elm-core/src/JsonRender/WatcherTrigger.js"
 // @ts-ignore -- Elm module has no type declarations
 import { Elm } from "./src/Main.elm"
 import { createElmBridge } from "../packages/js-bridge/src/index.ts"

@@ -1,4 +1,5 @@
 export { schema, type ElmSchema, type ElmSpec } from './schema'
+import '../../elm-core/src/JsonRender/WatcherTrigger.js'
 
 export interface ElmPorts {
   jsonRenderSpecIn: {
