@@ -11,7 +11,7 @@ import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Render as Render
 import JsonRender.Resolve as Resolve
 import JsonRender.Spec as Spec
-import JsonRender.Visibility exposing (VisibilityCondition(..))
+import JsonRender.Visibility exposing (VisibilityCondition(..), Source(..), Operator(..))
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
@@ -186,7 +186,7 @@ suite =
                                   , { type_ = "Text"
                                     , props = Dict.fromList [ ( "content", StringValue "Hidden" ) ]
                                     , children = []
-                                    , visible = Just (Truthy "/show")
+                                    , visible = Just (Compare (StateSource "/show") IsTruthy)
                                     , repeat = Nothing
                                     , on = Dict.empty
                                     , watch = Dict.empty
