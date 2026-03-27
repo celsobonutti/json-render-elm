@@ -1,0 +1,24 @@
+{
+  "state": {
+    "todos": [
+      { "text": "Buy milk", "status": "done" },
+      { "text": "Walk dog", "status": "pending" },
+      { "text": "Read book", "status": "done" }
+    ]
+  },
+  "root": "list",
+  "elements": {
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["item"],
+      "repeat": { "statePath": "/todos" }
+    },
+    "item": {
+      "type": "Text",
+      "props": { "content": { "$item": "text" } },
+      "children": [],
+      "visible": { "$item": "status", "eq": "done" }
+    }
+  }
+}

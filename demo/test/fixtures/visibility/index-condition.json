@@ -1,0 +1,20 @@
+{
+  "state": {
+    "items": ["first", "second", "third"]
+  },
+  "root": "list",
+  "elements": {
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["item"],
+      "repeat": { "statePath": "/items" }
+    },
+    "item": {
+      "type": "Text",
+      "props": { "content": { "$item": "" } },
+      "children": [],
+      "visible": { "$index": true, "gt": 0 }
+    }
+  }
+}
