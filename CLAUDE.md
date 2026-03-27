@@ -177,15 +177,49 @@ When implementing plans from brainstorming, dispatch three parallel agent teams 
 
 Each agent works in an isolated git worktree. After all three complete, integrate their branches and run the full test suite. Tasks that require all packages (e.g., e2e tests that need elm-core + elm-review + demo changes) are done in a final integration pass after merging.
 
-## Backlog
+## Feature Parity with json-render
 
-Features not yet implemented, roughly prioritized:
+Compared against the [json-render](https://github.com/nichochar/json-render) core framework (React renderer as reference).
 
-- **Named slots** — `ComponentContext props slots` with typed slot records decoded same way as props. The spec's `children` becomes `Dict String (List String)` keyed by slot name.
-- **Export catalog schema generator** — move `generate-catalog-schema.ts` logic into `@json-render/elm` as a `generateCatalogSchema(catalog)` export. Same for the elm-review data generator. Users shouldn't have to copy demo scripts.
-- **ElmCodeGen AST refactor** — replace string concatenation in `ElmCodeGen.elm` with `the-sett/elm-syntax-dsl` for AST-based code generation. See `docs/superpowers/specs/2026-03-26-elm-codegen-refactor.md`.
-- **Form validation** — `validateForm` built-in action
-- **Streaming optimizations** — incremental patches instead of full spec snapshots
+### Fully Implemented
+
+| Feature | Details |
+|---|---|
+| **Expressions** | All 8 types: `$state`, `$bindState`, `$item`, `$bindItem`, `$index`, `$template`, `$cond`, `$computed` |
+| **Actions** | `setState`, `pushState`, `removeState` + custom actions via `ActionConfig` |
+| **Chained actions** | Array of action bindings executed sequentially |
+| **Event bindings** | `on` field mapping event names to action bindings |
+| **Watchers** | `watch` field with state path triggers, repeat-aware |
+| **Visibility** | `$state` conditions with `eq`, `neq`, `not`, `$and`, `$or`, implicit AND, boolean literals |
+| **Repeat** | `repeat` field with `statePath` + optional `key` for keyed rendering |
+| **State on spec** | `state` field on spec for initial state |
+| **Catalog schema** | `defineSchema` with components, actions, functions + `generateCatalogSchema` export |
+| **Props error rendering** | Red error box when props fail to decode |
+
+### Not Yet Implemented
+
+Gaps versus json-render core, grouped by area and roughly prioritized:
+
+#### Visibility gaps
+- **Comparison operators `gt`/`gte`/`lt`/`lte`** — only `eq`/`neq` are implemented
+- **`$item` and `$index` conditions** — visibility only evaluates `$state`, not repeat context expressions
+- **State-to-state comparison** — RHS of comparison operators is always a literal; upstream allows `{ "$state": "/path" }` as the comparand
+
+#### Action gaps
+- **`confirm` dialogs** — `{ "confirm": { "title": "...", "message": "...", "variant": "danger" } }` on action bindings to show a confirmation dialog before executing
+- **`onSuccess` / `onError` handlers** — post-action callbacks: navigate, set state, or chain another action
+- **`preventDefault` flag** — prevents default browser behavior on action trigger
+- **`pushState` `clearStatePath` param** — clears a state path after push (e.g., reset form input)
+- **`$id` auto-generation** — `"$id"` string in `pushState` value auto-generates a unique ID
+
+#### Larger features
+- **Named slots** — `ComponentContext props slots` with typed slot records decoded same way as props. The spec's `children` becomes `Dict String (List String)` keyed by slot name
+- **Form validation** — `validateForm` action + validation checks (`required`, `email`, `minLength`, `pattern`, etc.), `validateOn` timing, cross-field validation, conditional validation, custom validators
+- **Streaming / SpecStream** — JSONL + RFC 6902 JSON Patch incremental rendering instead of full spec snapshots
+- **Edit modes** — `buildEditInstructions()`, `deepMergeSpec()`, `diffToPatches()` for spec editing workflows
+
+### Internal Improvements (not parity gaps)
+- **ElmCodeGen AST refactor** — replace string concatenation in `ElmCodeGen.elm` with `the-sett/elm-syntax-dsl` for AST-based code generation. See `docs/superpowers/specs/2026-03-26-elm-codegen-refactor.md`
 
 ## Key Files
 
