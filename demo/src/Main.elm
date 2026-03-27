@@ -139,20 +139,14 @@ update msg model =
 
         JsonRenderMsg actionMsg ->
             let
-                oldState =
-                    model.renderState
-
                 actionsModel =
                     { spec = model.spec, state = model.renderState }
 
-                ( afterAction, cmd ) =
+                ( newActionsModel, cmd ) =
                     Actions.update actionConfig actionMsg actionsModel
-
-                ( afterWatchers, watcherCmd ) =
-                    Actions.checkWatchers actionConfig oldState afterAction
             in
-            ( { model | renderState = afterWatchers.state }
-            , Cmd.map JsonRenderMsg (Cmd.batch [ cmd, watcherCmd ])
+            ( { model | renderState = newActionsModel.state }
+            , Cmd.map JsonRenderMsg cmd
             )
 
 

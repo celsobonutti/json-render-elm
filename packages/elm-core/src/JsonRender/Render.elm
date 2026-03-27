@@ -13,9 +13,10 @@ module JsonRender.Render exposing
 import Dict exposing (Dict)
 import Html exposing (Html)
 import Html.Attributes
+import Html.Events
 import Html.Keyed
 import Json.Decode as Decode
-import Json.Encode exposing (Value)
+import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions exposing (Msg(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext, ResolvedValue)
@@ -263,13 +264,46 @@ renderElementInner registry state repeatCtx spec element =
 
                         Nothing ->
                             renderChildren registry state repeatCtx spec element.children
+
+                componentHtml =
+                    componentFn
+                        { props = resolved
+                        , bindings = bindings
+                        , children = children
+                        , emit = buildEmit element.on repeatCtx
+                        }
+
+                watcherTriggers =
+                    renderWatcherTriggers state repeatCtx element.watch
             in
-            componentFn
-                { props = resolved
-                , bindings = bindings
-                , children = children
-                , emit = buildEmit element.on repeatCtx
-                }
+            if List.isEmpty watcherTriggers then
+                componentHtml
+
+            else
+                Html.div [ Html.Attributes.style "display" "contents" ]
+                    (componentHtml :: watcherTriggers)
 
         Nothing ->
             Html.text ""
+
+
+renderWatcherTriggers : Value -> Maybe RepeatContext -> Dict String EventHandler -> List (Html (Msg action))
+renderWatcherTriggers state repeatCtx watchDict =
+    Dict.foldl
+        (\path handler acc ->
+            let
+                watchedValue =
+                    State.get path state
+                        |> Maybe.map (Encode.encode 0)
+                        |> Maybe.withDefault "null"
+            in
+            Html.node "watcher-trigger"
+                [ Html.Attributes.attribute "value" watchedValue
+                , Html.Events.on "watcher-triggered"
+                    (Decode.succeed (WatcherTriggered handler repeatCtx))
+                ]
+                []
+                :: acc
+        )
+        []
+        watchDict

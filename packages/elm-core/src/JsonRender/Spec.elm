@@ -3,9 +3,7 @@ module JsonRender.Spec exposing
     , Element
     , EventHandler(..)
     , Repeat
-    , RepeatAncestor
     , Spec
-    , WatcherEntry
     , decoder
     , propValueDecoder
     )
@@ -29,20 +27,6 @@ type alias Spec =
     { root : String
     , elements : Dict String Element
     , state : Maybe Value
-    , watchers : List WatcherEntry
-    }
-
-
-type alias WatcherEntry =
-    { path : String
-    , handler : EventHandler
-    , repeatAncestor : Maybe RepeatAncestor
-    }
-
-
-type alias RepeatAncestor =
-    { statePath : String
-    , key : Maybe String
     }
 
 
@@ -76,47 +60,10 @@ type EventHandler
 
 decoder : Decoder Spec
 decoder =
-    Decode.succeed (\root elements state -> { root = root, elements = elements, state = state, watchers = collectWatchers root elements })
+    Decode.succeed Spec
         |> required "root" Decode.string
         |> required "elements" (Decode.dict elementDecoder)
         |> optional "state" (Decode.map Just Decode.value) Nothing
-
-
-collectWatchers : String -> Dict String Element -> List WatcherEntry
-collectWatchers root elements =
-    collectWatchersFromElement elements Nothing root []
-
-
-collectWatchersFromElement : Dict String Element -> Maybe RepeatAncestor -> String -> List WatcherEntry -> List WatcherEntry
-collectWatchersFromElement elements repeatAncestor elementId acc =
-    case Dict.get elementId elements of
-        Nothing ->
-            acc
-
-        Just element ->
-            let
-                watchEntries =
-                    Dict.foldl
-                        (\path handler innerAcc ->
-                            { path = path, handler = handler, repeatAncestor = repeatAncestor } :: innerAcc
-                        )
-                        acc
-                        element.watch
-
-                childRepeatAncestor =
-                    case element.repeat of
-                        Just repeat ->
-                            Just { statePath = repeat.statePath, key = repeat.key }
-
-                        Nothing ->
-                            repeatAncestor
-            in
-            List.foldl
-                (\childId childAcc ->
-                    collectWatchersFromElement elements childRepeatAncestor childId childAcc
-                )
-                watchEntries
-                element.children
 
 
 elementDecoder : Decoder Element
