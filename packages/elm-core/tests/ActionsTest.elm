@@ -7,6 +7,7 @@ import Json.Encode as Encode
 import JsonRender.Actions as Actions exposing (Msg(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.State as State
+import Random
 import Test exposing (..)
 
 
@@ -46,6 +47,11 @@ decodeTestAction name params =
             Err ("Unknown action: " ++ name)
 
 
+testModel : Encode.Value -> Actions.Model
+testModel state =
+    { spec = Nothing, state = state, seed = Random.initialSeed 42 }
+
+
 suite : Test
 suite =
     describe "JsonRender.Actions"
@@ -54,9 +60,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "name", Encode.string "Alice" ) ]
-                            }
+                            testModel (Encode.object [ ( "name", Encode.string "Alice" ) ])
 
                         ( newModel, _ ) =
                             Actions.update testActionConfig (SetState "/name" (Encode.string "Bob")) model
@@ -68,9 +72,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "items", Encode.list Encode.string [ "a" ] ) ]
-                            }
+                            testModel (Encode.object [ ( "items", Encode.list Encode.string [ "a" ] ) ])
 
                         ( newModel, _ ) =
                             Actions.update testActionConfig (PushState "/items" (Encode.string "b")) model
@@ -82,13 +84,12 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "name", Encode.string "Alice" )
                                     , ( "age", Encode.int 30 )
                                     ]
-                            }
+                                )
 
                         ( newModel, _ ) =
                             Actions.update testActionConfig (RemoveState "/age") model
@@ -99,9 +100,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object []
-                            }
+                            testModel (Encode.object [])
 
                         config =
                             { handleAction =
@@ -130,9 +129,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "clicked", Encode.bool False ) ]
-                            }
+                            testModel (Encode.object [ ( "clicked", Encode.bool False ) ])
 
                         binding =
                             { action = "setState"
@@ -153,11 +150,10 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "items", Encode.list Encode.string [ "first" ] ) ]
-                            }
+                                )
 
                         binding =
                             { action = "pushState"
@@ -178,13 +174,12 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "name", Encode.string "Alice" )
                                     , ( "temp", Encode.string "remove me" )
                                     ]
-                            }
+                                )
 
                         binding =
                             { action = "removeState"
@@ -208,9 +203,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object []
-                            }
+                            testModel (Encode.object [])
 
                         exportConfig =
                             { handleAction =
@@ -244,9 +237,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "x", Encode.int 1 ) ]
-                            }
+                            testModel (Encode.object [ ( "x", Encode.int 1 ) ])
 
                         binding =
                             { action = "nonexistentAction"
@@ -263,13 +254,12 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "source", Encode.string "hello" )
                                     , ( "items", Encode.list Encode.string [] )
                                     ]
-                            }
+                                )
 
                         binding =
                             { action = "pushState"
@@ -292,13 +282,12 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "loading", Encode.bool False )
                                     , ( "items", Encode.list Encode.string [] )
                                     ]
-                            }
+                                )
 
                         bindings =
                             [ { action = "setState"
@@ -335,13 +324,12 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "input", Encode.string "Buy milk" )
                                     , ( "items", Encode.list Encode.string [] )
                                     ]
-                            }
+                                )
 
                         bindings =
                             [ -- First: push current input value to items
@@ -380,9 +368,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "x", Encode.int 42 ) ]
-                            }
+                            testModel (Encode.object [ ( "x", Encode.int 42 ) ])
 
                         ( newModel, _ ) =
                             Actions.update testActionConfig (ExecuteChain [] Nothing) model
@@ -396,9 +382,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "x", Encode.int 1 ) ]
-                            }
+                            testModel (Encode.object [ ( "x", Encode.int 1 ) ])
 
                         ( newModel, _ ) =
                             Actions.update testActionConfig (ActionError "No handler for event: tap") model

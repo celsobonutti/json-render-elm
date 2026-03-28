@@ -14,11 +14,13 @@ import Json.Encode exposing (Value)
 import JsonRender.Resolve as Resolve exposing (RepeatContext)
 import JsonRender.Spec exposing (ActionBinding, EventHandler(..), Spec)
 import JsonRender.State as State
+import Random
 
 
 type alias Model =
     { spec : Maybe Spec
     , state : Value
+    , seed : Random.Seed
     }
 
 
