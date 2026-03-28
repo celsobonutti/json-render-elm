@@ -611,4 +611,94 @@ suite =
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
                         |> Expect.equal (Just "$id")
             ]
+        , describe "pushState clearStatePath"
+            [ test "clearStatePath resets path to empty string after push" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "input", Encode.string "Buy milk" )
+                                    , ( "items", Encode.list identity [] )
+                                    ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value", StateExpr "/input" )
+                                    , ( "clearStatePath", StringValue "/input" )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    Expect.all
+                        [ \m ->
+                            State.get "/items/0" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "Buy milk")
+                        , \m ->
+                            State.get "/input" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "")
+                        ]
+                        newModel
+            , test "pushState without clearStatePath does not clear anything" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "input", Encode.string "Buy milk" )
+                                    , ( "items", Encode.list identity [] )
+                                    ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value", StateExpr "/input" )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    State.get "/input" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                        |> Expect.equal (Just "Buy milk")
+            , test "clearStatePath is ignored on non-pushState actions" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "input", Encode.string "keep me" )
+                                    , ( "flag", Encode.bool False )
+                                    ]
+                                )
+
+                        binding =
+                            { action = "setState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/flag" )
+                                    , ( "value", BoolValue True )
+                                    , ( "clearStatePath", StringValue "/input" )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    State.get "/input" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                        |> Expect.equal (Just "keep me")
+            ]
         ]

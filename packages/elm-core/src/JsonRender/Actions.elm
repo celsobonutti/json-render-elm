@@ -198,6 +198,24 @@ preProcess actionName resolvedParams seed =
             ( resolvedParams, seed )
 
 
+{-| Post-process after action execution.
+For pushState: clear the state path specified by clearStatePath.
+-}
+postProcess : String -> Dict String Value -> Model -> Model
+postProcess actionName processedParams model =
+    case ( actionName, Dict.get "clearStatePath" processedParams ) of
+        ( "pushState", Just clearPathVal ) ->
+            case Decode.decodeValue Decode.string clearPathVal of
+                Ok path ->
+                    { model | state = State.set path (Json.Encode.string "") model.state }
+
+                Err _ ->
+                    model
+
+        _ ->
+            model
+
+
 {-| Execute a single action binding: resolve params, then dispatch built-in or custom.
 -}
 executeOneAction : ActionConfig action -> Maybe RepeatContext -> ActionBinding -> Model -> ( Model, Cmd (Msg action) )
@@ -233,7 +251,8 @@ executeOneAction config repeatCtx binding model =
                 ( Just pathVal, Just value ) ->
                     case Decode.decodeValue Decode.string pathVal of
                         Ok path ->
-                            ( { model_ | state = State.push path value model_.state }
+                            ( postProcess binding.action processedParams
+                                { model_ | state = State.push path value model_.state }
                             , Cmd.none
                             )
 
