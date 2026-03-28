@@ -1,0 +1,49 @@
+{
+  "state": { "newTodo": "Buy milk", "todos": [] },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["input", "btn", "list"]
+    },
+    "input": {
+      "type": "Input",
+      "props": {
+        "value": { "$bindState": "/newTodo" },
+        "label": "New Todo",
+        "placeholder": "Enter a todo"
+      },
+      "children": []
+    },
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Add Todo" },
+      "children": [],
+      "on": {
+        "press": {
+          "action": "pushState",
+          "params": {
+            "path": "/todos",
+            "value": {
+              "id": "$id",
+              "title": { "$state": "/newTodo" }
+            },
+            "clearStatePath": "/newTodo"
+          }
+        }
+      }
+    },
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["todo-item"],
+      "repeat": { "statePath": "/todos", "key": "id" }
+    },
+    "todo-item": {
+      "type": "Text",
+      "props": { "content": { "$item": "title" } },
+      "children": []
+    }
+  }
+}
