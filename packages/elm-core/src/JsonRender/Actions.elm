@@ -152,12 +152,12 @@ substituteIds seed value =
                                         ( newVal, nextSeed ) =
                                             substituteIds accSeed val
                                     in
-                                    ( accPairs ++ [ ( key, newVal ) ], nextSeed )
+                                    ( ( key, newVal ) :: accPairs, nextSeed )
                                 )
                                 ( [], seed )
                                 pairs
                     in
-                    ( Json.Encode.object newPairs, newSeed )
+                    ( Json.Encode.object (List.reverse newPairs), newSeed )
 
                 Err _ ->
                     case Decode.decodeValue (Decode.list Decode.value) value of
@@ -170,12 +170,12 @@ substituteIds seed value =
                                                 ( newItem, nextSeed ) =
                                                     substituteIds accSeed item
                                             in
-                                            ( accItems ++ [ newItem ], nextSeed )
+                                            ( newItem :: accItems, nextSeed )
                                         )
                                         ( [], seed )
                                         items
                             in
-                            ( Json.Encode.list identity newItems, newSeed )
+                            ( Json.Encode.list identity (List.reverse newItems), newSeed )
 
                         Err _ ->
                             ( value, seed )

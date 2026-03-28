@@ -673,6 +673,42 @@ suite =
                     State.get "/input" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
                         |> Expect.equal (Just "Buy milk")
+            , test "clearStatePath with $state expression resolves the path to clear" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "input", Encode.string "Buy milk" )
+                                    , ( "items", Encode.list identity [] )
+                                    , ( "clearTarget", Encode.string "/input" )
+                                    ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value", StateExpr "/input" )
+                                    , ( "clearStatePath", StateExpr "/clearTarget" )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    Expect.all
+                        [ \m ->
+                            State.get "/items/0" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "Buy milk")
+                        , \m ->
+                            State.get "/input" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "")
+                        ]
+                        newModel
             , test "clearStatePath is ignored on non-pushState actions" <|
                 \_ ->
                     let
