@@ -9,6 +9,7 @@ import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.State as State
 import Random
 import Test exposing (..)
+import UUID
 
 
 type TestAction
@@ -390,5 +391,224 @@ suite =
                     State.get "/x" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
                         |> Expect.equal (Just 1)
+            ]
+        , describe "pushState $id auto-generation"
+            [ test "pushState with $id in value replaces with UUID" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] ) ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value"
+                                      , ObjectValue
+                                            (Dict.fromList
+                                                [ ( "id", StringValue "$id" )
+                                                , ( "title", StringValue "hello" )
+                                                ]
+                                            )
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    case State.get "/items/0/id" newModel.state of
+                        Just idVal ->
+                            case Decode.decodeValue Decode.string idVal of
+                                Ok idStr ->
+                                    case UUID.fromString idStr of
+                                        Ok _ ->
+                                            Expect.pass
+
+                                        Err _ ->
+                                            Expect.fail ("Expected valid UUID, got: " ++ idStr)
+
+                                Err _ ->
+                                    Expect.fail "id should be a string"
+
+                        Nothing ->
+                            Expect.fail "pushed item should have id field"
+            , test "multiple $id occurrences get different UUIDs" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] ) ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value"
+                                      , ObjectValue
+                                            (Dict.fromList
+                                                [ ( "id", StringValue "$id" )
+                                                , ( "ref", StringValue "$id" )
+                                                ]
+                                            )
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+
+                        getId path =
+                            State.get path newModel.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                    in
+                    case ( getId "/items/0/id", getId "/items/0/ref" ) of
+                        ( Just id1, Just id2 ) ->
+                            Expect.notEqual id1 id2
+
+                        _ ->
+                            Expect.fail "both id and ref should be strings"
+            , test "$id in nested objects is substituted" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] ) ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value"
+                                      , ObjectValue
+                                            (Dict.fromList
+                                                [ ( "meta"
+                                                  , ObjectValue
+                                                        (Dict.fromList
+                                                            [ ( "uid", StringValue "$id" ) ]
+                                                        )
+                                                  )
+                                                ]
+                                            )
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    case State.get "/items/0/meta/uid" newModel.state of
+                        Just idVal ->
+                            case Decode.decodeValue Decode.string idVal of
+                                Ok idStr ->
+                                    case UUID.fromString idStr of
+                                        Ok _ ->
+                                            Expect.pass
+
+                                        Err _ ->
+                                            Expect.fail ("Expected valid UUID, got: " ++ idStr)
+
+                                Err _ ->
+                                    Expect.fail "uid should be a string"
+
+                        Nothing ->
+                            Expect.fail "pushed item should have meta/uid field"
+            , test "$id in arrays is substituted" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] ) ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value"
+                                      , ListValue
+                                            [ StringValue "$id"
+                                            , StringValue "static"
+                                            ]
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    case State.get "/items/0/0" newModel.state of
+                        Just idVal ->
+                            case Decode.decodeValue Decode.string idVal of
+                                Ok idStr ->
+                                    Expect.notEqual "$id" idStr
+
+                                Err _ ->
+                                    Expect.fail "first element should be a string"
+
+                        Nothing ->
+                            Expect.fail "pushed item should have element at index 0"
+            , test "non-$id strings are not substituted" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] ) ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value"
+                                      , ObjectValue
+                                            (Dict.fromList
+                                                [ ( "name", StringValue "Alice" ) ]
+                                            )
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    State.get "/items/0/name" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                        |> Expect.equal (Just "Alice")
+            , test "setState ignores $id in value" <|
+                \_ ->
+                    let
+                        model =
+                            testModel (Encode.object [])
+
+                        binding =
+                            { action = "setState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/name" )
+                                    , ( "value", StringValue "$id" )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    State.get "/name" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                        |> Expect.equal (Just "$id")
             ]
         ]
