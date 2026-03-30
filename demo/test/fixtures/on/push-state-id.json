@@ -1,0 +1,36 @@
+{
+  "state": { "items": [] },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["btn", "list"]
+    },
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Add Item" },
+      "children": [],
+      "on": {
+        "press": {
+          "action": "pushState",
+          "params": {
+            "path": "/items",
+            "value": { "id": "$id", "title": "New Item" }
+          }
+        }
+      }
+    },
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["item-text"],
+      "repeat": { "statePath": "/items", "key": "id" }
+    },
+    "item-text": {
+      "type": "Text",
+      "props": { "content": { "$item": "id" } },
+      "children": []
+    }
+  }
+}

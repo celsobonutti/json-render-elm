@@ -78,7 +78,7 @@ export const schema = defineSchema(
       {
         name: "pushState",
         description:
-          "Append an item to an array in state. Params: { path: string, value: any }",
+          'Append an item to an array in state. Params: { path: string, value: any, clearStatePath?: string }. Use "$id" as a string value inside value to auto-generate a unique ID. Use clearStatePath to reset a state path (e.g., an input field) to "" after appending.',
       },
       {
         name: "removeState",

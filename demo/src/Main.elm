@@ -10,6 +10,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions as Actions
 import JsonRender.Render as Render
+import Random
 import JsonRender.Spec as Spec exposing (Spec)
 
 
@@ -51,11 +52,12 @@ type alias Model =
     , specJson : Maybe Value
     , showJson : Bool
     , renderState : Value
+    , seed : Random.Seed
     }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
+init : Int -> ( Model, Cmd Msg )
+init randomSeed =
     ( { state = Idle
       , prompt = ""
       , error = Nothing
@@ -63,6 +65,7 @@ init _ =
       , specJson = Nothing
       , showJson = False
       , renderState = Encode.object []
+      , seed = Random.initialSeed randomSeed
       }
     , Cmd.none
     )
@@ -140,12 +143,12 @@ update msg model =
         JsonRenderMsg actionMsg ->
             let
                 actionsModel =
-                    { spec = model.spec, state = model.renderState }
+                    { spec = model.spec, state = model.renderState, seed = model.seed }
 
                 ( newActionsModel, cmd ) =
                     Actions.update actionConfig actionMsg actionsModel
             in
-            ( { model | renderState = newActionsModel.state }
+            ( { model | renderState = newActionsModel.state, seed = newActionsModel.seed }
             , Cmd.map JsonRenderMsg cmd
             )
 
@@ -308,7 +311,7 @@ subscriptions _ =
 -- MAIN
 
 
-main : Program () Model Msg
+main : Program Int Model Msg
 main =
     Browser.element
         { init = init

@@ -7,7 +7,9 @@ import Json.Encode as Encode
 import JsonRender.Actions as Actions exposing (Msg(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.State as State
+import Random
 import Test exposing (..)
+import UUID
 
 
 type TestAction
@@ -46,6 +48,11 @@ decodeTestAction name params =
             Err ("Unknown action: " ++ name)
 
 
+testModel : Encode.Value -> Actions.Model
+testModel state =
+    { spec = Nothing, state = state, seed = Random.initialSeed 42 }
+
+
 suite : Test
 suite =
     describe "JsonRender.Actions"
@@ -54,9 +61,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "name", Encode.string "Alice" ) ]
-                            }
+                            testModel (Encode.object [ ( "name", Encode.string "Alice" ) ])
 
                         ( newModel, _ ) =
                             Actions.update testActionConfig (SetState "/name" (Encode.string "Bob")) model
@@ -68,9 +73,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "items", Encode.list Encode.string [ "a" ] ) ]
-                            }
+                            testModel (Encode.object [ ( "items", Encode.list Encode.string [ "a" ] ) ])
 
                         ( newModel, _ ) =
                             Actions.update testActionConfig (PushState "/items" (Encode.string "b")) model
@@ -82,13 +85,12 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "name", Encode.string "Alice" )
                                     , ( "age", Encode.int 30 )
                                     ]
-                            }
+                                )
 
                         ( newModel, _ ) =
                             Actions.update testActionConfig (RemoveState "/age") model
@@ -99,9 +101,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object []
-                            }
+                            testModel (Encode.object [])
 
                         config =
                             { handleAction =
@@ -130,9 +130,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "clicked", Encode.bool False ) ]
-                            }
+                            testModel (Encode.object [ ( "clicked", Encode.bool False ) ])
 
                         binding =
                             { action = "setState"
@@ -153,11 +151,10 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "items", Encode.list Encode.string [ "first" ] ) ]
-                            }
+                                )
 
                         binding =
                             { action = "pushState"
@@ -178,13 +175,12 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "name", Encode.string "Alice" )
                                     , ( "temp", Encode.string "remove me" )
                                     ]
-                            }
+                                )
 
                         binding =
                             { action = "removeState"
@@ -208,9 +204,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object []
-                            }
+                            testModel (Encode.object [])
 
                         exportConfig =
                             { handleAction =
@@ -244,9 +238,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "x", Encode.int 1 ) ]
-                            }
+                            testModel (Encode.object [ ( "x", Encode.int 1 ) ])
 
                         binding =
                             { action = "nonexistentAction"
@@ -263,13 +255,12 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "source", Encode.string "hello" )
                                     , ( "items", Encode.list Encode.string [] )
                                     ]
-                            }
+                                )
 
                         binding =
                             { action = "pushState"
@@ -292,13 +283,12 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "loading", Encode.bool False )
                                     , ( "items", Encode.list Encode.string [] )
                                     ]
-                            }
+                                )
 
                         bindings =
                             [ { action = "setState"
@@ -335,13 +325,12 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state =
-                                Encode.object
+                            testModel
+                                (Encode.object
                                     [ ( "input", Encode.string "Buy milk" )
                                     , ( "items", Encode.list Encode.string [] )
                                     ]
-                            }
+                                )
 
                         bindings =
                             [ -- First: push current input value to items
@@ -380,9 +369,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "x", Encode.int 42 ) ]
-                            }
+                            testModel (Encode.object [ ( "x", Encode.int 42 ) ])
 
                         ( newModel, _ ) =
                             Actions.update testActionConfig (ExecuteChain [] Nothing) model
@@ -396,9 +383,7 @@ suite =
                 \_ ->
                     let
                         model =
-                            { spec = Nothing
-                            , state = Encode.object [ ( "x", Encode.int 1 ) ]
-                            }
+                            testModel (Encode.object [ ( "x", Encode.int 1 ) ])
 
                         ( newModel, _ ) =
                             Actions.update testActionConfig (ActionError "No handler for event: tap") model
@@ -406,5 +391,509 @@ suite =
                     State.get "/x" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
                         |> Expect.equal (Just 1)
+            ]
+        , describe "pushState $id auto-generation"
+            [ test "pushState with $id in value replaces with UUID" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] ) ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value"
+                                      , ObjectValue
+                                            (Dict.fromList
+                                                [ ( "id", StringValue "$id" )
+                                                , ( "title", StringValue "hello" )
+                                                ]
+                                            )
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    case State.get "/items/0/id" newModel.state of
+                        Just idVal ->
+                            case Decode.decodeValue Decode.string idVal of
+                                Ok idStr ->
+                                    case UUID.fromString idStr of
+                                        Ok _ ->
+                                            Expect.pass
+
+                                        Err _ ->
+                                            Expect.fail ("Expected valid UUID, got: " ++ idStr)
+
+                                Err _ ->
+                                    Expect.fail "id should be a string"
+
+                        Nothing ->
+                            Expect.fail "pushed item should have id field"
+            , test "multiple $id occurrences get different UUIDs" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] ) ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value"
+                                      , ObjectValue
+                                            (Dict.fromList
+                                                [ ( "id", StringValue "$id" )
+                                                , ( "ref", StringValue "$id" )
+                                                ]
+                                            )
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+
+                        getId path =
+                            State.get path newModel.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                    in
+                    case ( getId "/items/0/id", getId "/items/0/ref" ) of
+                        ( Just id1, Just id2 ) ->
+                            Expect.notEqual id1 id2
+
+                        _ ->
+                            Expect.fail "both id and ref should be strings"
+            , test "$id in nested objects is substituted" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] ) ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value"
+                                      , ObjectValue
+                                            (Dict.fromList
+                                                [ ( "meta"
+                                                  , ObjectValue
+                                                        (Dict.fromList
+                                                            [ ( "uid", StringValue "$id" ) ]
+                                                        )
+                                                  )
+                                                ]
+                                            )
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    case State.get "/items/0/meta/uid" newModel.state of
+                        Just idVal ->
+                            case Decode.decodeValue Decode.string idVal of
+                                Ok idStr ->
+                                    case UUID.fromString idStr of
+                                        Ok _ ->
+                                            Expect.pass
+
+                                        Err _ ->
+                                            Expect.fail ("Expected valid UUID, got: " ++ idStr)
+
+                                Err _ ->
+                                    Expect.fail "uid should be a string"
+
+                        Nothing ->
+                            Expect.fail "pushed item should have meta/uid field"
+            , test "$id in arrays is substituted" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] ) ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value"
+                                      , ListValue
+                                            [ StringValue "$id"
+                                            , StringValue "static"
+                                            ]
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    case State.get "/items/0/0" newModel.state of
+                        Just idVal ->
+                            case Decode.decodeValue Decode.string idVal of
+                                Ok idStr ->
+                                    Expect.notEqual "$id" idStr
+
+                                Err _ ->
+                                    Expect.fail "first element should be a string"
+
+                        Nothing ->
+                            Expect.fail "pushed item should have element at index 0"
+            , test "non-$id strings are not substituted" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] ) ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value"
+                                      , ObjectValue
+                                            (Dict.fromList
+                                                [ ( "name", StringValue "Alice" ) ]
+                                            )
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    State.get "/items/0/name" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                        |> Expect.equal (Just "Alice")
+            , test "setState ignores $id in value" <|
+                \_ ->
+                    let
+                        model =
+                            testModel (Encode.object [])
+
+                        binding =
+                            { action = "setState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/name" )
+                                    , ( "value", StringValue "$id" )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    State.get "/name" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                        |> Expect.equal (Just "$id")
+            ]
+        , describe "pushState clearStatePath"
+            [ test "clearStatePath resets path to empty string after push" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "input", Encode.string "Buy milk" )
+                                    , ( "items", Encode.list identity [] )
+                                    ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value", StateExpr "/input" )
+                                    , ( "clearStatePath", StringValue "/input" )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    Expect.all
+                        [ \m ->
+                            State.get "/items/0" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "Buy milk")
+                        , \m ->
+                            State.get "/input" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "")
+                        ]
+                        newModel
+            , test "pushState without clearStatePath does not clear anything" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "input", Encode.string "Buy milk" )
+                                    , ( "items", Encode.list identity [] )
+                                    ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value", StateExpr "/input" )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    State.get "/input" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                        |> Expect.equal (Just "Buy milk")
+            , test "clearStatePath with $state expression resolves the path to clear" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "input", Encode.string "Buy milk" )
+                                    , ( "items", Encode.list identity [] )
+                                    , ( "clearTarget", Encode.string "/input" )
+                                    ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/items" )
+                                    , ( "value", StateExpr "/input" )
+                                    , ( "clearStatePath", StateExpr "/clearTarget" )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    Expect.all
+                        [ \m ->
+                            State.get "/items/0" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "Buy milk")
+                        , \m ->
+                            State.get "/input" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "")
+                        ]
+                        newModel
+            , test "clearStatePath is ignored on non-pushState actions" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "input", Encode.string "keep me" )
+                                    , ( "flag", Encode.bool False )
+                                    ]
+                                )
+
+                        binding =
+                            { action = "setState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/flag" )
+                                    , ( "value", BoolValue True )
+                                    , ( "clearStatePath", StringValue "/input" )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    State.get "/input" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                        |> Expect.equal (Just "keep me")
+            ]
+        , describe "middleware integration"
+            [ test "pushState with $id + clearStatePath in one action" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "input", Encode.string "Buy milk" )
+                                    , ( "todos", Encode.list identity [] )
+                                    ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "path", StringValue "/todos" )
+                                    , ( "value"
+                                      , ObjectValue
+                                            (Dict.fromList
+                                                [ ( "id", StringValue "$id" )
+                                                , ( "title", StateExpr "/input" )
+                                                ]
+                                            )
+                                      )
+                                    , ( "clearStatePath", StringValue "/input" )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                    in
+                    Expect.all
+                        [ \m ->
+                            State.get "/todos/0/title" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "Buy milk")
+                        , \m ->
+                            case State.get "/todos/0/id" m.state of
+                                Just idVal ->
+                                    case Decode.decodeValue Decode.string idVal of
+                                        Ok idStr ->
+                                            case UUID.fromString idStr of
+                                                Ok _ ->
+                                                    Expect.pass
+
+                                                Err _ ->
+                                                    Expect.fail ("Expected UUID, got: " ++ idStr)
+
+                                        Err _ ->
+                                            Expect.fail "id should be a string"
+
+                                Nothing ->
+                                    Expect.fail "todo should have id"
+                        , \m ->
+                            State.get "/input" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "")
+                        ]
+                        newModel
+            , test "two pushState actions in chain produce different UUIDs" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] ) ]
+                                )
+
+                        bindings =
+                            [ { action = "pushState"
+                              , params =
+                                    Dict.fromList
+                                        [ ( "path", StringValue "/items" )
+                                        , ( "value"
+                                          , ObjectValue
+                                                (Dict.fromList
+                                                    [ ( "id", StringValue "$id" ) ]
+                                                )
+                                          )
+                                        ]
+                              }
+                            , { action = "pushState"
+                              , params =
+                                    Dict.fromList
+                                        [ ( "path", StringValue "/items" )
+                                        , ( "value"
+                                          , ObjectValue
+                                                (Dict.fromList
+                                                    [ ( "id", StringValue "$id" ) ]
+                                                )
+                                          )
+                                        ]
+                              }
+                            ]
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteChain bindings Nothing) model
+
+                        getId path =
+                            State.get path newModel.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                    in
+                    case ( getId "/items/0/id", getId "/items/1/id" ) of
+                        ( Just id1, Just id2 ) ->
+                            Expect.notEqual id1 id2
+
+                        _ ->
+                            Expect.fail "both items should have id strings"
+            , test "chained actions: pushState with clearStatePath, then setState sees cleared state" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "input", Encode.string "Buy milk" )
+                                    , ( "todos", Encode.list identity [] )
+                                    , ( "lastInput", Encode.string "" )
+                                    ]
+                                )
+
+                        bindings =
+                            [ { action = "pushState"
+                              , params =
+                                    Dict.fromList
+                                        [ ( "path", StringValue "/todos" )
+                                        , ( "value", StateExpr "/input" )
+                                        , ( "clearStatePath", StringValue "/input" )
+                                        ]
+                              }
+                            , { action = "setState"
+                              , params =
+                                    Dict.fromList
+                                        [ ( "path", StringValue "/lastInput" )
+                                        , ( "value", StateExpr "/input" )
+                                        ]
+                              }
+                            ]
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (ExecuteChain bindings Nothing) model
+                    in
+                    Expect.all
+                        [ \m ->
+                            State.get "/todos/0" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "Buy milk")
+                        , \m ->
+                            State.get "/input" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "")
+                        , \m ->
+                            -- The second action reads /input AFTER clearStatePath ran
+                            State.get "/lastInput" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                                |> Expect.equal (Just "")
+                        ]
+                        newModel
             ]
         ]

@@ -3,7 +3,9 @@ import { Elm } from "./src/TestHarness.elm"
 import { createElmBridge } from "../packages/js-bridge/src/index.ts"
 
 const root = document.querySelector("#app")
-const app = Elm.TestHarness!.init({ node: root })
+const seedArray = new Uint32Array(1)
+crypto.getRandomValues(seedArray)
+const app = Elm.TestHarness!.init({ node: root, flags: seedArray[0] })
 
 const bridge = createElmBridge(app)
 

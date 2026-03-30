@@ -9,7 +9,9 @@ if (process.env.NODE_ENV === "development") {
 }
 
 const root = document.querySelector("#app div")
-const app = Elm.Main!.init({ node: root })
+const seedArray = new Uint32Array(1)
+crypto.getRandomValues(seedArray)
+const app = Elm.Main!.init({ node: root, flags: seedArray[0] })
 
 // Set up the json-render-elm bridge (handles spec-in port)
 const bridge = createElmBridge(app)

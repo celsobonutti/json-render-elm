@@ -86,6 +86,57 @@ test.describe("on field - event handling", () => {
     expect(action).toEqual({ name: "press" })
   })
 
+  test("pushState with $id generates unique IDs for each push", async ({
+    page,
+  }) => {
+    await sendSpec(page, "on/push-state-id.json")
+
+    const items = page.locator(".jr-stack-vertical .jr-stack-vertical .jr-text")
+    await expect(items).toHaveCount(0)
+
+    await page.locator(".jr-button").click()
+    await expect(items).toHaveCount(1)
+
+    await page.locator(".jr-button").click()
+    await expect(items).toHaveCount(2)
+
+    const text1 = await items.nth(0).textContent()
+    const text2 = await items.nth(1).textContent()
+
+    expect(text1).not.toBe("$id")
+    expect(text2).not.toBe("$id")
+    expect(text1).not.toBe(text2)
+
+    expect(text1!.length).toBe(36)
+    expect(text2!.length).toBe(36)
+  })
+
+  test("pushState with clearStatePath clears input after push", async ({
+    page,
+  }) => {
+    await sendSpec(page, "on/push-state-clear.json")
+
+    const input = page.locator(".jr-input")
+    await expect(input).toHaveValue("Buy milk")
+
+    await page.locator(".jr-button").click()
+
+    await expect(input).toHaveValue("")
+
+    const todoItems = page.locator(
+      ".jr-stack-vertical .jr-stack-vertical .jr-text"
+    )
+    await expect(todoItems).toHaveCount(1)
+    await expect(todoItems.nth(0)).toHaveText("Buy milk")
+
+    await input.fill("Walk dog")
+    await page.locator(".jr-button").click()
+
+    await expect(input).toHaveValue("")
+    await expect(todoItems).toHaveCount(2)
+    await expect(todoItems.nth(1)).toHaveText("Walk dog")
+  })
+
   test("expression params resolve current state at execution time", async ({
     page,
   }) => {

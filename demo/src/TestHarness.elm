@@ -8,6 +8,7 @@ import Html.Attributes exposing (id)
 import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions as Actions
+import Random
 import JsonRender.Render as Render
 import JsonRender.Spec as Spec exposing (Spec)
 
@@ -27,6 +28,7 @@ port testDecodeErrorOut : String -> Cmd msg
 type alias Model =
     { spec : Maybe Spec
     , renderState : Value
+    , seed : Random.Seed
     }
 
 
@@ -36,10 +38,11 @@ type Msg
     | JsonRenderMsg (Actions.Msg Action)
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
+init : Int -> ( Model, Cmd Msg )
+init randomSeed =
     ( { spec = Nothing
       , renderState = Encode.object []
+      , seed = Random.initialSeed randomSeed
       }
     , Cmd.none
     )
@@ -67,12 +70,12 @@ update msg model =
         JsonRenderMsg actionMsg ->
             let
                 actionsModel =
-                    { spec = model.spec, state = model.renderState }
+                    { spec = model.spec, state = model.renderState, seed = model.seed }
 
                 ( newActionsModel, cmd ) =
                     Actions.update actionConfig actionMsg actionsModel
             in
-            ( { model | renderState = newActionsModel.state }
+            ( { model | renderState = newActionsModel.state, seed = newActionsModel.seed }
             , Cmd.map JsonRenderMsg cmd
             )
 
@@ -124,7 +127,7 @@ subscriptions _ =
         ]
 
 
-main : Program () Model Msg
+main : Program Int Model Msg
 main =
     Browser.element
         { init = init
