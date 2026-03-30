@@ -5,6 +5,7 @@ import Expect
 import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender.Actions as Actions exposing (Msg(..), ResolvedAction(..))
+import JsonRender.Spec exposing (EventHandler(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.State as State
 import Random
@@ -53,35 +54,60 @@ testModel state =
     { spec = Nothing, state = state, seed = Random.initialSeed 42 }
 
 
+executeAction : String -> List ( String, PropValue ) -> Msg TestAction
+executeAction name params =
+    Actions.ExecuteAction (SingleAction { action = name, params = Dict.fromList params }) Nothing
+
+
+executeChain : List { action : String, params : List ( String, PropValue ) } -> Msg TestAction
+executeChain bindings =
+    Actions.ExecuteAction (ChainedActions (List.map (\b -> { action = b.action, params = Dict.fromList b.params }) bindings)) Nothing
+
+
+setStateMsg : String -> PropValue -> Msg TestAction
+setStateMsg path value =
+    executeAction "setState" [ ( "statePath", StringValue path ), ( "value", value ) ]
+
+
+pushStateMsg : String -> PropValue -> Msg TestAction
+pushStateMsg path value =
+    executeAction "pushState" [ ( "statePath", StringValue path ), ( "value", value ) ]
+
+
+removeStateMsg : String -> Msg TestAction
+removeStateMsg path =
+    executeAction "removeState" [ ( "statePath", StringValue path ) ]
+
+
 suite : Test
 suite =
     describe "JsonRender.Actions"
-        [ describe "built-in actions (legacy Msg variants)"
-            [ test "SetState updates state" <|
+        [ describe "built-in actions via ExecuteAction"
+            [ test "setState updates state" <|
                 \_ ->
                     let
                         model =
                             testModel (Encode.object [ ( "name", Encode.string "Alice" ) ])
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (SetState "/name" (Encode.string "Bob")) model
+                            Actions.update testActionConfig (setStateMsg "/name" (StringValue "Bob")) model
                     in
                     State.get "/name" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
                         |> Expect.equal (Just "Bob")
-            , test "PushState appends to array" <|
+            , test "pushState appends to array" <|
                 \_ ->
                     let
                         model =
                             testModel (Encode.object [ ( "items", Encode.list Encode.string [ "a" ] ) ])
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (PushState "/items" (Encode.string "b")) model
+                            Actions.update testActionConfig (pushStateMsg "/items" (StringValue "b")) model
                     in
                     State.get "/items/1" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
                         |> Expect.equal (Just "b")
-            , test "RemoveState removes from state" <|
+            , test "removeState removes from state" <|
                 \_ ->
                     let
                         model =
@@ -93,11 +119,11 @@ suite =
                                 )
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (RemoveState "/age") model
+                            Actions.update testActionConfig (removeStateMsg "/age") model
                     in
                     State.get "/age" newModel.state
                         |> Expect.equal Nothing
-            , test "CustomAction delegates to handler" <|
+            , test "custom action delegates to handler" <|
                 \_ ->
                     let
                         model =
@@ -119,7 +145,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update config (CustomAction (TestExport { format = "pdf" })) model
+                            Actions.update config (executeAction "export" [ ( "format", StringValue "pdf" ) ]) model
                     in
                     State.get "/exported" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -142,7 +168,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/clicked" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.bool >> Result.toMaybe)
@@ -166,7 +192,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/items/1" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -190,7 +216,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     Expect.all
                         [ \m -> State.get "/temp" m.state |> Expect.equal Nothing
@@ -229,7 +255,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update exportConfig (ExecuteAction binding Nothing) model
+                            Actions.update exportConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/exported" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -246,7 +272,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/x" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
@@ -272,14 +298,14 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/items/0" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
                         |> Expect.equal (Just "hello")
             ]
-        , describe "chained action execution (ExecuteChain)"
-            [ test "ExecuteChain executes two actions in sequence" <|
+        , describe "chained action execution (chained actions)"
+            [ test "chained actions executes two actions in sequence" <|
                 \_ ->
                     let
                         model =
@@ -308,7 +334,7 @@ suite =
                             ]
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteChain bindings Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -321,7 +347,7 @@ suite =
                                 |> Expect.equal (Just "new item")
                         ]
                         newModel
-            , test "ExecuteChain second action sees first action mutations via $state" <|
+            , test "chained actions second action sees first action mutations via $state" <|
                 \_ ->
                     let
                         model =
@@ -352,7 +378,7 @@ suite =
                             ]
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteChain bindings Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -365,14 +391,14 @@ suite =
                                 |> Expect.equal (Just "")
                         ]
                         newModel
-            , test "ExecuteChain with empty list does not change state" <|
+            , test "chained actions with empty list does not change state" <|
                 \_ ->
                     let
                         model =
                             testModel (Encode.object [ ( "x", Encode.int 42 ) ])
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteChain [] Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (ChainedActions []) Nothing) model
                     in
                     State.get "/x" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
@@ -391,6 +417,32 @@ suite =
                     State.get "/x" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
                         |> Expect.equal (Just 1)
+            ]
+        , describe "BindingUpdate"
+            [ test "BindingUpdate sets state at path" <|
+                \_ ->
+                    let
+                        model =
+                            testModel (Encode.object [ ( "name", Encode.string "Alice" ) ])
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (BindingUpdate "/name" (Encode.string "Bob")) model
+                    in
+                    State.get "/name" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
+                        |> Expect.equal (Just "Bob")
+            , test "BindingUpdate creates new path" <|
+                \_ ->
+                    let
+                        model =
+                            testModel (Encode.object [])
+
+                        ( newModel, _ ) =
+                            Actions.update testActionConfig (BindingUpdate "/newKey" (Encode.int 99)) model
+                    in
+                    State.get "/newKey" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
+                        |> Expect.equal (Just 99)
             ]
         , describe "pushState $id auto-generation"
             [ test "pushState with $id in value replaces with UUID" <|
@@ -419,7 +471,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     case State.get "/items/0/id" newModel.state of
                         Just idVal ->
@@ -463,7 +515,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
 
                         getId path =
                             State.get path newModel.state
@@ -505,7 +557,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     case State.get "/items/0/meta/uid" newModel.state of
                         Just idVal ->
@@ -547,7 +599,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     case State.get "/items/0/0" newModel.state of
                         Just idVal ->
@@ -584,7 +636,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/items/0/name" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -605,7 +657,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/name" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -634,7 +686,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -668,7 +720,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/input" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -696,7 +748,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -731,7 +783,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/input" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -767,7 +819,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction binding Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -834,7 +886,7 @@ suite =
                             ]
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteChain bindings Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
 
                         getId path =
                             State.get path newModel.state
@@ -877,7 +929,7 @@ suite =
                             ]
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteChain bindings Nothing) model
+                            Actions.update testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -916,7 +968,7 @@ suite =
                             Actions.resolveBinding testActionConfig binding Nothing model
                     in
                     case result of
-                        Ok ( ResolvedSetState { path, value }, _ ) ->
+                        Ok ( SetState { path, value }, _ ) ->
                             Expect.all
                                 [ \_ -> Expect.equal "/name" path
                                 , \_ ->
@@ -927,7 +979,7 @@ suite =
                                 ()
 
                         Ok ( other, _ ) ->
-                            Expect.fail ("Expected ResolvedSetState, got: " ++ Debug.toString other)
+                            Expect.fail ("Expected SetState, got: " ++ Debug.toString other)
 
                         Err err ->
                             Expect.fail ("Expected Ok, got Err: " ++ err)
@@ -963,7 +1015,7 @@ suite =
                             Actions.resolveBinding testActionConfig binding Nothing model
                     in
                     case result of
-                        Ok ( ResolvedPushState { path, clearPath, value }, _ ) ->
+                        Ok ( PushState { path, clearPath, value }, _ ) ->
                             Expect.all
                                 [ \_ -> Expect.equal "/items" path
                                 , \_ -> Expect.equal (Just "/input") clearPath
@@ -979,7 +1031,7 @@ suite =
                                 ()
 
                         Ok ( other, _ ) ->
-                            Expect.fail ("Expected ResolvedPushState, got: " ++ Debug.toString other)
+                            Expect.fail ("Expected PushState, got: " ++ Debug.toString other)
 
                         Err err ->
                             Expect.fail ("Expected Ok, got Err: " ++ err)
@@ -1005,7 +1057,7 @@ suite =
                             Actions.resolveBinding testActionConfig binding Nothing model
                     in
                     case result of
-                        Ok ( ResolvedRemoveState { path, index }, _ ) ->
+                        Ok ( RemoveState { path, index }, _ ) ->
                             Expect.all
                                 [ \_ -> Expect.equal "/items" path
                                 , \_ -> Expect.equal (Just 2) index
@@ -1013,7 +1065,7 @@ suite =
                                 ()
 
                         Ok ( other, _ ) ->
-                            Expect.fail ("Expected ResolvedRemoveState, got: " ++ Debug.toString other)
+                            Expect.fail ("Expected RemoveState, got: " ++ Debug.toString other)
 
                         Err err ->
                             Expect.fail ("Expected Ok, got Err: " ++ err)
@@ -1032,11 +1084,11 @@ suite =
                             Actions.resolveBinding testActionConfig binding Nothing model
                     in
                     case result of
-                        Ok ( ResolvedCustomAction TestPress, _ ) ->
+                        Ok ( CustomAction TestPress, _ ) ->
                             Expect.pass
 
                         Ok ( other, _ ) ->
-                            Expect.fail ("Expected ResolvedCustomAction TestPress, got: " ++ Debug.toString other)
+                            Expect.fail ("Expected CustomAction TestPress, got: " ++ Debug.toString other)
 
                         Err err ->
                             Expect.fail ("Expected Ok, got Err: " ++ err)

@@ -4,6 +4,7 @@ module JsonRender.Actions exposing
     , Msg(..)
     , ResolvedAction(..)
     , applyAction
+    , executeHandler
     , resolveBinding
     , update
     )
@@ -39,25 +40,18 @@ type alias ActionConfig action =
 
 
 {-| A resolved, typed action ready to be applied to the model.
-Variants are prefixed with "Resolved" to avoid name conflicts with
-existing Msg constructors during the additive migration phase.
 -}
 type ResolvedAction action
-    = ResolvedSetState { path : String, value : Value }
-    | ResolvedPushState { path : String, value : Value, clearPath : Maybe String }
-    | ResolvedRemoveState { path : String, index : Maybe Int }
-    | ResolvedCustomAction action
+    = SetState { path : String, value : Value }
+    | PushState { path : String, value : Value, clearPath : Maybe String }
+    | RemoveState { path : String, index : Maybe Int }
+    | CustomAction action
 
 
 type Msg action
     = SpecReceived Value
-    | SetState String Value
-    | PushState String Value
-    | RemoveState String
-    | CustomAction action
-    | ExecuteAction ActionBinding (Maybe RepeatContext)
-    | ExecuteChain (List ActionBinding) (Maybe RepeatContext)
-    | WatcherTriggered EventHandler (Maybe RepeatContext)
+    | ExecuteAction EventHandler (Maybe RepeatContext)
+    | BindingUpdate String Value
     | ActionError String
 
 
@@ -67,62 +61,44 @@ update config msg model =
         SpecReceived _ ->
             ( model, Cmd.none )
 
-        SetState path value ->
-            ( { model | state = State.set path value model.state }
-            , Cmd.none
-            )
+        BindingUpdate path value ->
+            ( { model | state = State.set path value model.state }, Cmd.none )
 
-        PushState path value ->
-            ( { model | state = State.push path value model.state }
-            , Cmd.none
-            )
-
-        RemoveState path ->
-            ( { model | state = State.remove path model.state }
-            , Cmd.none
-            )
-
-        CustomAction action ->
-            config.handleAction action model
-
-        ExecuteAction binding repeatCtx ->
-            executeOneAction config repeatCtx binding model
-
-        ExecuteChain bindings repeatCtx ->
-            List.foldl
-                (\binding ( accModel, accCmd ) ->
-                    let
-                        ( newModel, newCmd ) =
-                            executeOneAction config repeatCtx binding accModel
-                    in
-                    ( newModel, Cmd.batch [ accCmd, newCmd ] )
-                )
-                ( model, Cmd.none )
-                bindings
-
-        WatcherTriggered handler repeatCtx ->
-            let
-                bindings =
-                    case handler of
-                        SingleAction binding ->
-                            [ binding ]
-
-                        ChainedActions bs ->
-                            bs
-            in
-            List.foldl
-                (\binding ( accModel, accCmd ) ->
-                    let
-                        ( newModel, newCmd ) =
-                            executeOneAction config repeatCtx binding accModel
-                    in
-                    ( newModel, Cmd.batch [ accCmd, newCmd ] )
-                )
-                ( model, Cmd.none )
-                bindings
+        ExecuteAction handler repeatCtx ->
+            executeHandler config handler repeatCtx model
 
         ActionError _ ->
             ( model, Cmd.none )
+
+
+{-| Execute an EventHandler (single or chained actions) against the model.
+-}
+executeHandler : ActionConfig action -> EventHandler -> Maybe RepeatContext -> Model -> ( Model, Cmd (Msg action) )
+executeHandler config handler repeatCtx model =
+    let
+        bindings =
+            case handler of
+                SingleAction binding ->
+                    [ binding ]
+
+                ChainedActions bs ->
+                    bs
+    in
+    List.foldl
+        (\binding ( accModel, accCmd ) ->
+            case resolveBinding config binding repeatCtx accModel of
+                Ok ( resolved, newSeed ) ->
+                    let
+                        ( newModel, newCmd ) =
+                            applyAction config resolved { accModel | seed = newSeed }
+                    in
+                    ( newModel, Cmd.batch [ accCmd, newCmd ] )
+
+                Err _ ->
+                    ( accModel, accCmd )
+        )
+        ( model, Cmd.none )
+        bindings
 
 
 getPathParam : Dict String Value -> Maybe Value
@@ -187,125 +163,6 @@ substituteIds seed value =
                             ( value, seed )
 
 
-{-| Pre-process resolved action params before execution.
-For pushState: substitute $id in the value param.
--}
-preProcess : String -> Dict String Value -> Random.Seed -> ( Dict String Value, Random.Seed )
-preProcess actionName resolvedParams seed =
-    case ( actionName, Dict.get "value" resolvedParams ) of
-        ( "pushState", Just value ) ->
-            let
-                ( newValue, newSeed ) =
-                    substituteIds seed value
-            in
-            ( Dict.insert "value" newValue resolvedParams, newSeed )
-
-        _ ->
-            ( resolvedParams, seed )
-
-
-{-| Post-process after action execution.
-For pushState: clear the state path specified by clearStatePath.
--}
-postProcess : String -> Dict String Value -> Model -> Model
-postProcess actionName processedParams model =
-    case ( actionName, Dict.get "clearStatePath" processedParams ) of
-        ( "pushState", Just clearPathVal ) ->
-            case Decode.decodeValue Decode.string clearPathVal of
-                Ok path ->
-                    { model | state = State.set path (Json.Encode.string "") model.state }
-
-                Err _ ->
-                    model
-
-        _ ->
-            model
-
-
-{-| Execute a single action binding: resolve params, then dispatch built-in or custom.
--}
-executeOneAction : ActionConfig action -> Maybe RepeatContext -> ActionBinding -> Model -> ( Model, Cmd (Msg action) )
-executeOneAction config repeatCtx binding model =
-    let
-        resolvedParams =
-            Resolve.resolveActionParamsWith config.functions model.state repeatCtx binding.params
-
-        ( processedParams, newSeed ) =
-            preProcess binding.action resolvedParams model.seed
-
-        model_ =
-            { model | seed = newSeed }
-    in
-    case binding.action of
-        "setState" ->
-            case ( getPathParam processedParams, Dict.get "value" processedParams ) of
-                ( Just pathVal, Just value ) ->
-                    case Decode.decodeValue Decode.string pathVal of
-                        Ok path ->
-                            ( { model_ | state = State.set path value model_.state }
-                            , Cmd.none
-                            )
-
-                        Err _ ->
-                            ( model_, Cmd.none )
-
-                _ ->
-                    ( model_, Cmd.none )
-
-        "pushState" ->
-            case ( getPathParam processedParams, Dict.get "value" processedParams ) of
-                ( Just pathVal, Just value ) ->
-                    case Decode.decodeValue Decode.string pathVal of
-                        Ok path ->
-                            ( postProcess binding.action processedParams
-                                { model_ | state = State.push path value model_.state }
-                            , Cmd.none
-                            )
-
-                        Err _ ->
-                            ( model_, Cmd.none )
-
-                _ ->
-                    ( model_, Cmd.none )
-
-        "removeState" ->
-            case getPathParam processedParams of
-                Just pathVal ->
-                    case Decode.decodeValue Decode.string pathVal of
-                        Ok path ->
-                            let
-                                fullPath =
-                                    case Dict.get "index" processedParams of
-                                        Just indexVal ->
-                                            case Decode.decodeValue Decode.int indexVal of
-                                                Ok idx ->
-                                                    path ++ "/" ++ String.fromInt idx
-
-                                                Err _ ->
-                                                    path
-
-                                        Nothing ->
-                                            path
-                            in
-                            ( { model_ | state = State.remove fullPath model_.state }
-                            , Cmd.none
-                            )
-
-                        Err _ ->
-                            ( model_, Cmd.none )
-
-                Nothing ->
-                    ( model_, Cmd.none )
-
-        _ ->
-            case config.decodeAction binding.action processedParams of
-                Ok action ->
-                    config.handleAction action model_
-
-                Err _ ->
-                    ( model_, Cmd.none )
-
-
 {-| Resolve an ActionBinding into a typed ResolvedAction.
 Combines param resolution, $id substitution, and action decoding into one step.
 -}
@@ -321,7 +178,7 @@ resolveBinding config binding repeatCtx model =
                 ( Just pathVal, Just value ) ->
                     case Decode.decodeValue Decode.string pathVal of
                         Ok path ->
-                            Ok ( ResolvedSetState { path = path, value = value }, model.seed )
+                            Ok ( SetState { path = path, value = value }, model.seed )
 
                         Err _ ->
                             Err "setState: statePath must be a string"
@@ -342,7 +199,7 @@ resolveBinding config binding repeatCtx model =
                                     Dict.get "clearStatePath" resolvedParams
                                         |> Maybe.andThen (\v -> Decode.decodeValue Decode.string v |> Result.toMaybe)
                             in
-                            Ok ( ResolvedPushState { path = path, value = substitutedValue, clearPath = clearPath }, newSeed )
+                            Ok ( PushState { path = path, value = substitutedValue, clearPath = clearPath }, newSeed )
 
                         Err _ ->
                             Err "pushState: statePath must be a string"
@@ -360,7 +217,7 @@ resolveBinding config binding repeatCtx model =
                                     Dict.get "index" resolvedParams
                                         |> Maybe.andThen (\v -> Decode.decodeValue Decode.int v |> Result.toMaybe)
                             in
-                            Ok ( ResolvedRemoveState { path = path, index = index }, model.seed )
+                            Ok ( RemoveState { path = path, index = index }, model.seed )
 
                         Err _ ->
                             Err "removeState: statePath must be a string"
@@ -371,7 +228,7 @@ resolveBinding config binding repeatCtx model =
         _ ->
             case config.decodeAction binding.action resolvedParams of
                 Ok action ->
-                    Ok ( ResolvedCustomAction action, model.seed )
+                    Ok ( CustomAction action, model.seed )
 
                 Err err ->
                     Err err
@@ -382,10 +239,10 @@ resolveBinding config binding repeatCtx model =
 applyAction : ActionConfig action -> ResolvedAction action -> Model -> ( Model, Cmd (Msg action) )
 applyAction config resolved model =
     case resolved of
-        ResolvedSetState { path, value } ->
+        SetState { path, value } ->
             ( { model | state = State.set path value model.state }, Cmd.none )
 
-        ResolvedPushState { path, value, clearPath } ->
+        PushState { path, value, clearPath } ->
             let
                 pushed =
                     { model | state = State.push path value model.state }
@@ -397,7 +254,7 @@ applyAction config resolved model =
                 Nothing ->
                     ( pushed, Cmd.none )
 
-        ResolvedRemoveState { path, index } ->
+        RemoveState { path, index } ->
             let
                 fullPath =
                     case index of
@@ -409,5 +266,5 @@ applyAction config resolved model =
             in
             ( { model | state = State.remove fullPath model.state }, Cmd.none )
 
-        ResolvedCustomAction action ->
+        CustomAction action ->
             config.handleAction action model
