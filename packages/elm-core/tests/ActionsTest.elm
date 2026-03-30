@@ -4,7 +4,7 @@ import Dict
 import Expect
 import Json.Decode as Decode
 import Json.Encode as Encode
-import JsonRender.Actions as Actions exposing (Msg(..))
+import JsonRender.Actions as Actions exposing (Msg(..), ResolvedAction(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.State as State
 import Random
@@ -895,5 +895,172 @@ suite =
                                 |> Expect.equal (Just "")
                         ]
                         newModel
+            ]
+        , describe "resolveBinding"
+            [ test "resolves setState binding" <|
+                \_ ->
+                    let
+                        model =
+                            testModel (Encode.object [ ( "name", Encode.string "Alice" ) ])
+
+                        binding =
+                            { action = "setState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "statePath", StringValue "/name" )
+                                    , ( "value", StringValue "Bob" )
+                                    ]
+                            }
+
+                        result =
+                            Actions.resolveBinding testActionConfig binding Nothing model
+                    in
+                    case result of
+                        Ok ( ResolvedSetState { path, value }, _ ) ->
+                            Expect.all
+                                [ \_ -> Expect.equal "/name" path
+                                , \_ ->
+                                    Decode.decodeValue Decode.string value
+                                        |> Result.toMaybe
+                                        |> Expect.equal (Just "Bob")
+                                ]
+                                ()
+
+                        Ok ( other, _ ) ->
+                            Expect.fail ("Expected ResolvedSetState, got: " ++ Debug.toString other)
+
+                        Err err ->
+                            Expect.fail ("Expected Ok, got Err: " ++ err)
+            , test "resolves pushState with $id and clearPath" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list identity [] )
+                                    , ( "input", Encode.string "hello" )
+                                    ]
+                                )
+
+                        binding =
+                            { action = "pushState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "statePath", StringValue "/items" )
+                                    , ( "value"
+                                      , ObjectValue
+                                            (Dict.fromList
+                                                [ ( "id", StringValue "$id" )
+                                                , ( "text", StateExpr "/input" )
+                                                ]
+                                            )
+                                      )
+                                    , ( "clearStatePath", StringValue "/input" )
+                                    ]
+                            }
+
+                        result =
+                            Actions.resolveBinding testActionConfig binding Nothing model
+                    in
+                    case result of
+                        Ok ( ResolvedPushState { path, clearPath, value }, _ ) ->
+                            Expect.all
+                                [ \_ -> Expect.equal "/items" path
+                                , \_ -> Expect.equal (Just "/input") clearPath
+                                , \_ ->
+                                    -- The $id should have been substituted (not "$id")
+                                    case Decode.decodeValue (Decode.field "id" Decode.string) value of
+                                        Ok idStr ->
+                                            Expect.notEqual "$id" idStr
+
+                                        Err _ ->
+                                            Expect.fail "value should have an id field"
+                                ]
+                                ()
+
+                        Ok ( other, _ ) ->
+                            Expect.fail ("Expected ResolvedPushState, got: " ++ Debug.toString other)
+
+                        Err err ->
+                            Expect.fail ("Expected Ok, got Err: " ++ err)
+            , test "resolves removeState with index" <|
+                \_ ->
+                    let
+                        model =
+                            testModel
+                                (Encode.object
+                                    [ ( "items", Encode.list Encode.string [ "a", "b", "c" ] ) ]
+                                )
+
+                        binding =
+                            { action = "removeState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "statePath", StringValue "/items" )
+                                    , ( "index", IntValue 2 )
+                                    ]
+                            }
+
+                        result =
+                            Actions.resolveBinding testActionConfig binding Nothing model
+                    in
+                    case result of
+                        Ok ( ResolvedRemoveState { path, index }, _ ) ->
+                            Expect.all
+                                [ \_ -> Expect.equal "/items" path
+                                , \_ -> Expect.equal (Just 2) index
+                                ]
+                                ()
+
+                        Ok ( other, _ ) ->
+                            Expect.fail ("Expected ResolvedRemoveState, got: " ++ Debug.toString other)
+
+                        Err err ->
+                            Expect.fail ("Expected Ok, got Err: " ++ err)
+            , test "resolves custom action" <|
+                \_ ->
+                    let
+                        model =
+                            testModel (Encode.object [])
+
+                        binding =
+                            { action = "press"
+                            , params = Dict.empty
+                            }
+
+                        result =
+                            Actions.resolveBinding testActionConfig binding Nothing model
+                    in
+                    case result of
+                        Ok ( ResolvedCustomAction TestPress, _ ) ->
+                            Expect.pass
+
+                        Ok ( other, _ ) ->
+                            Expect.fail ("Expected ResolvedCustomAction TestPress, got: " ++ Debug.toString other)
+
+                        Err err ->
+                            Expect.fail ("Expected Ok, got Err: " ++ err)
+            , test "returns error for missing statePath" <|
+                \_ ->
+                    let
+                        model =
+                            testModel (Encode.object [])
+
+                        binding =
+                            { action = "setState"
+                            , params =
+                                Dict.fromList
+                                    [ ( "value", StringValue "hello" ) ]
+                            }
+
+                        result =
+                            Actions.resolveBinding testActionConfig binding Nothing model
+                    in
+                    case result of
+                        Err _ ->
+                            Expect.pass
+
+                        Ok _ ->
+                            Expect.fail "Expected Err for missing statePath"
             ]
         ]

@@ -2,6 +2,9 @@ module JsonRender.Actions exposing
     ( ActionConfig
     , Model
     , Msg(..)
+    , ResolvedAction(..)
+    , applyAction
+    , resolveBinding
     , update
     )
 
@@ -33,6 +36,17 @@ type alias ActionConfig action =
     , decodeAction : String -> Dict String Value -> Result String action
     , functions : Resolve.FunctionDict
     }
+
+
+{-| A resolved, typed action ready to be applied to the model.
+Variants are prefixed with "Resolved" to avoid name conflicts with
+existing Msg constructors during the additive migration phase.
+-}
+type ResolvedAction action
+    = ResolvedSetState { path : String, value : Value }
+    | ResolvedPushState { path : String, value : Value, clearPath : Maybe String }
+    | ResolvedRemoveState { path : String, index : Maybe Int }
+    | ResolvedCustomAction action
 
 
 type Msg action
@@ -290,3 +304,110 @@ executeOneAction config repeatCtx binding model =
 
                 Err _ ->
                     ( model_, Cmd.none )
+
+
+{-| Resolve an ActionBinding into a typed ResolvedAction.
+Combines param resolution, $id substitution, and action decoding into one step.
+-}
+resolveBinding : ActionConfig action -> ActionBinding -> Maybe RepeatContext -> Model -> Result String ( ResolvedAction action, Random.Seed )
+resolveBinding config binding repeatCtx model =
+    let
+        resolvedParams =
+            Resolve.resolveActionParamsWith config.functions model.state repeatCtx binding.params
+    in
+    case binding.action of
+        "setState" ->
+            case ( getPathParam resolvedParams, Dict.get "value" resolvedParams ) of
+                ( Just pathVal, Just value ) ->
+                    case Decode.decodeValue Decode.string pathVal of
+                        Ok path ->
+                            Ok ( ResolvedSetState { path = path, value = value }, model.seed )
+
+                        Err _ ->
+                            Err "setState: statePath must be a string"
+
+                _ ->
+                    Err "setState: missing statePath or value"
+
+        "pushState" ->
+            case ( getPathParam resolvedParams, Dict.get "value" resolvedParams ) of
+                ( Just pathVal, Just value ) ->
+                    case Decode.decodeValue Decode.string pathVal of
+                        Ok path ->
+                            let
+                                ( substitutedValue, newSeed ) =
+                                    substituteIds model.seed value
+
+                                clearPath =
+                                    Dict.get "clearStatePath" resolvedParams
+                                        |> Maybe.andThen (\v -> Decode.decodeValue Decode.string v |> Result.toMaybe)
+                            in
+                            Ok ( ResolvedPushState { path = path, value = substitutedValue, clearPath = clearPath }, newSeed )
+
+                        Err _ ->
+                            Err "pushState: statePath must be a string"
+
+                _ ->
+                    Err "pushState: missing statePath or value"
+
+        "removeState" ->
+            case getPathParam resolvedParams of
+                Just pathVal ->
+                    case Decode.decodeValue Decode.string pathVal of
+                        Ok path ->
+                            let
+                                index =
+                                    Dict.get "index" resolvedParams
+                                        |> Maybe.andThen (\v -> Decode.decodeValue Decode.int v |> Result.toMaybe)
+                            in
+                            Ok ( ResolvedRemoveState { path = path, index = index }, model.seed )
+
+                        Err _ ->
+                            Err "removeState: statePath must be a string"
+
+                Nothing ->
+                    Err "removeState: missing statePath"
+
+        _ ->
+            case config.decodeAction binding.action resolvedParams of
+                Ok action ->
+                    Ok ( ResolvedCustomAction action, model.seed )
+
+                Err err ->
+                    Err err
+
+
+{-| Apply a ResolvedAction to the model.
+-}
+applyAction : ActionConfig action -> ResolvedAction action -> Model -> ( Model, Cmd (Msg action) )
+applyAction config resolved model =
+    case resolved of
+        ResolvedSetState { path, value } ->
+            ( { model | state = State.set path value model.state }, Cmd.none )
+
+        ResolvedPushState { path, value, clearPath } ->
+            let
+                pushed =
+                    { model | state = State.push path value model.state }
+            in
+            case clearPath of
+                Just cp ->
+                    ( { pushed | state = State.set cp (Json.Encode.string "") pushed.state }, Cmd.none )
+
+                Nothing ->
+                    ( pushed, Cmd.none )
+
+        ResolvedRemoveState { path, index } ->
+            let
+                fullPath =
+                    case index of
+                        Just idx ->
+                            path ++ "/" ++ String.fromInt idx
+
+                        Nothing ->
+                            path
+            in
+            ( { model | state = State.remove fullPath model.state }, Cmd.none )
+
+        ResolvedCustomAction action ->
+            config.handleAction action model
