@@ -24,7 +24,7 @@
         "press": {
           "action": "pushState",
           "params": {
-            "path": "/todos",
+            "statePath": "/todos",
             "value": {
               "id": "$id",
               "title": { "$state": "/newTodo" }

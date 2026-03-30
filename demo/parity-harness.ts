@@ -13,7 +13,9 @@ import { ReactHarness } from "./src/react-components/ReactHarness.tsx"
 
 // Mount Elm
 const elmRoot = document.querySelector("#elm-root")!
-const app = Elm.TestHarness!.init({ node: elmRoot })
+const seedArray = new Uint32Array(1)
+crypto.getRandomValues(seedArray)
+const app = Elm.TestHarness!.init({ node: elmRoot, flags: seedArray[0] })
 const bridge = createElmBridge(app)
 
 // Mount React

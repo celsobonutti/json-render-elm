@@ -24,7 +24,7 @@
         "press": {
           "action": "pushState",
           "params": {
-            "path": "/collected",
+            "statePath": "/collected",
             "value": { "$state": "/inputValue" }
           }
         }
