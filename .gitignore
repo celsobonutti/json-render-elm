@@ -3,4 +3,5 @@ node_modules/
 dist/
 docs/
 .claude/
+.worktrees/
 json-render/
