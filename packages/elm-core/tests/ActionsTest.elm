@@ -136,7 +136,7 @@ suite =
                             { action = "setState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/clicked" )
+                                    [ ( "statePath", StringValue "/clicked" )
                                     , ( "value", BoolValue True )
                                     ]
                             }
@@ -160,7 +160,7 @@ suite =
                             { action = "pushState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/items" )
+                                    [ ( "statePath", StringValue "/items" )
                                     , ( "value", StringValue "second" )
                                     ]
                             }
@@ -186,7 +186,7 @@ suite =
                             { action = "removeState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/temp" ) ]
+                                    [ ( "statePath", StringValue "/temp" ) ]
                             }
 
                         ( newModel, _ ) =
@@ -266,7 +266,7 @@ suite =
                             { action = "pushState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/items" )
+                                    [ ( "statePath", StringValue "/items" )
                                     , ( "value", StateExpr "/source" )
                                     ]
                             }
@@ -294,14 +294,14 @@ suite =
                             [ { action = "setState"
                               , params =
                                     Dict.fromList
-                                        [ ( "path", StringValue "/loading" )
+                                        [ ( "statePath", StringValue "/loading" )
                                         , ( "value", BoolValue True )
                                         ]
                               }
                             , { action = "pushState"
                               , params =
                                     Dict.fromList
-                                        [ ( "path", StringValue "/items" )
+                                        [ ( "statePath", StringValue "/items" )
                                         , ( "value", StringValue "new item" )
                                         ]
                               }
@@ -337,7 +337,7 @@ suite =
                               { action = "pushState"
                               , params =
                                     Dict.fromList
-                                        [ ( "path", StringValue "/items" )
+                                        [ ( "statePath", StringValue "/items" )
                                         , ( "value", StateExpr "/input" )
                                         ]
                               }
@@ -345,7 +345,7 @@ suite =
                               { action = "setState"
                               , params =
                                     Dict.fromList
-                                        [ ( "path", StringValue "/input" )
+                                        [ ( "statePath", StringValue "/input" )
                                         , ( "value", StringValue "" )
                                         ]
                               }
@@ -406,7 +406,7 @@ suite =
                             { action = "pushState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/items" )
+                                    [ ( "statePath", StringValue "/items" )
                                     , ( "value"
                                       , ObjectValue
                                             (Dict.fromList
@@ -450,7 +450,7 @@ suite =
                             { action = "pushState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/items" )
+                                    [ ( "statePath", StringValue "/items" )
                                     , ( "value"
                                       , ObjectValue
                                             (Dict.fromList
@@ -488,7 +488,7 @@ suite =
                             { action = "pushState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/items" )
+                                    [ ( "statePath", StringValue "/items" )
                                     , ( "value"
                                       , ObjectValue
                                             (Dict.fromList
@@ -536,7 +536,7 @@ suite =
                             { action = "pushState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/items" )
+                                    [ ( "statePath", StringValue "/items" )
                                     , ( "value"
                                       , ListValue
                                             [ StringValue "$id"
@@ -573,7 +573,7 @@ suite =
                             { action = "pushState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/items" )
+                                    [ ( "statePath", StringValue "/items" )
                                     , ( "value"
                                       , ObjectValue
                                             (Dict.fromList
@@ -599,7 +599,7 @@ suite =
                             { action = "setState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/name" )
+                                    [ ( "statePath", StringValue "/name" )
                                     , ( "value", StringValue "$id" )
                                     ]
                             }
@@ -627,7 +627,7 @@ suite =
                             { action = "pushState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/items" )
+                                    [ ( "statePath", StringValue "/items" )
                                     , ( "value", StateExpr "/input" )
                                     , ( "clearStatePath", StringValue "/input" )
                                     ]
@@ -662,7 +662,7 @@ suite =
                             { action = "pushState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/items" )
+                                    [ ( "statePath", StringValue "/items" )
                                     , ( "value", StateExpr "/input" )
                                     ]
                             }
@@ -689,7 +689,7 @@ suite =
                             { action = "pushState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/items" )
+                                    [ ( "statePath", StringValue "/items" )
                                     , ( "value", StateExpr "/input" )
                                     , ( "clearStatePath", StateExpr "/clearTarget" )
                                     ]
@@ -724,7 +724,7 @@ suite =
                             { action = "setState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/flag" )
+                                    [ ( "statePath", StringValue "/flag" )
                                     , ( "value", BoolValue True )
                                     , ( "clearStatePath", StringValue "/input" )
                                     ]
@@ -753,7 +753,7 @@ suite =
                             { action = "pushState"
                             , params =
                                 Dict.fromList
-                                    [ ( "path", StringValue "/todos" )
+                                    [ ( "statePath", StringValue "/todos" )
                                     , ( "value"
                                       , ObjectValue
                                             (Dict.fromList
@@ -810,7 +810,7 @@ suite =
                             [ { action = "pushState"
                               , params =
                                     Dict.fromList
-                                        [ ( "path", StringValue "/items" )
+                                        [ ( "statePath", StringValue "/items" )
                                         , ( "value"
                                           , ObjectValue
                                                 (Dict.fromList
@@ -822,7 +822,7 @@ suite =
                             , { action = "pushState"
                               , params =
                                     Dict.fromList
-                                        [ ( "path", StringValue "/items" )
+                                        [ ( "statePath", StringValue "/items" )
                                         , ( "value"
                                           , ObjectValue
                                                 (Dict.fromList
@@ -862,7 +862,7 @@ suite =
                             [ { action = "pushState"
                               , params =
                                     Dict.fromList
-                                        [ ( "path", StringValue "/todos" )
+                                        [ ( "statePath", StringValue "/todos" )
                                         , ( "value", StateExpr "/input" )
                                         , ( "clearStatePath", StringValue "/input" )
                                         ]
@@ -870,7 +870,7 @@ suite =
                             , { action = "setState"
                               , params =
                                     Dict.fromList
-                                        [ ( "path", StringValue "/lastInput" )
+                                        [ ( "statePath", StringValue "/lastInput" )
                                         , ( "value", StateExpr "/input" )
                                         ]
                               }

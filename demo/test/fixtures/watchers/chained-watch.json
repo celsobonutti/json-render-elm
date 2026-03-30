@@ -8,8 +8,8 @@
       "children": ["country-label", "city-label", "status-label", "change-btn"],
       "watch": {
         "/country": [
-          { "action": "setState", "params": { "path": "/city", "value": "cleared" } },
-          { "action": "setState", "params": { "path": "/status", "value": "updated" } }
+          { "action": "setState", "params": { "statePath": "/city", "value": "cleared" } },
+          { "action": "setState", "params": { "statePath": "/status", "value": "updated" } }
         ]
       }
     },
@@ -35,7 +35,7 @@
       "on": {
         "press": {
           "action": "setState",
-          "params": { "path": "/country", "value": "Canada" }
+          "params": { "statePath": "/country", "value": "Canada" }
         }
       }
     }

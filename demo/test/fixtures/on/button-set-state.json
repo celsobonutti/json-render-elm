@@ -14,7 +14,7 @@
       "on": {
         "press": {
           "action": "setState",
-          "params": { "path": "/clicked", "value": true }
+          "params": { "statePath": "/clicked", "value": true }
         }
       }
     },

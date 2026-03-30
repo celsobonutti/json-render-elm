@@ -9,7 +9,7 @@
       "watch": {
         "/category": {
           "action": "setState",
-          "params": { "path": "/filter", "value": "reset" }
+          "params": { "statePath": "/filter", "value": "reset" }
         }
       }
     },
@@ -30,7 +30,7 @@
       "on": {
         "press": {
           "action": "setState",
-          "params": { "path": "/category", "value": "books" }
+          "params": { "statePath": "/category", "value": "books" }
         }
       }
     }

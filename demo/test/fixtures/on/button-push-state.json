@@ -15,7 +15,7 @@
         "press": {
           "action": "pushState",
           "params": {
-            "path": "/items",
+            "statePath": "/items",
             "value": { "id": "new", "title": "New Item" }
           }
         }

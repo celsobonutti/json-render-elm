@@ -22,10 +22,10 @@
       "children": [],
       "on": {
         "press": [
-          { "action": "setState", "params": { "path": "/loading", "value": true } },
-          { "action": "pushState", "params": { "path": "/todos", "value": { "$state": "/newTodo" } } },
-          { "action": "setState", "params": { "path": "/newTodo", "value": "" } },
-          { "action": "setState", "params": { "path": "/loading", "value": false } }
+          { "action": "setState", "params": { "statePath": "/loading", "value": true } },
+          { "action": "pushState", "params": { "statePath": "/todos", "value": { "$state": "/newTodo" } } },
+          { "action": "setState", "params": { "statePath": "/newTodo", "value": "" } },
+          { "action": "setState", "params": { "statePath": "/loading", "value": false } }
         ]
       }
     },

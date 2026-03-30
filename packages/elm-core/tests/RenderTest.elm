@@ -548,7 +548,7 @@ suite =
                                   "on": {
                                     "press": {
                                       "action": "setState",
-                                      "params": { "path": "/clicked", "value": true }
+                                      "params": { "statePath": "/clicked", "value": true }
                                     }
                                   }
                                 }
@@ -602,7 +602,7 @@ suite =
                                   "props": { "label": { "$state": "/buttonLabel" } },
                                   "children": [],
                                   "on": {
-                                    "press": { "action": "setState", "params": { "path": "/x", "value": 1 } }
+                                    "press": { "action": "setState", "params": { "statePath": "/x", "value": 1 } }
                                   }
                                 }
                               }
@@ -634,8 +634,8 @@ suite =
                                   "children": [],
                                   "on": {
                                     "press": [
-                                      { "action": "pushState", "params": { "path": "/todos", "value": { "$state": "/newTodo" } } },
-                                      { "action": "setState", "params": { "path": "/newTodo", "value": "" } }
+                                      { "action": "pushState", "params": { "statePath": "/todos", "value": { "$state": "/newTodo" } } },
+                                      { "action": "setState", "params": { "statePath": "/newTodo", "value": "" } }
                                     ]
                                   }
                                 }
@@ -674,7 +674,7 @@ suite =
                                   "props": { "label": "Submit" },
                                   "children": [],
                                   "on": {
-                                    "press": { "action": "setState", "params": { "path": "/submitted", "value": true } }
+                                    "press": { "action": "setState", "params": { "statePath": "/submitted", "value": true } }
                                   }
                                 }
                               }

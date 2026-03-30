@@ -317,7 +317,7 @@ suite =
                                   "on": {
                                     "press": {
                                       "action": "setState",
-                                      "params": { "path": "/clicked", "value": true }
+                                      "params": { "statePath": "/clicked", "value": true }
                                     }
                                   }
                                 }
@@ -333,7 +333,7 @@ suite =
                                         Just (SingleAction binding) ->
                                             Expect.all
                                                 [ \b -> Expect.equal "setState" b.action
-                                                , \b -> Expect.equal (Just (StringValue "/clicked")) (Dict.get "path" b.params)
+                                                , \b -> Expect.equal (Just (StringValue "/clicked")) (Dict.get "statePath" b.params)
                                                 , \b -> Expect.equal (Just (BoolValue True)) (Dict.get "value" b.params)
                                                 ]
                                                 binding
@@ -363,8 +363,8 @@ suite =
                                   "children": [],
                                   "on": {
                                     "press": [
-                                      { "action": "setState", "params": { "path": "/loading", "value": true } },
-                                      { "action": "pushState", "params": { "path": "/items", "value": "new" } }
+                                      { "action": "setState", "params": { "statePath": "/loading", "value": true } },
+                                      { "action": "pushState", "params": { "statePath": "/items", "value": "new" } }
                                     ]
                                   }
                                 }
@@ -424,7 +424,7 @@ suite =
                                     "press": {
                                       "action": "pushState",
                                       "params": {
-                                        "path": "/items",
+                                        "statePath": "/items",
                                         "value": { "$state": "/newItem" }
                                       }
                                     }
@@ -442,7 +442,7 @@ suite =
                                         Just (SingleAction binding) ->
                                             Expect.all
                                                 [ \b -> Expect.equal "pushState" b.action
-                                                , \b -> Expect.equal (Just (StringValue "/items")) (Dict.get "path" b.params)
+                                                , \b -> Expect.equal (Just (StringValue "/items")) (Dict.get "statePath" b.params)
                                                 , \b -> Expect.equal (Just (StateExpr "/newItem")) (Dict.get "value" b.params)
                                                 ]
                                                 binding
@@ -496,8 +496,8 @@ suite =
                                   "props": { "value": "test" },
                                   "children": [],
                                   "on": {
-                                    "change": { "action": "setState", "params": { "path": "/val", "value": "x" } },
-                                    "submit": { "action": "setState", "params": { "path": "/submitted", "value": true } }
+                                    "change": { "action": "setState", "params": { "statePath": "/val", "value": "x" } },
+                                    "submit": { "action": "setState", "params": { "statePath": "/submitted", "value": true } }
                                   }
                                 }
                               }
@@ -536,7 +536,7 @@ suite =
                                     "press": {
                                       "action": "removeState",
                                       "params": {
-                                        "path": { "$template": "/todos/${/currentIndex}" }
+                                        "statePath": { "$template": "/todos/${/currentIndex}" }
                                       }
                                     }
                                   }
@@ -553,7 +553,7 @@ suite =
                                         Just (SingleAction binding) ->
                                             Expect.equal
                                                 (Just (TemplateExpr "/todos/${/currentIndex}"))
-                                                (Dict.get "path" binding.params)
+                                                (Dict.get "statePath" binding.params)
 
                                         _ ->
                                             Expect.fail "expected SingleAction"
@@ -703,7 +703,7 @@ suite =
                                   "watch": {
                                     "/form/country": {
                                       "action": "setState",
-                                      "params": { "path": "/form/city", "value": "" }
+                                      "params": { "statePath": "/form/city", "value": "" }
                                     }
                                   }
                                 }
@@ -745,7 +745,7 @@ suite =
                                   "watch": {
                                     "/form/country": [
                                       { "action": "loadCities", "params": { "country": { "$state": "/form/country" } } },
-                                      { "action": "setState", "params": { "path": "/form/city", "value": "" } }
+                                      { "action": "setState", "params": { "statePath": "/form/city", "value": "" } }
                                     ]
                                   }
                                 }
@@ -795,8 +795,8 @@ suite =
                                   "props": { "content": "ok" },
                                   "children": [],
                                   "watch": {
-                                    "/a": { "action": "setState", "params": { "path": "/x", "value": 1 } },
-                                    "/b": { "action": "setState", "params": { "path": "/y", "value": 2 } }
+                                    "/a": { "action": "setState", "params": { "statePath": "/x", "value": 1 } },
+                                    "/b": { "action": "setState", "params": { "statePath": "/y", "value": 2 } }
                                   }
                                 }
                               }
