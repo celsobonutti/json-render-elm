@@ -1,10 +1,12 @@
 import { defineConfig } from "@playwright/test"
 
+const PORT = Number(process.env.VITE_PORT ?? 5173)
+
 export default defineConfig({
   testDir: "./specs",
   webServer: {
-    command: "npx vite --port 5173",
-    port: 5173,
+    command: `npx vite --port ${PORT}`,
+    port: PORT,
     cwd: "..",
     reuseExistingServer: true,
   },
@@ -12,14 +14,14 @@ export default defineConfig({
     {
       name: "e2e",
       use: {
-        baseURL: "http://localhost:5173/test-harness.html",
+        baseURL: `http://localhost:${PORT}/test-harness.html`,
       },
     },
     {
       name: "parity",
       testMatch: "parity/**",
       use: {
-        baseURL: "http://localhost:5173/parity-harness.html",
+        baseURL: `http://localhost:${PORT}/parity-harness.html`,
       },
     },
   ],
