@@ -30,13 +30,13 @@
           {
             "action": "pushState",
             "params": {
-              "path": "/todos",
+              "statePath": "/todos",
               "value": { "$state": "/newTodo" }
             }
           },
           {
             "action": "setState",
-            "params": { "path": "/newTodo", "value": "" }
+            "params": { "statePath": "/newTodo", "value": "" }
           }
         ]
       }
