@@ -9,7 +9,7 @@
       "watch": {
         "/input": {
           "action": "setState",
-          "params": { "path": "/output", "value": "watcher-fired" }
+          "params": { "statePath": "/output", "value": "watcher-fired" }
         }
       }
     },
