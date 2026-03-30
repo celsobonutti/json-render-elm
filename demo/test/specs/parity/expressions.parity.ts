@@ -72,28 +72,7 @@ test.describe("Parity: Expressions", () => {
     }
   })
 
-  test("$computed with unknown function shows error", async ({ page }) => {
-    // Send spec directly — Elm produces a Props error div (no jr- class), so
-    // sendParitySpec's jr- waitFor would timeout. React silently renders undefined.
-    const { readFileSync } = await import("fs")
-    const { join, dirname } = await import("path")
-    const { fileURLToPath } = await import("url")
-    const __dirname = dirname(fileURLToPath(import.meta.url))
-    const json = readFileSync(join(__dirname, "../../fixtures/expressions/computed-error.json"), "utf-8")
-    const spec = JSON.parse(json)
-    await page.evaluate((s) => (window as any).__parityBridge.sendSpec(s), spec)
-
-    // Elm shows a "Props error: Unknown function: …" div
-    const elmRoot = page.locator("#render-root")
-    await expect(elmRoot, "elm: error shown").toContainText(/Props error|Unknown function/i)
-
-    // React silently returns undefined for unknown functions (no error rendered)
-    // — this is a known parity difference. Verify React at least renders something.
-    const reactRoot = page.locator("#react-root")
-    await page.waitForTimeout(200)
-    // React renders an empty jr-text span (content = undefined → empty string)
-    await expect(reactRoot.locator(".jr-text"), "react: text element in DOM").toBeAttached()
-  })
+  // $computed error test lives in error-rendering.parity.ts
 
   test("$computed updates when bound state changes", async ({ page }) => {
     await sendParitySpec(page, "expressions/computed-with-bind.json")

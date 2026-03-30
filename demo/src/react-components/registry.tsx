@@ -13,7 +13,7 @@ import { Image } from "./Image.tsx"
 // `watch`, `functions`), but defineRegistry only uses the catalog for type
 // inference at compile time — at runtime the _catalog parameter is unused.
 // Cast to `Catalog` to satisfy the type checker.
-export const { registry, handlers } = defineRegistry(catalog as unknown as Catalog, {
+export const { registry } = defineRegistry(catalog as unknown as Catalog, {
   components: {
     Card,
     Text,
@@ -22,13 +22,5 @@ export const { registry, handlers } = defineRegistry(catalog as unknown as Catal
     Stack,
     Badge,
     Image,
-  },
-  actions: {
-    press: async () => {
-      ;(window as any).__lastReactAction = { name: "press" }
-    },
-    export: async (params: Record<string, unknown> | undefined) => {
-      ;(window as any).__lastReactAction = { name: "export", ...params }
-    },
   },
 })
