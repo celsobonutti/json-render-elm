@@ -89,8 +89,11 @@ import Dict
 import Components.Card
 registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
 """
-                , """module Components.Actions exposing (Action(..))
+                , """module Components.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)
 type Action = Press
+actionConfig functions = ()
+decodeAction name params = Ok Press
+handleAction action model = ()
 """
                 ]
                     |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
@@ -191,8 +194,11 @@ import Dict
 import Components.Card
 registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
 """
-                , """module Components.Actions exposing (Action(..))
+                , """module Components.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)
 type Action = Press
+actionConfig functions = ()
+decodeAction name params = Ok Press
+handleAction action model = ()
 """
                 ]
                     |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
@@ -227,14 +233,14 @@ type Action = Press
                     |> Review.Test.expectErrorsForModules
                         [ ( "Components.Actions"
                           , [ Review.Test.error
-                                { message = "Actions module is missing variants: Export"
+                                { message = "Actions module is missing variants: Export, actionConfig, handleAction"
                                 , details =
                                     [ "The Actions module does not match the catalog actions."
                                     , "Accept the fix to regenerate it."
                                     ]
                                 , under = "module Components.Actions exposing (Action(..))"
                                 }
-                                |> Review.Test.whenFixed ("module Components.Actions exposing (Action(..), decodeAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\n\n\ntype alias ExportParams =\n    { format : String\n    }\n\n\ntype Action\n    = Export ExportParams\n    | Press\n\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"export\" ->\n            case Dict.get \"format\" params of\n                Just format_raw ->\n                    case Decode.decodeValue Decode.string format_raw of\n                        Ok format ->\n                            Ok (Export { format = format })\n\n                        Err _ ->\n                            Err \"format must be a String\"\n\n                Nothing ->\n                    Err \"missing required param format\"\n\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n")
+                                |> Review.Test.whenFixed ("module Components.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\nimport JsonRender.Actions as Actions\nimport JsonRender.Resolve as Resolve\n\n\ntype alias ExportParams =\n    { format : String\n    }\n\n\ntype Action\n    = Export ExportParams\n    | Press\n\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"export\" ->\n            case Dict.get \"format\" params of\n                Just format_raw ->\n                    case Decode.decodeValue Decode.string format_raw of\n                        Ok format ->\n                            Ok (Export { format = format })\n\n                        Err _ ->\n                            Err \"format must be a String\"\n\n                Nothing ->\n                    Err \"missing required param format\"\n\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n\n\nhandleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\nhandleAction action model =\n    ()\n\n\nactionConfig : Resolve.FunctionDict -> Actions.ActionConfig Action\nactionConfig functions =\n    { handleAction = handleAction\n    , decodeAction = decodeAction\n    , functions = functions\n    }\n")
                             ]
                           )
                         ]
@@ -260,13 +266,48 @@ import Dict
 import Components.Card
 registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
 """
-                , """module Components.Actions exposing (Action(..), decodeAction)
+                , """module Components.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)
 type Action = Export ExportParams | Press
+actionConfig functions = ()
 decodeAction name params = Ok Press
+handleAction action model = ()
 """
                 ]
                     |> Review.Test.runOnModules (CatalogSync.rule twoActionsConfig)
                     |> Review.Test.expectNoErrors
+        , test "reports missing actionConfig and handleAction when variants are correct" <|
+            \_ ->
+                [ """module Components.Card exposing (..)
+type alias CardProps = { title : String }
+propsDecoder = identity
+component = ()
+view ctx = ()
+"""
+                , """module Components.Registry exposing (registry)
+import Dict
+import Components.Card
+registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
+"""
+                , """module Components.Actions exposing (Action(..), decodeAction)
+type Action = Press
+decodeAction name params = Ok Press
+"""
+                ]
+                    |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
+                    |> Review.Test.expectErrorsForModules
+                        [ ( "Components.Actions"
+                          , [ Review.Test.error
+                                { message = "Actions module is missing actionConfig, handleAction"
+                                , details =
+                                    [ "The Actions module does not match the catalog actions."
+                                    , "Accept the fix to regenerate it."
+                                    ]
+                                , under = "module Components.Actions exposing (Action(..), decodeAction)"
+                                }
+                                |> Review.Test.whenFixed ("module Components.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\nimport JsonRender.Actions as Actions\nimport JsonRender.Resolve as Resolve\n\n\ntype Action\n    = Press\n\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n\n\nhandleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\nhandleAction action model =\n    ()\n\n\nactionConfig : Resolve.FunctionDict -> Actions.ActionConfig Action\nactionConfig functions =\n    { handleAction = handleAction\n    , decodeAction = decodeAction\n    , functions = functions\n    }\n")
+                            ]
+                          )
+                        ]
         , test "no actions in catalog means no actions module needed" <|
             \_ ->
                 let
@@ -313,14 +354,14 @@ placeholder = ()
                     |> Review.Test.expectErrorsForModules
                         [ ( "Components.Actions"
                           , [ Review.Test.error
-                                { message = "Actions module is missing variants: Press"
+                                { message = "Actions module is missing variants: Press, actionConfig, handleAction"
                                 , details =
                                     [ "The Actions module does not match the catalog actions."
                                     , "Accept the fix to regenerate it."
                                     ]
                                 , under = "module Components.Actions exposing (..)"
                                 }
-                                |> Review.Test.whenFixed ("module Components.Actions exposing (Action(..), decodeAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\n\n\ntype Action\n    = Press\n\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n")
+                                |> Review.Test.whenFixed ("module Components.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\nimport JsonRender.Actions as Actions\nimport JsonRender.Resolve as Resolve\n\n\ntype Action\n    = Press\n\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n\n\nhandleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\nhandleAction action model =\n    ()\n\n\nactionConfig : Resolve.FunctionDict -> Actions.ActionConfig Action\nactionConfig functions =\n    { handleAction = handleAction\n    , decodeAction = decodeAction\n    , functions = functions\n    }\n")
                             ]
                           )
                         ]

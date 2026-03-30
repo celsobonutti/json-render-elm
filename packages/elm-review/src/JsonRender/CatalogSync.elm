@@ -250,11 +250,44 @@ declarationListVisitor declarations context =
                             |> List.map TypeMapping.capitalizeFirst
                             |> Set.fromList
 
-                    missing =
+                    missingVariants =
                         Set.diff expectedVariants existingVariants
 
+                    hasActionConfig =
+                        List.any (hasFunction "actionConfig") declarations
+
+                    hasHandleAction =
+                        List.any (hasFunction "handleAction") declarations
+
+                    needsFix =
+                        not (Set.isEmpty missingVariants) || not hasActionConfig || not hasHandleAction
+
+                    errorMessage =
+                        let
+                            missingParts =
+                                (if not (Set.isEmpty missingVariants) then
+                                    [ "variants: " ++ String.join ", " (Set.toList missingVariants) ]
+
+                                 else
+                                    []
+                                )
+                                    ++ (if not hasActionConfig then
+                                            [ "actionConfig" ]
+
+                                        else
+                                            []
+                                       )
+                                    ++ (if not hasHandleAction then
+                                            [ "handleAction" ]
+
+                                        else
+                                            []
+                                       )
+                        in
+                        "Actions module is missing " ++ String.join ", " missingParts
+
                     errors =
-                        if Set.isEmpty missing then
+                        if not needsFix then
                             []
 
                         else
@@ -272,7 +305,7 @@ declarationListVisitor declarations context =
                                                 catalog.actions
                                     in
                                     [ Rule.errorWithFix
-                                        { message = "Actions module is missing variants: " ++ String.join ", " (Set.toList missing)
+                                        { message = errorMessage
                                         , details =
                                             [ "The Actions module does not match the catalog actions."
                                             , "Accept the fix to regenerate it."

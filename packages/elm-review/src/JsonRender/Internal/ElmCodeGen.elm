@@ -1,5 +1,6 @@
 module JsonRender.Internal.ElmCodeGen exposing
-    ( actionParamsType
+    ( actionConfigFunction
+    , actionParamsType
     , actionType
     , actionsModule
     , bindingsDecoder
@@ -7,6 +8,7 @@ module JsonRender.Internal.ElmCodeGen exposing
     , componentModule
     , decodeActionFunction
     , functionsModule
+    , handleActionFunction
     , propsDecoder
     , propsTypeAlias
     , registryModule
@@ -376,6 +378,23 @@ indent n =
     String.repeat n " "
 
 
+handleActionFunction : String
+handleActionFunction =
+    "handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\n"
+        ++ "handleAction action model =\n"
+        ++ "    ()\n"
+
+
+actionConfigFunction : String
+actionConfigFunction =
+    "actionConfig : Resolve.FunctionDict -> Actions.ActionConfig Action\n"
+        ++ "actionConfig functions =\n"
+        ++ "    { handleAction = handleAction\n"
+        ++ "    , decodeAction = decodeAction\n"
+        ++ "    , functions = functions\n"
+        ++ "    }\n"
+
+
 actionsModule : String -> Dict String ActionSchema -> String
 actionsModule namespace actions =
     let
@@ -403,17 +422,22 @@ actionsModule namespace actions =
             "import Dict exposing (Dict)\n"
                 ++ "import Json.Decode as Decode\n"
                 ++ "import Json.Encode exposing (Value)\n"
+                ++ "import JsonRender.Actions as Actions\n"
+                ++ "import JsonRender.Resolve as Resolve\n"
     in
     "module "
         ++ namespace
-        ++ ".Actions exposing (Action(..), decodeAction)\n\n"
+        ++ ".Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\n"
         ++ imports
         ++ "\n\n"
         ++ paramsTypesStr
         ++ actionType actions
         ++ "\n\n"
         ++ decodeActionFunction actions
-        ++ "\n"
+        ++ "\n\n\n"
+        ++ handleActionFunction
+        ++ "\n\n"
+        ++ actionConfigFunction
 
 
 functionsModule : String -> Dict String SchemaParser.FunctionSchema -> String
