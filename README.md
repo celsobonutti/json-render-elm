@@ -33,6 +33,9 @@ cd packages/elm-core && npx elm-test
 
 # Run Playwright e2e tests
 cd demo && npm run test:e2e
+
+# Run parity tests (Elm vs React renderer comparison)
+cd demo && npx playwright test --project=parity
 ```
 
 ## Usage
@@ -203,6 +206,26 @@ Elements can be conditionally shown using the `visible` field:
 ```
 
 Supported conditions: `truthy`, `equals`, `notEquals`, `not`, `and`, `or`.
+
+## Parity Testing
+
+Parity tests verify that the Elm renderer produces the same output as the React renderer (`@json-render/react`) for the same JSON specs. A dual-mount harness renders each spec through both renderers side-by-side, and shared Playwright assertions check both DOMs.
+
+```bash
+cd demo && npx playwright test --project=parity
+```
+
+40 tests cover rendering, expressions, visibility, repeat, actions, watchers, state-on-spec, and error rendering.
+
+### Known Behavioral Differences
+
+| Area | Elm | React |
+|---|---|---|
+| Props error rendering | Visible red error box | Silent (renders `undefined`) |
+| Unknown `$computed` function | Visible error message | Returns `undefined` |
+| `$id` generation | UUID v4 (36 chars) | Timestamp-based (`Date.now()-counter`) |
+| Chained watcher actions | All execute in order | Re-render cancels remaining chain |
+| Action param `path` alias | Accepts `path` and `statePath` | Only `statePath` |
 
 ## elm-review CatalogSync
 

@@ -30,6 +30,9 @@ cd packages/elm-review && npx elm-test
 # Playwright e2e tests (10 browser tests)
 cd demo && npm run test:e2e
 
+# Playwright parity tests (40 tests — Elm vs React side-by-side)
+cd demo && npx playwright test --project=parity
+
 # Demo dev server
 cd demo && npm run dev
 
@@ -115,6 +118,14 @@ The CatalogSync rule validates component modules against a catalog JSON Schema. 
 - `test-harness.html` + `test-harness.ts` + `TestHarness.elm` — minimal harness for Playwright tests
 
 `TestHarness.elm` has no UI chrome. It shares the same `Components/Registry.elm`. It adds a `jsonRenderStateIn` port for test state injection (not present in Main.elm).
+
+### Parity Test Harness
+- `parity-harness.html` + `parity-harness.ts` — dual-mount page rendering specs through both Elm and React (`@json-render/react`) side-by-side
+- `demo/src/react-components/` — 7 React component ports (Card, Text, Button, Input, Stack, Badge, Image) with identical `jr-` CSS classes and HTML structure
+- `demo/test/parity-helpers.ts` — `sendParitySpec`, `setParityState`, `renderers`, `getParityLastAction`
+- `demo/test/specs/parity/*.parity.ts` — 40 parity tests across 8 files
+
+Run with: `cd demo && npx playwright test --project=parity`
 
 ## Testing Requirements
 
@@ -217,6 +228,20 @@ Gaps versus json-render core, grouped by area and roughly prioritized:
 - **Form validation** — `validateForm` action + validation checks (`required`, `email`, `minLength`, `pattern`, etc.), `validateOn` timing, cross-field validation, conditional validation, custom validators
 - **Streaming / SpecStream** — JSONL + RFC 6902 JSON Patch incremental rendering instead of full spec snapshots
 - **Edit modes** — `buildEditInstructions()`, `deepMergeSpec()`, `diffToPatches()` for spec editing workflows
+
+### Known Behavioral Differences (Elm vs React)
+
+Discovered via parity tests (`demo/test/specs/parity/`). These are behavioral divergences between the Elm and React renderers when given the same spec:
+
+| Area | Elm Behavior | React Behavior |
+|---|---|---|
+| **Props error rendering** | Shows a red "Props error" box with the decode error message | Silently renders with `undefined` props (no visible error) |
+| **Unknown `$computed` function** | Shows "Props error: Unknown function: X" | Returns `undefined`, renders empty content |
+| **`$id` generation format** | 36-char UUID v4 (via `TSFoster/elm-uuid`) | Timestamp-based ID (`Date.now()-counter`, ~15 chars) |
+| **Chained watcher actions** | All chained actions execute synchronously in order | First action triggers re-render, which cancels remaining chained actions via React's effect cleanup |
+| **Action param name** | Accepts both `statePath` and `path` | Only accepts `statePath` |
+
+**Note:** All shared fixtures use `statePath` (not `path`) for cross-renderer compatibility. The `path` alias is Elm-specific.
 
 ### Internal Improvements (not parity gaps)
 - **ElmCodeGen AST refactor** — replace string concatenation in `ElmCodeGen.elm` with `the-sett/elm-syntax-dsl` for AST-based code generation. See `docs/superpowers/specs/2026-03-26-elm-codegen-refactor.md`
