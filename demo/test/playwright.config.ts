@@ -8,7 +8,19 @@ export default defineConfig({
     cwd: "..",
     reuseExistingServer: true,
   },
-  use: {
-    baseURL: "http://localhost:5173/test-harness.html",
-  },
+  projects: [
+    {
+      name: "e2e",
+      use: {
+        baseURL: "http://localhost:5173/test-harness.html",
+      },
+    },
+    {
+      name: "parity",
+      testMatch: "parity/**",
+      use: {
+        baseURL: "http://localhost:5173/parity-harness.html",
+      },
+    },
+  ],
 })
