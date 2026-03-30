@@ -111,17 +111,9 @@ update config msg model =
             ( model, Cmd.none )
 
 
-{-| Look up a path param, accepting both "statePath" and "path" since the
-json-render prompt uses both names depending on context.
--}
 getPathParam : Dict String Value -> Maybe Value
 getPathParam params =
-    case Dict.get "statePath" params of
-        Just val ->
-            Just val
-
-        Nothing ->
-            Dict.get "path" params
+    Dict.get "statePath" params
 
 
 {-| Walk a JSON Value, replacing every "$id" string with a fresh UUID.
