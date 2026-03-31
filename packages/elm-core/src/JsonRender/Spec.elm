@@ -6,6 +6,7 @@ module JsonRender.Spec exposing
     , Spec
     , decoder
     , propValueDecoder
+    , shouldPreventDefault
     )
 
 {-| Core types and JSON decoder for json-render specs.
@@ -100,6 +101,19 @@ eventHandlerDecoder =
         [ Decode.list actionBindingDecoder |> Decode.map ChainedActions
         , actionBindingDecoder |> Decode.map SingleAction
         ]
+
+
+{-| Returns True if any action binding in the handler has preventDefault set.
+Matches React's `actionBindings.some(b => b.preventDefault)` semantics.
+-}
+shouldPreventDefault : EventHandler -> Bool
+shouldPreventDefault handler =
+    case handler of
+        SingleAction binding ->
+            binding.preventDefault
+
+        ChainedActions bindings ->
+            List.any .preventDefault bindings
 
 
 {-| Re-export for convenience.

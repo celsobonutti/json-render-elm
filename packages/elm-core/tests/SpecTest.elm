@@ -952,4 +952,35 @@ suite =
                         Err err ->
                             Expect.fail (Decode.errorToString err)
             ]
+        , describe "shouldPreventDefault"
+            [ test "SingleAction with preventDefault True returns True" <|
+                \_ ->
+                    Spec.shouldPreventDefault
+                        (SingleAction { action = "x", params = Dict.empty, preventDefault = True })
+                        |> Expect.equal True
+            , test "SingleAction with preventDefault False returns False" <|
+                \_ ->
+                    Spec.shouldPreventDefault
+                        (SingleAction { action = "x", params = Dict.empty, preventDefault = False })
+                        |> Expect.equal False
+            , test "ChainedActions returns True if any binding has preventDefault" <|
+                \_ ->
+                    Spec.shouldPreventDefault
+                        (ChainedActions
+                            [ { action = "a", params = Dict.empty, preventDefault = False }
+                            , { action = "b", params = Dict.empty, preventDefault = True }
+                            , { action = "c", params = Dict.empty, preventDefault = False }
+                            ]
+                        )
+                        |> Expect.equal True
+            , test "ChainedActions returns False if no binding has preventDefault" <|
+                \_ ->
+                    Spec.shouldPreventDefault
+                        (ChainedActions
+                            [ { action = "a", params = Dict.empty, preventDefault = False }
+                            , { action = "b", params = Dict.empty, preventDefault = False }
+                            ]
+                        )
+                        |> Expect.equal False
+            ]
         ]
