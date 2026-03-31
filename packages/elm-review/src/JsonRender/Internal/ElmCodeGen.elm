@@ -385,18 +385,28 @@ handleActionFunction =
         ++ "    ()\n"
 
 
-actionConfigFunction : String
-actionConfigFunction =
-    "actionConfig : Resolve.FunctionDict -> Actions.ActionConfig Action\n"
-        ++ "actionConfig functions =\n"
+actionConfigFunction : String -> Bool -> String
+actionConfigFunction namespace hasFunctions =
+    let
+        functionsExpr =
+            if hasFunctions then
+                namespace ++ ".Functions.toFunctionDict " ++ namespace ++ ".Functions.functions"
+
+            else
+                "Dict.empty"
+    in
+    "actionConfig : Actions.ActionConfig Action\n"
+        ++ "actionConfig =\n"
         ++ "    { handleAction = handleAction\n"
         ++ "    , decodeAction = decodeAction\n"
-        ++ "    , functions = functions\n"
+        ++ "    , functions = "
+        ++ functionsExpr
+        ++ "\n"
         ++ "    }\n"
 
 
-actionsModule : String -> Dict String ActionSchema -> String
-actionsModule namespace actions =
+actionsModule : String -> Dict String ActionSchema -> Bool -> String
+actionsModule namespace actions hasFunctions =
     let
         paramsTypes =
             Dict.toList actions
@@ -418,12 +428,19 @@ actionsModule namespace actions =
                 _ ->
                     String.join "\n\n\n" paramsTypes ++ "\n\n\n"
 
+        functionsImport =
+            if hasFunctions then
+                "import " ++ namespace ++ ".Functions\n"
+
+            else
+                ""
+
         imports =
             "import Dict exposing (Dict)\n"
                 ++ "import Json.Decode as Decode\n"
                 ++ "import Json.Encode exposing (Value)\n"
                 ++ "import JsonRender.Actions as Actions\n"
-                ++ "import JsonRender.Resolve as Resolve\n"
+                ++ functionsImport
     in
     "module "
         ++ namespace
@@ -437,7 +454,7 @@ actionsModule namespace actions =
         ++ "\n\n\n"
         ++ handleActionFunction
         ++ "\n\n"
-        ++ actionConfigFunction
+        ++ actionConfigFunction namespace hasFunctions
 
 
 functionsModule : String -> Dict String SchemaParser.FunctionSchema -> String
