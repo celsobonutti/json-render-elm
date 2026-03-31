@@ -1,8 +1,9 @@
-module Components.Actions exposing (Action(..), decodeAction)
+module Components.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)
 
 import Dict exposing (Dict)
 import Json.Decode as Decode
 import Json.Encode exposing (Value)
+import JsonRender.Actions as Actions
 
 
 type alias ExportParams =
@@ -36,3 +37,15 @@ decodeAction name params =
 
         _ ->
             Err ("Unknown action: " ++ name)
+
+
+handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
+handleAction _ model =
+    ( model, Cmd.none )
+
+
+actionConfig : Actions.ActionConfig Action
+actionConfig =
+    { handleAction = handleAction
+    , decodeAction = decodeAction
+    }

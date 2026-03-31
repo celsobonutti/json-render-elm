@@ -8,10 +8,9 @@ import Html.Attributes exposing (class, disabled, placeholder, rows, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
+import JsonRender
 import JsonRender.Actions as Actions
-import JsonRender.Render as Render
 import Random
-import JsonRender.Spec as Spec exposing (Spec)
 
 
 
@@ -48,11 +47,9 @@ type alias Model =
     { state : State
     , prompt : String
     , error : Maybe String
-    , spec : Maybe Spec
-    , specJson : Maybe Value
     , showJson : Bool
-    , renderState : Value
-    , seed : Random.Seed
+    , specJson : Maybe Value
+    , jsonRender : JsonRender.Model
     }
 
 
@@ -61,14 +58,36 @@ init randomSeed =
     ( { state = Idle
       , prompt = ""
       , error = Nothing
-      , spec = Nothing
-      , specJson = Nothing
       , showJson = False
-      , renderState = Encode.object []
-      , seed = Random.initialSeed randomSeed
+      , specJson = Nothing
+      , jsonRender = JsonRender.init (Random.initialSeed randomSeed)
       }
     , Cmd.none
     )
+
+
+handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
+handleAction action model =
+    case action of
+        Press ->
+            ( model, Cmd.none )
+
+        Export _ ->
+            ( model, downloadJson model.state )
+
+
+app : JsonRender.App Action Model Msg
+app =
+    JsonRender.create
+        { actionConfig =
+            { handleAction = handleAction
+            , decodeAction = decodeAction
+            }
+        , registry = registry
+        , toMsg = JsonRenderMsg
+        , getModel = .jsonRender
+        , setModel = \jr model -> { model | jsonRender = jr }
+        }
 
 
 
@@ -101,14 +120,13 @@ update msg model =
                 )
 
         SpecReceived val ->
-            case Decode.decodeValue Spec.decoder val of
-                Ok spec ->
+            case JsonRender.receiveSpec val model.jsonRender of
+                Ok jr ->
                     ( { model
                         | state = Rendered
-                        , spec = Just spec
+                        , jsonRender = jr
                         , specJson = Just val
                         , error = Nothing
-                        , renderState = Maybe.withDefault (Encode.object []) spec.state
                       }
                     , Cmd.none
                     )
@@ -116,7 +134,7 @@ update msg model =
                 Err err ->
                     ( { model
                         | state = Idle
-                        , error = Just ("Failed to decode spec: " ++ Decode.errorToString err)
+                        , error = Just ("Failed to decode spec: " ++ err)
                       }
                     , Cmd.none
                     )
@@ -127,12 +145,11 @@ update msg model =
         Reset ->
             ( { model
                 | state = Idle
-                , spec = Nothing
+                , jsonRender = JsonRender.init model.jsonRender.seed
                 , specJson = Nothing
                 , showJson = False
                 , prompt = ""
                 , error = Nothing
-                , renderState = Encode.object []
               }
             , Cmd.none
             )
@@ -141,34 +158,7 @@ update msg model =
             ( { model | showJson = not model.showJson }, Cmd.none )
 
         JsonRenderMsg actionMsg ->
-            let
-                actionsModel =
-                    { spec = model.spec, state = model.renderState, seed = model.seed }
-
-                ( newActionsModel, cmd ) =
-                    Actions.update actionConfig actionMsg actionsModel
-            in
-            ( { model | renderState = newActionsModel.state, seed = newActionsModel.seed }
-            , Cmd.map JsonRenderMsg cmd
-            )
-
-
-actionConfig : Actions.ActionConfig Action
-actionConfig =
-    { handleAction = handleAction
-    , decodeAction = decodeAction
-    , functions = registry.functions
-    }
-
-
-handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
-handleAction action model =
-    case action of
-        Press ->
-            ( model, Cmd.none )
-
-        Export _ ->
-            ( model, downloadJson model.state )
+            app.update actionMsg model
 
 
 
@@ -260,13 +250,11 @@ viewLoading model =
 
 viewRendered : Model -> Html Msg
 viewRendered model =
-    case model.spec of
-        Just spec ->
+    case model.jsonRender.spec of
+        Just _ ->
             div [ class "rendered-container" ]
                 [ div [ class "rendered-output" ]
-                    [ Html.map JsonRenderMsg
-                        (Render.render registry model.renderState spec)
-                    ]
+                    [ app.render model ]
                 , div [ class "json-panel" ]
                     [ button [ class "json-toggle", onClick ToggleJson ]
                         [ text
