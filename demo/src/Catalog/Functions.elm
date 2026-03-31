@@ -1,4 +1,4 @@
-module Components.Functions exposing (Functions, functions, toFunctionDict)
+module Catalog.Functions exposing (Functions, functions, toFunctionDict)
 
 import Dict exposing (Dict)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue(..))

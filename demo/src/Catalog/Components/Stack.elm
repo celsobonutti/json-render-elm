@@ -1,4 +1,4 @@
-module Components.Stack exposing (StackProps, component, propsDecoder)
+module Catalog.Components.Stack exposing (StackProps, component, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, div)

@@ -22,7 +22,6 @@ testActionConfig : Actions.ActionConfig TestAction
 testActionConfig =
     { handleAction = \_ model -> ( model, Cmd.none )
     , decodeAction = decodeTestAction
-    , functions = Dict.empty
     }
 
 
@@ -90,7 +89,7 @@ suite =
                             testModel (Encode.object [ ( "name", Encode.string "Alice" ) ])
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (setStateMsg "/name" (StringValue "Bob")) model
+                            Actions.update Dict.empty testActionConfig (setStateMsg "/name" (StringValue "Bob")) model
                     in
                     State.get "/name" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -102,7 +101,7 @@ suite =
                             testModel (Encode.object [ ( "items", Encode.list Encode.string [ "a" ] ) ])
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (pushStateMsg "/items" (StringValue "b")) model
+                            Actions.update Dict.empty testActionConfig (pushStateMsg "/items" (StringValue "b")) model
                     in
                     State.get "/items/1" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -119,7 +118,7 @@ suite =
                                 )
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (removeStateMsg "/age") model
+                            Actions.update Dict.empty testActionConfig (removeStateMsg "/age") model
                     in
                     State.get "/age" newModel.state
                         |> Expect.equal Nothing
@@ -141,11 +140,10 @@ suite =
                                         _ ->
                                             ( m, Cmd.none )
                             , decodeAction = decodeTestAction
-                            , functions = Dict.empty
                             }
 
                         ( newModel, _ ) =
-                            Actions.update config (executeAction "export" [ ( "format", StringValue "pdf" ) ]) model
+                            Actions.update Dict.empty config (executeAction "export" [ ( "format", StringValue "pdf" ) ]) model
                     in
                     State.get "/exported" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -168,7 +166,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/clicked" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.bool >> Result.toMaybe)
@@ -192,7 +190,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/items/1" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -216,7 +214,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     Expect.all
                         [ \m -> State.get "/temp" m.state |> Expect.equal Nothing
@@ -244,7 +242,6 @@ suite =
                                         _ ->
                                             ( m, Cmd.none )
                             , decodeAction = decodeTestAction
-                            , functions = Dict.empty
                             }
 
                         binding =
@@ -255,7 +252,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update exportConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty exportConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/exported" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -272,7 +269,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/x" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
@@ -298,7 +295,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/items/0" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -334,7 +331,7 @@ suite =
                             ]
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -378,7 +375,7 @@ suite =
                             ]
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -398,7 +395,7 @@ suite =
                             testModel (Encode.object [ ( "x", Encode.int 42 ) ])
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (ChainedActions []) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (ChainedActions []) Nothing) model
                     in
                     State.get "/x" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
@@ -412,7 +409,7 @@ suite =
                             testModel (Encode.object [ ( "x", Encode.int 1 ) ])
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ActionError "No handler for event: tap") model
+                            Actions.update Dict.empty testActionConfig (ActionError "No handler for event: tap") model
                     in
                     State.get "/x" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
@@ -426,7 +423,7 @@ suite =
                             testModel (Encode.object [ ( "name", Encode.string "Alice" ) ])
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (BindingUpdate "/name" (Encode.string "Bob")) model
+                            Actions.update Dict.empty testActionConfig (BindingUpdate "/name" (Encode.string "Bob")) model
                     in
                     State.get "/name" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -438,7 +435,7 @@ suite =
                             testModel (Encode.object [])
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (BindingUpdate "/newKey" (Encode.int 99)) model
+                            Actions.update Dict.empty testActionConfig (BindingUpdate "/newKey" (Encode.int 99)) model
                     in
                     State.get "/newKey" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.int >> Result.toMaybe)
@@ -471,7 +468,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     case State.get "/items/0/id" newModel.state of
                         Just idVal ->
@@ -515,7 +512,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
 
                         getId path =
                             State.get path newModel.state
@@ -557,7 +554,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     case State.get "/items/0/meta/uid" newModel.state of
                         Just idVal ->
@@ -599,7 +596,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     case State.get "/items/0/0" newModel.state of
                         Just idVal ->
@@ -636,7 +633,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/items/0/name" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -657,7 +654,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/name" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -686,7 +683,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -720,7 +717,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/input" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -748,7 +745,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -783,7 +780,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     State.get "/input" newModel.state
                         |> Maybe.andThen (Decode.decodeValue Decode.string >> Result.toMaybe)
@@ -819,7 +816,7 @@ suite =
                             }
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -886,7 +883,7 @@ suite =
                             ]
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
 
                         getId path =
                             State.get path newModel.state
@@ -929,7 +926,7 @@ suite =
                             ]
 
                         ( newModel, _ ) =
-                            Actions.update testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (ChainedActions bindings) Nothing) model
                     in
                     Expect.all
                         [ \m ->
@@ -965,7 +962,7 @@ suite =
                             }
 
                         result =
-                            Actions.resolveBinding testActionConfig binding Nothing model
+                            Actions.resolveBinding Dict.empty testActionConfig binding Nothing model
                     in
                     case result of
                         Ok ( SetState { path, value }, _ ) ->
@@ -1012,7 +1009,7 @@ suite =
                             }
 
                         result =
-                            Actions.resolveBinding testActionConfig binding Nothing model
+                            Actions.resolveBinding Dict.empty testActionConfig binding Nothing model
                     in
                     case result of
                         Ok ( PushState { path, clearPath, value }, _ ) ->
@@ -1054,7 +1051,7 @@ suite =
                             }
 
                         result =
-                            Actions.resolveBinding testActionConfig binding Nothing model
+                            Actions.resolveBinding Dict.empty testActionConfig binding Nothing model
                     in
                     case result of
                         Ok ( RemoveState { path, index }, _ ) ->
@@ -1081,7 +1078,7 @@ suite =
                             }
 
                         result =
-                            Actions.resolveBinding testActionConfig binding Nothing model
+                            Actions.resolveBinding Dict.empty testActionConfig binding Nothing model
                     in
                     case result of
                         Ok ( CustomAction TestPress, _ ) ->
@@ -1106,7 +1103,7 @@ suite =
                             }
 
                         result =
-                            Actions.resolveBinding testActionConfig binding Nothing model
+                            Actions.resolveBinding Dict.empty testActionConfig binding Nothing model
                     in
                     case result of
                         Err _ ->

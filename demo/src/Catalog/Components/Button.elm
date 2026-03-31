@@ -1,4 +1,4 @@
-module Components.Button exposing (ButtonProps, component, propsDecoder)
+module Catalog.Components.Button exposing (ButtonProps, component, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, button, text)

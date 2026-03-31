@@ -1,4 +1,4 @@
-module Components.Input exposing (InputBindings, InputProps, component, inputBindingsDecoder, propsDecoder)
+module Catalog.Components.Input exposing (InputBindings, InputProps, component, inputBindingsDecoder, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, div, input, label, text)

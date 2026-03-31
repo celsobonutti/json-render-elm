@@ -1,4 +1,4 @@
-module Components.Image exposing (ImageProps, component, propsDecoder)
+module Catalog.Components.Image exposing (ImageProps, component, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, img)

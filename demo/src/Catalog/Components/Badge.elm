@@ -1,4 +1,4 @@
-module Components.Badge exposing (BadgeProps, component, propsDecoder)
+module Catalog.Components.Badge exposing (BadgeProps, component, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)

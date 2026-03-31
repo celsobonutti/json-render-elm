@@ -1,5 +1,6 @@
 module JsonRender.Internal.ElmCodeGen exposing
-    ( actionParamsType
+    ( actionConfigFunction
+    , actionParamsType
     , actionType
     , actionsModule
     , bindingsDecoder
@@ -7,6 +8,7 @@ module JsonRender.Internal.ElmCodeGen exposing
     , componentModule
     , decodeActionFunction
     , functionsModule
+    , handleActionFunction
     , propsDecoder
     , propsTypeAlias
     , registryModule
@@ -128,7 +130,7 @@ componentModule : String -> String -> ComponentSchema -> String
 componentModule namespace componentName schema =
     let
         moduleName =
-            namespace ++ "." ++ componentName
+            namespace ++ ".Components." ++ componentName
 
         typeAlias =
             propsTypeAlias componentName schema
@@ -376,6 +378,22 @@ indent n =
     String.repeat n " "
 
 
+handleActionFunction : String
+handleActionFunction =
+    "handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\n"
+        ++ "handleAction action model =\n"
+        ++ "    ()\n"
+
+
+actionConfigFunction : String
+actionConfigFunction =
+    "actionConfig : Actions.ActionConfig Action\n"
+        ++ "actionConfig =\n"
+        ++ "    { handleAction = handleAction\n"
+        ++ "    , decodeAction = decodeAction\n"
+        ++ "    }\n"
+
+
 actionsModule : String -> Dict String ActionSchema -> String
 actionsModule namespace actions =
     let
@@ -403,17 +421,21 @@ actionsModule namespace actions =
             "import Dict exposing (Dict)\n"
                 ++ "import Json.Decode as Decode\n"
                 ++ "import Json.Encode exposing (Value)\n"
+                ++ "import JsonRender.Actions as Actions\n"
     in
     "module "
         ++ namespace
-        ++ ".Actions exposing (Action(..), decodeAction)\n\n"
+        ++ ".Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\n"
         ++ imports
         ++ "\n\n"
         ++ paramsTypesStr
         ++ actionType actions
         ++ "\n\n"
         ++ decodeActionFunction actions
-        ++ "\n"
+        ++ "\n\n\n"
+        ++ handleActionFunction
+        ++ "\n\n"
+        ++ actionConfigFunction
 
 
 functionsModule : String -> Dict String SchemaParser.FunctionSchema -> String
@@ -619,7 +641,7 @@ registryModule namespace componentNames hasFunctions =
     let
         imports =
             List.map
-                (\name -> "import " ++ namespace ++ "." ++ name)
+                (\name -> "import " ++ namespace ++ ".Components." ++ name)
                 componentNames
 
         functionsImport =
@@ -636,7 +658,7 @@ registryModule namespace componentNames hasFunctions =
                         ++ name
                         ++ "\", "
                         ++ namespace
-                        ++ "."
+                        ++ ".Components."
                         ++ name
                         ++ ".component )"
                 )

@@ -8,6 +8,7 @@ module JsonRender.Internal.PropValue exposing
 
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
+import Json.Decode.Pipeline exposing (optional, required)
 
 
 type PropValue
@@ -38,19 +39,13 @@ decoder =
         , Decode.field "$template" Decode.string |> Decode.map TemplateExpr
         , Decode.field "$bindState" Decode.string |> Decode.map BindStateExpr
         , Decode.field "$bindItem" Decode.string |> Decode.map BindItemExpr
-        , Decode.map3 ConditionalExpr
-            (Decode.field "$cond" (Decode.lazy (\_ -> decoder)))
-            (Decode.field "$then" (Decode.lazy (\_ -> decoder)))
-            (Decode.field "$else" (Decode.lazy (\_ -> decoder)))
-        , Decode.field "$computed" Decode.string
-            |> Decode.andThen
-                (\name ->
-                    Decode.oneOf
-                        [ Decode.field "args" (Decode.lazy (\_ -> Decode.dict decoder))
-                        , Decode.succeed Dict.empty
-                        ]
-                        |> Decode.map (ComputedExpr name)
-                )
+        , Decode.succeed ConditionalExpr
+            |> required "$cond" (Decode.lazy (\_ -> decoder))
+            |> required "$then" (Decode.lazy (\_ -> decoder))
+            |> required "$else" (Decode.lazy (\_ -> decoder))
+        , Decode.succeed (\name args -> ComputedExpr name args)
+            |> required "$computed" Decode.string
+            |> optional "args" (Decode.lazy (\_ -> Decode.dict decoder)) Dict.empty
 
         -- Literals
         , Decode.null NullValue

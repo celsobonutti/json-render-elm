@@ -1,16 +1,14 @@
 port module TestHarness exposing (main)
 
 import Browser
-import Components.Actions exposing (Action(..), decodeAction)
-import Components.Registry exposing (registry)
+import Catalog.Actions exposing (Action(..), decodeAction)
+import Catalog.Registry exposing (registry)
 import Html exposing (Html, div)
 import Html.Attributes exposing (id)
-import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
+import JsonRender
 import JsonRender.Actions as Actions
 import Random
-import JsonRender.Render as Render
-import JsonRender.Spec as Spec exposing (Spec)
 
 
 port jsonRenderSpecIn : (Value -> msg) -> Sub msg
@@ -26,9 +24,7 @@ port testDecodeErrorOut : String -> Cmd msg
 
 
 type alias Model =
-    { spec : Maybe Spec
-    , renderState : Value
-    , seed : Random.Seed
+    { jsonRender : JsonRender.Model
     }
 
 
@@ -40,52 +36,14 @@ type Msg
 
 init : Int -> ( Model, Cmd Msg )
 init randomSeed =
-    ( { spec = Nothing
-      , renderState = Encode.object []
-      , seed = Random.initialSeed randomSeed
-      }
+    ( { jsonRender = JsonRender.init (Random.initialSeed randomSeed) }
     , Cmd.none
     )
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        SpecReceived val ->
-            case Decode.decodeValue Spec.decoder val of
-                Ok spec ->
-                    ( { model
-                        | spec = Just spec
-                        , renderState = Maybe.withDefault model.renderState spec.state
-                      }
-                    , Cmd.none
-                    )
-
-                Err err ->
-                    ( model, testDecodeErrorOut (Decode.errorToString err) )
-
-        StateReceived val ->
-            ( { model | renderState = val }, Cmd.none )
-
-        JsonRenderMsg actionMsg ->
-            let
-                actionsModel =
-                    { spec = model.spec, state = model.renderState, seed = model.seed }
-
-                ( newActionsModel, cmd ) =
-                    Actions.update actionConfig actionMsg actionsModel
-            in
-            ( { model | renderState = newActionsModel.state, seed = newActionsModel.seed }
-            , Cmd.map JsonRenderMsg cmd
-            )
-
-
-actionConfig : Actions.ActionConfig Action
-actionConfig =
-    { handleAction = handleAction
-    , decodeAction = decodeAction
-    , functions = registry.functions
-    }
+handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
+handleAction action model =
+    ( model, testActionOut (encodeAction action) )
 
 
 encodeAction : Action -> Value
@@ -101,18 +59,48 @@ encodeAction action =
                 ]
 
 
-handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
-handleAction action model =
-    ( model, testActionOut (encodeAction action) )
+app : JsonRender.App Action Model Msg
+app =
+    JsonRender.create
+        { actionConfig =
+            { handleAction = handleAction
+            , decodeAction = decodeAction
+            }
+        , registry = registry
+        , toMsg = JsonRenderMsg
+        , getModel = .jsonRender
+        , setModel = \jr model -> { model | jsonRender = jr }
+        }
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        SpecReceived val ->
+            case JsonRender.receiveSpec val model.jsonRender of
+                Ok jr ->
+                    ( { model | jsonRender = jr }, Cmd.none )
+
+                Err err ->
+                    ( model, testDecodeErrorOut err )
+
+        StateReceived val ->
+            let
+                jr =
+                    model.jsonRender
+            in
+            ( { model | jsonRender = { jr | state = val } }, Cmd.none )
+
+        JsonRenderMsg actionMsg ->
+            app.update actionMsg model
 
 
 view : Model -> Html Msg
 view model =
     div [ id "render-root" ]
-        [ case model.spec of
-            Just spec ->
-                Html.map JsonRenderMsg
-                    (Render.render registry model.renderState spec)
+        [ case model.jsonRender.spec of
+            Just _ ->
+                app.render model
 
             Nothing ->
                 div [ id "no-spec" ] []

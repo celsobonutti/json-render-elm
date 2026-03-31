@@ -1,4 +1,4 @@
-module Components.Text exposing (TextProps, component, propsDecoder)
+module Catalog.Components.Text exposing (TextProps, component, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)

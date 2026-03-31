@@ -28,7 +28,7 @@ import Set exposing (Set)
 
 type alias Config =
     { schemaJson : String
-    , componentsNamespace : String
+    , catalogNamespace : String
     }
 
 
@@ -103,24 +103,18 @@ fromProjectToModule catalog config =
                 moduleStr =
                     String.join "." (Node.value moduleName)
 
+                componentsPrefix =
+                    config.catalogNamespace ++ ".Components."
+
                 componentName =
                     case catalog of
                         Just cat ->
-                            if String.startsWith (config.componentsNamespace ++ ".") moduleStr then
+                            if String.startsWith componentsPrefix moduleStr then
                                 let
                                     suffix =
-                                        String.dropLeft (String.length config.componentsNamespace + 1) moduleStr
+                                        String.dropLeft (String.length componentsPrefix) moduleStr
                                 in
-                                if suffix == "Registry" then
-                                    Nothing
-
-                                else if suffix == "Actions" then
-                                    Nothing
-
-                                else if suffix == "Functions" then
-                                    Nothing
-
-                                else if Dict.member suffix cat.components then
+                                if Dict.member suffix cat.components then
                                     Just suffix
 
                                 else
@@ -136,9 +130,9 @@ fromProjectToModule catalog config =
             , config = config
             , moduleName = moduleStr
             , isComponentModule = componentName
-            , isRegistryModule = moduleStr == config.componentsNamespace ++ ".Registry"
-            , isActionsModule = moduleStr == config.componentsNamespace ++ ".Actions"
-            , isFunctionsModule = moduleStr == config.componentsNamespace ++ ".Functions"
+            , isRegistryModule = moduleStr == config.catalogNamespace ++ ".Registry"
+            , isActionsModule = moduleStr == config.catalogNamespace ++ ".Actions"
+            , isFunctionsModule = moduleStr == config.catalogNamespace ++ ".Functions"
             , registryEntries = Set.empty
             , moduleKey = moduleKey
             , moduleRange = Nothing
@@ -220,7 +214,7 @@ declarationListVisitor declarations context =
 
                                         generatedCode =
                                             ElmCodeGen.registryModule
-                                                context.config.componentsNamespace
+                                                context.config.catalogNamespace
                                                 (Dict.keys catalog.components |> List.sort)
                                                 (not (Dict.isEmpty catalog.functions))
                                     in
@@ -250,11 +244,44 @@ declarationListVisitor declarations context =
                             |> List.map TypeMapping.capitalizeFirst
                             |> Set.fromList
 
-                    missing =
+                    missingVariants =
                         Set.diff expectedVariants existingVariants
 
+                    hasActionConfig =
+                        List.any (hasFunction "actionConfig") declarations
+
+                    hasHandleAction =
+                        List.any (hasFunction "handleAction") declarations
+
+                    needsFix =
+                        not (Set.isEmpty missingVariants) || not hasActionConfig || not hasHandleAction
+
+                    errorMessage =
+                        let
+                            missingParts =
+                                (if not (Set.isEmpty missingVariants) then
+                                    [ "variants: " ++ String.join ", " (Set.toList missingVariants) ]
+
+                                 else
+                                    []
+                                )
+                                    ++ (if not hasActionConfig then
+                                            [ "actionConfig" ]
+
+                                        else
+                                            []
+                                       )
+                                    ++ (if not hasHandleAction then
+                                            [ "handleAction" ]
+
+                                        else
+                                            []
+                                       )
+                        in
+                        "Actions module is missing " ++ String.join ", " missingParts
+
                     errors =
-                        if Set.isEmpty missing then
+                        if not needsFix then
                             []
 
                         else
@@ -268,11 +295,11 @@ declarationListVisitor declarations context =
 
                                         generatedCode =
                                             ElmCodeGen.actionsModule
-                                                context.config.componentsNamespace
+                                                context.config.catalogNamespace
                                                 catalog.actions
                                     in
                                     [ Rule.errorWithFix
-                                        { message = "Actions module is missing variants: " ++ String.join ", " (Set.toList missing)
+                                        { message = errorMessage
                                         , details =
                                             [ "The Actions module does not match the catalog actions."
                                             , "Accept the fix to regenerate it."
@@ -307,7 +334,7 @@ declarationListVisitor declarations context =
 
                                         generatedCode =
                                             ElmCodeGen.functionsModule
-                                                context.config.componentsNamespace
+                                                context.config.catalogNamespace
                                                 catalog.functions
                                     in
                                     [ Rule.errorWithFix
@@ -348,7 +375,7 @@ declarationListVisitor declarations context =
 
                                                 generatedCode =
                                                     ElmCodeGen.componentModule
-                                                        context.config.componentsNamespace
+                                                        context.config.catalogNamespace
                                                         componentName
                                                         schema
                                             in
@@ -490,109 +517,89 @@ finalEvaluation config projectCtx =
 
         Just catalog ->
             let
-                missingModules =
+                nsPath =
+                    String.replace "." "/" config.catalogNamespace
+
+                missingComponents =
                     Dict.keys catalog.components
                         |> List.filter (\name -> not (Set.member name projectCtx.seenModules))
                         |> List.sort
 
-                missingModuleError =
-                    if List.isEmpty missingModules then
+                missingInfra =
+                    (if not projectCtx.registrySeen then
+                        [ "Registry" ]
+
+                     else
                         []
+                    )
+                        ++ (if not projectCtx.actionsSeen && not (Dict.isEmpty catalog.actions) then
+                                [ "Actions" ]
 
-                    else
-                        let
-                            fileList =
-                                missingModules
-                                    |> List.map
-                                        (\name ->
-                                            "src/"
-                                                ++ String.replace "." "/" config.componentsNamespace
-                                                ++ "/"
-                                                ++ name
-                                                ++ ".elm"
-                                        )
-                                    |> String.join ", "
+                            else
+                                []
+                           )
+                        ++ (if not projectCtx.functionsSeen && not (Dict.isEmpty catalog.functions) then
+                                [ "Functions" ]
 
-                            nsPath =
-                                String.replace "." "/" config.componentsNamespace
+                            else
+                                []
+                           )
 
-                            stubHint =
-                                missingModules
-                                    |> List.map
-                                        (\name ->
-                                            "  echo 'module "
-                                                ++ config.componentsNamespace
-                                                ++ "."
-                                                ++ name
-                                                ++ " exposing (..)' > src/"
-                                                ++ nsPath
-                                                ++ "/"
-                                                ++ name
-                                                ++ ".elm"
-                                        )
-                                    |> String.join " && \\\n"
-                        in
-                        [ Rule.globalError
-                            { message = "Missing component modules: " ++ String.join ", " missingModules
-                            , details =
-                                [ "Create these files: " ++ fileList
-                                , "Quick stub command:\n\nmkdir -p src/" ++ nsPath ++ " && \\\n" ++ stubHint
-                                , "Then run elm-review --fix to fill them in."
-                                ]
-                            }
-                        ]
-
-                missingRegistryError =
-                    if not projectCtx.registrySeen then
-                        [ Rule.globalError
-                            { message = "Missing registry module: " ++ config.componentsNamespace ++ ".Registry"
-                            , details =
-                                [ "Create: src/" ++ String.replace "." "/" config.componentsNamespace ++ "/Registry.elm"
-                                , "Quick stub: echo 'module " ++ config.componentsNamespace ++ ".Registry exposing (..)' > src/" ++ String.replace "." "/" config.componentsNamespace ++ "/Registry.elm"
-                                , "Then run elm-review --fix to fill it in."
-                                ]
-                            }
-                        ]
-
-                    else
-                        []
-
-                missingActionsError =
-                    if not projectCtx.actionsSeen && not (Dict.isEmpty catalog.actions) then
-                        let
-                            nsPath =
-                                String.replace "." "/" config.componentsNamespace
-                        in
-                        [ Rule.globalError
-                            { message = "Missing actions module: " ++ config.componentsNamespace ++ ".Actions"
-                            , details =
-                                [ "The catalog defines actions but no " ++ config.componentsNamespace ++ ".Actions module exists."
-                                , "Quick stub:\n\nmkdir -p src/" ++ nsPath ++ " && echo 'module " ++ config.componentsNamespace ++ ".Actions exposing (..)' > src/" ++ nsPath ++ "/Actions.elm"
-                                , "Then run elm-review --fix to fill it in."
-                                ]
-                            }
-                        ]
-
-                    else
-                        []
-
-                missingFunctionsError =
-                    if not projectCtx.functionsSeen && not (Dict.isEmpty catalog.functions) then
-                        let
-                            nsPath =
-                                String.replace "." "/" config.componentsNamespace
-                        in
-                        [ Rule.globalError
-                            { message = "Missing functions module: " ++ config.componentsNamespace ++ ".Functions"
-                            , details =
-                                [ "The catalog defines functions but no " ++ config.componentsNamespace ++ ".Functions module exists."
-                                , "Quick stub:\n\nmkdir -p src/" ++ nsPath ++ " && echo 'module " ++ config.componentsNamespace ++ ".Functions exposing (..)' > src/" ++ nsPath ++ "/Functions.elm"
-                                , "Then run elm-review --fix to fill it in."
-                                ]
-                            }
-                        ]
-
-                    else
-                        []
+                allMissing =
+                    List.map (\name -> { name = name, isComponent = True }) missingComponents
+                        ++ List.map (\name -> { name = name, isComponent = False }) missingInfra
             in
-            missingModuleError ++ missingRegistryError ++ missingActionsError ++ missingFunctionsError
+            if List.isEmpty allMissing then
+                []
+
+            else
+                let
+                    moduleAndPath entry =
+                        if entry.isComponent then
+                            { moduleName = config.catalogNamespace ++ ".Components." ++ entry.name
+                            , filePath = "src/" ++ nsPath ++ "/Components/" ++ entry.name ++ ".elm"
+                            }
+
+                        else
+                            { moduleName = config.catalogNamespace ++ "." ++ entry.name
+                            , filePath = "src/" ++ nsPath ++ "/" ++ entry.name ++ ".elm"
+                            }
+
+                    dirs =
+                        ("mkdir -p src/" ++ nsPath)
+                            ++ (if List.any .isComponent allMissing then
+                                    " src/" ++ nsPath ++ "/Components"
+
+                                else
+                                    ""
+                               )
+
+                    stubCommand =
+                        allMissing
+                            |> List.map
+                                (\entry ->
+                                    let
+                                        info =
+                                            moduleAndPath entry
+                                    in
+                                    "echo 'module "
+                                        ++ info.moduleName
+                                        ++ " exposing (..)' > "
+                                        ++ info.filePath
+                                )
+                            |> String.join " && \\\n  "
+
+                    fileList =
+                        allMissing
+                            |> List.map (\entry -> (moduleAndPath entry).filePath)
+                            |> String.join ", "
+                in
+                [ Rule.globalError
+                    { message = "Missing modules: " ++ String.join ", " (List.map .name allMissing)
+                    , details =
+                        [ "Create these files: " ++ fileList
+                        , "Quick stub command:\n\n" ++ dirs ++ " && \\\n  " ++ stubCommand
+                        , "Then run elm-review --fix to fill them in."
+                        ]
+                    }
+                ]
