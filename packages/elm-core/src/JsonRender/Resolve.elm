@@ -67,7 +67,12 @@ resolveProps =
 -}
 resolvedToValue : ResolvedValue -> Value
 resolvedToValue resolved =
-    resolvedToValueHelp resolved []
+    resolvedToValueLoop (ToValueDescend resolved) []
+
+
+type ToValueStep
+    = ToValueDescend ResolvedValue
+    | ToValueAscend Value
 
 
 type ToValueFrame
@@ -75,77 +80,73 @@ type ToValueFrame
     | ToValueObjectFrame String (List ( String, ResolvedValue )) (List ( String, Value ))
 
 
-resolvedToValueHelp : ResolvedValue -> List ToValueFrame -> Value
-resolvedToValueHelp current stack =
-    let
-        leaf val =
-            returnToValue val stack
-    in
-    case current of
-        RString s ->
-            leaf (Encode.string s)
+resolvedToValueLoop : ToValueStep -> List ToValueFrame -> Value
+resolvedToValueLoop step stack =
+    case step of
+        ToValueDescend current ->
+            case current of
+                RString s ->
+                    resolvedToValueLoop (ToValueAscend (Encode.string s)) stack
 
-        RInt i ->
-            leaf (Encode.int i)
+                RInt i ->
+                    resolvedToValueLoop (ToValueAscend (Encode.int i)) stack
 
-        RFloat f ->
-            leaf (Encode.float f)
+                RFloat f ->
+                    resolvedToValueLoop (ToValueAscend (Encode.float f)) stack
 
-        RBool b ->
-            leaf (Encode.bool b)
+                RBool b ->
+                    resolvedToValueLoop (ToValueAscend (Encode.bool b)) stack
 
-        RNull ->
-            leaf Encode.null
+                RNull ->
+                    resolvedToValueLoop (ToValueAscend Encode.null) stack
 
-        RError err ->
-            leaf (Encode.string ("ERROR: " ++ err))
+                RError err ->
+                    resolvedToValueLoop (ToValueAscend (Encode.string ("ERROR: " ++ err))) stack
 
-        RList items ->
-            case items of
+                RList items ->
+                    case items of
+                        [] ->
+                            resolvedToValueLoop (ToValueAscend (Encode.list identity [])) stack
+
+                        first :: rest ->
+                            resolvedToValueLoop (ToValueDescend first) (ToValueListFrame rest [] :: stack)
+
+                RObject obj ->
+                    case Dict.toList obj of
+                        [] ->
+                            resolvedToValueLoop (ToValueAscend (Encode.object [])) stack
+
+                        ( k, v ) :: rest ->
+                            resolvedToValueLoop (ToValueDescend v) (ToValueObjectFrame k rest [] :: stack)
+
+        ToValueAscend val ->
+            case stack of
                 [] ->
-                    leaf (Encode.list identity [])
+                    val
 
-                first :: rest ->
-                    resolvedToValueHelp first (ToValueListFrame rest [] :: stack)
+                (ToValueListFrame remaining done) :: rest ->
+                    let
+                        newDone =
+                            val :: done
+                    in
+                    case remaining of
+                        [] ->
+                            resolvedToValueLoop (ToValueAscend (Encode.list identity (List.reverse newDone))) rest
 
-        RObject obj ->
-            case Dict.toList obj of
-                [] ->
-                    leaf (Encode.object [])
+                        next :: more ->
+                            resolvedToValueLoop (ToValueDescend next) (ToValueListFrame more newDone :: rest)
 
-                ( k, v ) :: rest ->
-                    resolvedToValueHelp v (ToValueObjectFrame k rest [] :: stack)
+                (ToValueObjectFrame key remaining done) :: rest ->
+                    let
+                        newDone =
+                            ( key, val ) :: done
+                    in
+                    case remaining of
+                        [] ->
+                            resolvedToValueLoop (ToValueAscend (Encode.object (List.reverse newDone))) rest
 
-
-returnToValue : Value -> List ToValueFrame -> Value
-returnToValue val stack =
-    case stack of
-        [] ->
-            val
-
-        (ToValueListFrame remaining done) :: rest ->
-            let
-                newDone =
-                    val :: done
-            in
-            case remaining of
-                [] ->
-                    returnToValue (Encode.list identity (List.reverse newDone)) rest
-
-                next :: more ->
-                    resolvedToValueHelp next (ToValueListFrame more newDone :: rest)
-
-        (ToValueObjectFrame key remaining done) :: rest ->
-            let
-                newDone =
-                    ( key, val ) :: done
-            in
-            case remaining of
-                [] ->
-                    returnToValue (Encode.object (List.reverse newDone)) rest
-
-                ( nextKey, nextVal ) :: more ->
-                    resolvedToValueHelp nextVal (ToValueObjectFrame nextKey more newDone :: rest)
+                        ( nextKey, nextVal ) :: more ->
+                            resolvedToValueLoop (ToValueDescend nextVal) (ToValueObjectFrame nextKey more newDone :: rest)
 
 
 {-| Resolve action params: resolve each PropValue to a JSON Value.
@@ -208,7 +209,12 @@ resolvePropValue =
 
 resolvePropValueWith : FunctionDict -> Value -> Maybe RepeatContext -> PropValue -> ResolvedValue
 resolvePropValueWith functions state repeatCtx prop =
-    resolvePropHelp functions state repeatCtx prop []
+    resolvePropLoop functions state repeatCtx (PropDescend prop) []
+
+
+type PropStep
+    = PropDescend PropValue
+    | PropAscend ResolvedValue
 
 
 type PropFrame
@@ -218,178 +224,174 @@ type PropFrame
     | PropComputedFrame String String (List ( String, PropValue )) (List ( String, ResolvedValue ))
 
 
-resolvePropHelp : FunctionDict -> Value -> Maybe RepeatContext -> PropValue -> List PropFrame -> ResolvedValue
-resolvePropHelp functions state repeatCtx prop stack =
-    let
-        leaf rv =
-            returnPropValue functions state repeatCtx rv stack
-    in
-    case prop of
-        StringValue s ->
-            leaf (RString s)
+resolvePropLoop : FunctionDict -> Value -> Maybe RepeatContext -> PropStep -> List PropFrame -> ResolvedValue
+resolvePropLoop functions state repeatCtx step stack =
+    case step of
+        PropDescend prop ->
+            case prop of
+                StringValue s ->
+                    resolvePropLoop functions state repeatCtx (PropAscend (RString s)) stack
 
-        IntValue i ->
-            leaf (RInt i)
+                IntValue i ->
+                    resolvePropLoop functions state repeatCtx (PropAscend (RInt i)) stack
 
-        FloatValue f ->
-            leaf (RFloat f)
+                FloatValue f ->
+                    resolvePropLoop functions state repeatCtx (PropAscend (RFloat f)) stack
 
-        BoolValue b ->
-            leaf (RBool b)
+                BoolValue b ->
+                    resolvePropLoop functions state repeatCtx (PropAscend (RBool b)) stack
 
-        NullValue ->
-            leaf RNull
+                NullValue ->
+                    resolvePropLoop functions state repeatCtx (PropAscend RNull) stack
 
-        ListValue items ->
-            case items of
-                [] ->
-                    leaf (RList [])
+                ListValue items ->
+                    case items of
+                        [] ->
+                            resolvePropLoop functions state repeatCtx (PropAscend (RList [])) stack
 
-                first :: rest ->
-                    resolvePropHelp functions state repeatCtx first (PropListFrame rest [] :: stack)
+                        first :: rest ->
+                            resolvePropLoop functions state repeatCtx (PropDescend first) (PropListFrame rest [] :: stack)
 
-        ObjectValue obj ->
-            case Dict.toList obj of
-                [] ->
-                    leaf (RObject Dict.empty)
+                ObjectValue obj ->
+                    case Dict.toList obj of
+                        [] ->
+                            resolvePropLoop functions state repeatCtx (PropAscend (RObject Dict.empty)) stack
 
-                ( k, v ) :: rest ->
-                    resolvePropHelp functions state repeatCtx v (PropObjectFrame k rest [] :: stack)
+                        ( k, v ) :: rest ->
+                            resolvePropLoop functions state repeatCtx (PropDescend v) (PropObjectFrame k rest [] :: stack)
 
-        StateExpr path ->
-            leaf (jsonValueToResolved (State.get path state |> Maybe.withDefault Encode.null))
+                StateExpr path ->
+                    resolvePropLoop functions state repeatCtx (PropAscend (jsonValueToResolved (State.get path state |> Maybe.withDefault Encode.null))) stack
 
-        ItemExpr field ->
-            case repeatCtx of
-                Just ctx ->
-                    if field == "" then
-                        leaf (jsonValueToResolved ctx.item)
+                ItemExpr field ->
+                    case repeatCtx of
+                        Just ctx ->
+                            if field == "" then
+                                resolvePropLoop functions state repeatCtx (PropAscend (jsonValueToResolved ctx.item)) stack
 
-                    else
-                        case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
-                            Ok val ->
-                                leaf (jsonValueToResolved val)
+                            else
+                                case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
+                                    Ok val ->
+                                        resolvePropLoop functions state repeatCtx (PropAscend (jsonValueToResolved val)) stack
 
-                            Err _ ->
-                                leaf RNull
-
-                Nothing ->
-                    leaf RNull
-
-        IndexExpr ->
-            case repeatCtx of
-                Just ctx ->
-                    leaf (RInt ctx.index)
-
-                Nothing ->
-                    leaf (RInt 0)
-
-        TemplateExpr template ->
-            leaf (RString (resolveTemplate state template))
-
-        BindStateExpr path ->
-            leaf (jsonValueToResolved (State.get path state |> Maybe.withDefault Encode.null))
-
-        BindItemExpr field ->
-            case repeatCtx of
-                Just ctx ->
-                    if field == "" then
-                        leaf (jsonValueToResolved ctx.item)
-
-                    else
-                        case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
-                            Ok val ->
-                                leaf (jsonValueToResolved val)
-
-                            Err _ ->
-                                leaf RNull
-
-                Nothing ->
-                    leaf RNull
-
-        ConditionalExpr cond thenVal elseVal ->
-            resolvePropHelp functions state repeatCtx cond (PropCondFrame thenVal elseVal :: stack)
-
-        ComputedExpr name args ->
-            case Dict.toList args of
-                [] ->
-                    case Dict.get name functions of
-                        Just fn ->
-                            leaf (fn Dict.empty)
+                                    Err _ ->
+                                        resolvePropLoop functions state repeatCtx (PropAscend RNull) stack
 
                         Nothing ->
-                            leaf (RError ("Unknown function: " ++ name))
+                            resolvePropLoop functions state repeatCtx (PropAscend RNull) stack
 
-                ( k, v ) :: rest ->
-                    resolvePropHelp functions state repeatCtx v (PropComputedFrame name k rest [] :: stack)
-
-
-returnPropValue : FunctionDict -> Value -> Maybe RepeatContext -> ResolvedValue -> List PropFrame -> ResolvedValue
-returnPropValue functions state repeatCtx rv stack =
-    case stack of
-        [] ->
-            rv
-
-        (PropListFrame remaining done) :: rest ->
-            let
-                newDone =
-                    rv :: done
-            in
-            case remaining of
-                [] ->
-                    returnPropValue functions state repeatCtx (RList (List.reverse newDone)) rest
-
-                next :: more ->
-                    resolvePropHelp functions state repeatCtx next (PropListFrame more newDone :: rest)
-
-        (PropObjectFrame key remaining done) :: rest ->
-            let
-                newDone =
-                    ( key, rv ) :: done
-            in
-            case remaining of
-                [] ->
-                    returnPropValue functions state repeatCtx (RObject (Dict.fromList newDone)) rest
-
-                ( nextKey, nextVal ) :: more ->
-                    resolvePropHelp functions state repeatCtx nextVal (PropObjectFrame nextKey more newDone :: rest)
-
-        (PropCondFrame thenVal elseVal) :: rest ->
-            case isResolvedTruthy rv of
-                Ok True ->
-                    resolvePropHelp functions state repeatCtx thenVal rest
-
-                Ok False ->
-                    resolvePropHelp functions state repeatCtx elseVal rest
-
-                Err err ->
-                    returnPropValue functions state repeatCtx (RError err) rest
-
-        (PropComputedFrame name key remaining done) :: rest ->
-            let
-                newDone =
-                    ( key, rv ) :: done
-            in
-            case remaining of
-                [] ->
-                    let
-                        resolvedArgs =
-                            Dict.fromList newDone
-                    in
-                    case findError resolvedArgs of
-                        Just err ->
-                            returnPropValue functions state repeatCtx err rest
+                IndexExpr ->
+                    case repeatCtx of
+                        Just ctx ->
+                            resolvePropLoop functions state repeatCtx (PropAscend (RInt ctx.index)) stack
 
                         Nothing ->
+                            resolvePropLoop functions state repeatCtx (PropAscend (RInt 0)) stack
+
+                TemplateExpr template ->
+                    resolvePropLoop functions state repeatCtx (PropAscend (RString (resolveTemplate state template))) stack
+
+                BindStateExpr path ->
+                    resolvePropLoop functions state repeatCtx (PropAscend (jsonValueToResolved (State.get path state |> Maybe.withDefault Encode.null))) stack
+
+                BindItemExpr field ->
+                    case repeatCtx of
+                        Just ctx ->
+                            if field == "" then
+                                resolvePropLoop functions state repeatCtx (PropAscend (jsonValueToResolved ctx.item)) stack
+
+                            else
+                                case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
+                                    Ok val ->
+                                        resolvePropLoop functions state repeatCtx (PropAscend (jsonValueToResolved val)) stack
+
+                                    Err _ ->
+                                        resolvePropLoop functions state repeatCtx (PropAscend RNull) stack
+
+                        Nothing ->
+                            resolvePropLoop functions state repeatCtx (PropAscend RNull) stack
+
+                ConditionalExpr cond thenVal elseVal ->
+                    resolvePropLoop functions state repeatCtx (PropDescend cond) (PropCondFrame thenVal elseVal :: stack)
+
+                ComputedExpr name args ->
+                    case Dict.toList args of
+                        [] ->
                             case Dict.get name functions of
                                 Just fn ->
-                                    returnPropValue functions state repeatCtx (fn resolvedArgs) rest
+                                    resolvePropLoop functions state repeatCtx (PropAscend (fn Dict.empty)) stack
 
                                 Nothing ->
-                                    returnPropValue functions state repeatCtx (RError ("Unknown function: " ++ name)) rest
+                                    resolvePropLoop functions state repeatCtx (PropAscend (RError ("Unknown function: " ++ name))) stack
 
-                ( nextKey, nextVal ) :: more ->
-                    resolvePropHelp functions state repeatCtx nextVal (PropComputedFrame name nextKey more newDone :: rest)
+                        ( k, v ) :: rest ->
+                            resolvePropLoop functions state repeatCtx (PropDescend v) (PropComputedFrame name k rest [] :: stack)
+
+        PropAscend rv ->
+            case stack of
+                [] ->
+                    rv
+
+                (PropListFrame remaining done) :: rest ->
+                    let
+                        newDone =
+                            rv :: done
+                    in
+                    case remaining of
+                        [] ->
+                            resolvePropLoop functions state repeatCtx (PropAscend (RList (List.reverse newDone))) rest
+
+                        next :: more ->
+                            resolvePropLoop functions state repeatCtx (PropDescend next) (PropListFrame more newDone :: rest)
+
+                (PropObjectFrame key remaining done) :: rest ->
+                    let
+                        newDone =
+                            ( key, rv ) :: done
+                    in
+                    case remaining of
+                        [] ->
+                            resolvePropLoop functions state repeatCtx (PropAscend (RObject (Dict.fromList newDone))) rest
+
+                        ( nextKey, nextVal ) :: more ->
+                            resolvePropLoop functions state repeatCtx (PropDescend nextVal) (PropObjectFrame nextKey more newDone :: rest)
+
+                (PropCondFrame thenVal elseVal) :: rest ->
+                    case isResolvedTruthy rv of
+                        Ok True ->
+                            resolvePropLoop functions state repeatCtx (PropDescend thenVal) rest
+
+                        Ok False ->
+                            resolvePropLoop functions state repeatCtx (PropDescend elseVal) rest
+
+                        Err err ->
+                            resolvePropLoop functions state repeatCtx (PropAscend (RError err)) rest
+
+                (PropComputedFrame name key remaining done) :: rest ->
+                    let
+                        newDone =
+                            ( key, rv ) :: done
+                    in
+                    case remaining of
+                        [] ->
+                            let
+                                resolvedArgs =
+                                    Dict.fromList newDone
+                            in
+                            case findError resolvedArgs of
+                                Just err ->
+                                    resolvePropLoop functions state repeatCtx (PropAscend err) rest
+
+                                Nothing ->
+                                    case Dict.get name functions of
+                                        Just fn ->
+                                            resolvePropLoop functions state repeatCtx (PropAscend (fn resolvedArgs)) rest
+
+                                        Nothing ->
+                                            resolvePropLoop functions state repeatCtx (PropAscend (RError ("Unknown function: " ++ name))) rest
+
+                        ( nextKey, nextVal ) :: more ->
+                            resolvePropLoop functions state repeatCtx (PropDescend nextVal) (PropComputedFrame name nextKey more newDone :: rest)
 
 
 findError : Dict String ResolvedValue -> Maybe ResolvedValue
@@ -442,7 +444,12 @@ isResolvedTruthy resolved =
 
 jsonValueToResolved : Value -> ResolvedValue
 jsonValueToResolved value =
-    jsonToResolvedHelp value []
+    fromValueLoop (FromValueDescend value) []
+
+
+type FromValueStep
+    = FromValueDescend Value
+    | FromValueAscend ResolvedValue
 
 
 type FromValueFrame
@@ -450,89 +457,85 @@ type FromValueFrame
     | FromValueObjectFrame String (List ( String, Value )) (List ( String, ResolvedValue ))
 
 
-jsonToResolvedHelp : Value -> List FromValueFrame -> ResolvedValue
-jsonToResolvedHelp value stack =
-    let
-        leaf rv =
-            returnFromValue rv stack
-    in
-    case Decode.decodeValue Decode.string value of
-        Ok s ->
-            leaf (RString s)
-
-        Err _ ->
-            case Decode.decodeValue Decode.int value of
-                Ok i ->
-                    leaf (RInt i)
+fromValueLoop : FromValueStep -> List FromValueFrame -> ResolvedValue
+fromValueLoop step stack =
+    case step of
+        FromValueDescend value ->
+            case Decode.decodeValue Decode.string value of
+                Ok s ->
+                    fromValueLoop (FromValueAscend (RString s)) stack
 
                 Err _ ->
-                    case Decode.decodeValue Decode.float value of
-                        Ok f ->
-                            leaf (RFloat f)
+                    case Decode.decodeValue Decode.int value of
+                        Ok i ->
+                            fromValueLoop (FromValueAscend (RInt i)) stack
 
                         Err _ ->
-                            case Decode.decodeValue Decode.bool value of
-                                Ok b ->
-                                    leaf (RBool b)
+                            case Decode.decodeValue Decode.float value of
+                                Ok f ->
+                                    fromValueLoop (FromValueAscend (RFloat f)) stack
 
                                 Err _ ->
-                                    case Decode.decodeValue (Decode.null ()) value of
-                                        Ok _ ->
-                                            leaf RNull
+                                    case Decode.decodeValue Decode.bool value of
+                                        Ok b ->
+                                            fromValueLoop (FromValueAscend (RBool b)) stack
 
                                         Err _ ->
-                                            case Decode.decodeValue (Decode.list Decode.value) value of
-                                                Ok items ->
-                                                    case items of
-                                                        [] ->
-                                                            leaf (RList [])
-
-                                                        first :: rest ->
-                                                            jsonToResolvedHelp first (FromValueListFrame rest [] :: stack)
+                                            case Decode.decodeValue (Decode.null ()) value of
+                                                Ok _ ->
+                                                    fromValueLoop (FromValueAscend RNull) stack
 
                                                 Err _ ->
-                                                    case Decode.decodeValue (Decode.keyValuePairs Decode.value) value of
-                                                        Ok pairs ->
-                                                            case pairs of
+                                                    case Decode.decodeValue (Decode.list Decode.value) value of
+                                                        Ok items ->
+                                                            case items of
                                                                 [] ->
-                                                                    leaf (RObject Dict.empty)
+                                                                    fromValueLoop (FromValueAscend (RList [])) stack
 
-                                                                ( k, v ) :: rest ->
-                                                                    jsonToResolvedHelp v (FromValueObjectFrame k rest [] :: stack)
+                                                                first :: rest ->
+                                                                    fromValueLoop (FromValueDescend first) (FromValueListFrame rest [] :: stack)
 
                                                         Err _ ->
-                                                            leaf RNull
+                                                            case Decode.decodeValue (Decode.keyValuePairs Decode.value) value of
+                                                                Ok pairs ->
+                                                                    case pairs of
+                                                                        [] ->
+                                                                            fromValueLoop (FromValueAscend (RObject Dict.empty)) stack
 
+                                                                        ( k, v ) :: rest ->
+                                                                            fromValueLoop (FromValueDescend v) (FromValueObjectFrame k rest [] :: stack)
 
-returnFromValue : ResolvedValue -> List FromValueFrame -> ResolvedValue
-returnFromValue rv stack =
-    case stack of
-        [] ->
-            rv
+                                                                Err _ ->
+                                                                    fromValueLoop (FromValueAscend RNull) stack
 
-        (FromValueListFrame remaining done) :: rest ->
-            let
-                newDone =
-                    rv :: done
-            in
-            case remaining of
+        FromValueAscend rv ->
+            case stack of
                 [] ->
-                    returnFromValue (RList (List.reverse newDone)) rest
+                    rv
 
-                next :: more ->
-                    jsonToResolvedHelp next (FromValueListFrame more newDone :: rest)
+                (FromValueListFrame remaining done) :: rest ->
+                    let
+                        newDone =
+                            rv :: done
+                    in
+                    case remaining of
+                        [] ->
+                            fromValueLoop (FromValueAscend (RList (List.reverse newDone))) rest
 
-        (FromValueObjectFrame key remaining done) :: rest ->
-            let
-                newDone =
-                    ( key, rv ) :: done
-            in
-            case remaining of
-                [] ->
-                    returnFromValue (RObject (Dict.fromList (List.reverse newDone))) rest
+                        next :: more ->
+                            fromValueLoop (FromValueDescend next) (FromValueListFrame more newDone :: rest)
 
-                ( nextKey, nextVal ) :: more ->
-                    jsonToResolvedHelp nextVal (FromValueObjectFrame nextKey more newDone :: rest)
+                (FromValueObjectFrame key remaining done) :: rest ->
+                    let
+                        newDone =
+                            ( key, rv ) :: done
+                    in
+                    case remaining of
+                        [] ->
+                            fromValueLoop (FromValueAscend (RObject (Dict.fromList (List.reverse newDone)))) rest
+
+                        ( nextKey, nextVal ) :: more ->
+                            fromValueLoop (FromValueDescend nextVal) (FromValueObjectFrame nextKey more newDone :: rest)
 
 
 resolveTemplate : Value -> String -> String
