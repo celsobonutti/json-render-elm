@@ -20,7 +20,7 @@ import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions exposing (Msg(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext, ResolvedValue)
-import JsonRender.Spec exposing (Element, EventHandler(..), Repeat, Spec)
+import JsonRender.Spec exposing (Element, EventHandler, Repeat, Spec)
 import JsonRender.State as State
 import JsonRender.Visibility as Visibility
 

@@ -4,7 +4,6 @@ import Expect
 import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender
-import JsonRender.Actions as Actions
 import JsonRender.State as State
 import Random
 import Test exposing (..)

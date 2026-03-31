@@ -6,7 +6,6 @@ import Components.Registry exposing (registry)
 import Html exposing (Html, button, div, h1, p, pre, span, text, textarea)
 import Html.Attributes exposing (class, disabled, placeholder, rows, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
-import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
 import JsonRender
 import JsonRender.Actions as Actions
