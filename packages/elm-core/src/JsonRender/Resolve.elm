@@ -12,6 +12,7 @@ module JsonRender.Resolve exposing
     , resolvePropValue
     , resolveProps
     , resolvePropsWith
+    , object
     , resolvedToValue
     , string
     , succeed
@@ -506,3 +507,16 @@ bool val =
 
         _ ->
             Err "expected bool"
+
+
+object : ResolvedValue -> Result String (Dict String ResolvedValue)
+object val =
+    case val of
+        RObject dict ->
+            Ok dict
+
+        RError err ->
+            Err err
+
+        _ ->
+            Err "expected object"

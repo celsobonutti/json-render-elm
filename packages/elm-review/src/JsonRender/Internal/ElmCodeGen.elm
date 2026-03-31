@@ -6,7 +6,9 @@ module JsonRender.Internal.ElmCodeGen exposing
     , bindingsDecoder
     , bindingsTypeAlias
     , componentModule
+    , componentScaffold
     , decodeActionFunction
+    , defaultViewFunction
     , functionsModule
     , handleActionFunction
     , propsDecoder
@@ -15,7 +17,7 @@ module JsonRender.Internal.ElmCodeGen exposing
     )
 
 import Dict exposing (Dict)
-import JsonRender.Internal.SchemaParser as SchemaParser exposing (ActionSchema, ComponentSchema)
+import JsonRender.Internal.SchemaParser as SchemaParser exposing (ActionSchema, ComponentSchema, FieldType(..))
 import JsonRender.Internal.TypeMapping as TypeMapping
 
 
@@ -30,10 +32,10 @@ propsTypeAlias componentName schema =
                         let
                             elmType =
                                 if field.required then
-                                    TypeMapping.toElmType field.fieldType
+                                    fieldToElmType name field.fieldType
 
                                 else
-                                    "Maybe " ++ TypeMapping.toElmType field.fieldType
+                                    "Maybe " ++ fieldToElmType name field.fieldType
                         in
                         name ++ " : " ++ elmType
                     )
@@ -64,7 +66,7 @@ propsDecoder componentName schema =
                 (\( name, field ) ->
                     let
                         extractor =
-                            TypeMapping.toResolvedValueExtractor field.fieldType
+                            fieldToExtractor name field.fieldType
                     in
                     if field.required then
                         "        |> ResolvedValue.required \"" ++ name ++ "\" " ++ extractor
@@ -87,9 +89,12 @@ bindingsTypeAlias : String -> ComponentSchema -> String
 bindingsTypeAlias componentName schema =
     let
         fields =
-            Dict.keys schema.fields
-                |> List.sort
-                |> List.map (\name -> name ++ " : Maybe (Value -> EventHandle msg)")
+            Dict.toList schema.fields
+                |> List.sortBy Tuple.first
+                |> List.map
+                    (\( name, field ) ->
+                        name ++ " : Maybe (" ++ fieldToElmType name field.fieldType ++ " -> EventHandle msg)"
+                    )
 
         body =
             case fields of
@@ -109,12 +114,14 @@ bindingsDecoder : String -> ComponentSchema -> String
 bindingsDecoder componentName schema =
     let
         fields =
-            Dict.keys schema.fields
-                |> List.sort
+            Dict.toList schema.fields
+                |> List.sortBy Tuple.first
 
         pipelineSteps =
             List.map
-                (\name -> "        |> Bind.bindable \"" ++ name ++ "\"")
+                (\( name, field ) ->
+                    "        |> Bind.bindableTyped \"" ++ name ++ "\" " ++ fieldToEncoder name field.fieldType
+                )
                 fields
     in
     "bindingsDecoder : Dict String (Value -> EventHandle msg) -> "
@@ -126,11 +133,35 @@ bindingsDecoder componentName schema =
         ++ String.join "\n" pipelineSteps
 
 
-componentModule : String -> String -> ComponentSchema -> String
-componentModule namespace componentName schema =
+componentScaffold : String -> String -> ComponentSchema -> String
+componentScaffold namespace componentName schema =
     let
         moduleName =
             namespace ++ ".Components." ++ componentName
+
+        enums =
+            collectEnumsFromFields schema.fields
+
+        objects =
+            collectObjectFields schema.fields
+
+        enumExposing =
+            List.map (\variants -> TypeMapping.toElmType (FEnum variants) ++ "(..)") enums
+
+        objectExposing =
+            List.map (\( name, _ ) -> objectTypeName name) objects
+
+        exposingItems =
+            List.sort
+                (enumExposing
+                    ++ objectExposing
+                    ++ [ componentName ++ "Props"
+                       , componentName ++ "Bindings"
+                       , "propsDecoder"
+                       , "bindingsDecoder"
+                       , "component"
+                       ]
+                )
 
         typeAlias =
             propsTypeAlias componentName schema
@@ -143,21 +174,41 @@ componentModule namespace componentName schema =
 
         bindingsDecoderCode =
             bindingsDecoder componentName schema
+
+        enumSection =
+            case enums of
+                [] ->
+                    ""
+
+                _ ->
+                    List.map enumHelpers enums
+                        |> String.join "\n\n\n"
+                        |> (\s -> s ++ "\n\n\n")
+
+        objectSection =
+            case objects of
+                [] ->
+                    ""
+
+                _ ->
+                    List.map objectHelpers objects
+                        |> String.join "\n\n\n"
+                        |> (\s -> s ++ "\n\n\n")
     in
     "module "
         ++ moduleName
         ++ " exposing ("
-        ++ componentName
-        ++ "Props, "
-        ++ componentName
-        ++ "Bindings, propsDecoder, bindingsDecoder, component)\n\n"
+        ++ String.join ", " exposingItems
+        ++ ")\n\n"
         ++ "import Dict exposing (Dict)\n"
         ++ "import Html exposing (Html)\n"
         ++ "import Json.Encode exposing (Value)\n"
         ++ "import JsonRender.Bind as Bind\n"
         ++ "import JsonRender.Events exposing (EventHandle)\n"
-        ++ "import JsonRender.Render exposing (ComponentContext, Component, register)\n"
+        ++ "import JsonRender.Render exposing (Component, ComponentContext, register)\n"
         ++ "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)\n\n\n"
+        ++ enumSection
+        ++ objectSection
         ++ typeAlias
         ++ "\n\n\n"
         ++ bindingsType
@@ -166,12 +217,23 @@ componentModule namespace componentName schema =
         ++ "\n\n\n"
         ++ bindingsDecoderCode
         ++ "\n\n\n"
-        ++ "component : Component msg\ncomponent =\n    register propsDecoder bindingsDecoder view\n\n\n"
-        ++ "view : ComponentContext "
+        ++ "component : Component msg\ncomponent =\n    register propsDecoder bindingsDecoder view"
+
+
+defaultViewFunction : String -> String
+defaultViewFunction componentName =
+    "view : ComponentContext "
         ++ componentName
         ++ "Props ("
         ++ componentName
         ++ "Bindings msg) msg -> Html msg\nview ctx =\n    ()\n"
+
+
+componentModule : String -> String -> ComponentSchema -> String
+componentModule namespace componentName schema =
+    componentScaffold namespace componentName schema
+        ++ "\n\n\n"
+        ++ defaultViewFunction componentName
 
 
 actionParamsType : String -> ActionSchema -> String
@@ -378,6 +440,230 @@ indent n =
     String.repeat n " "
 
 
+collectEnumsFromFields : Dict String SchemaParser.FieldSchema -> List (List String)
+collectEnumsFromFields fields =
+    Dict.values fields
+        |> List.concatMap (collectEnumsFromFieldType << .fieldType)
+        |> dedupLists
+
+
+collectEnumsFromFieldType : SchemaParser.FieldType -> List (List String)
+collectEnumsFromFieldType fieldType =
+    case fieldType of
+        FEnum variants ->
+            [ variants ]
+
+        FObject subFields ->
+            Dict.values subFields
+                |> List.concatMap (collectEnumsFromFieldType << .fieldType)
+
+        _ ->
+            []
+
+
+dedupLists : List (List String) -> List (List String)
+dedupLists lists =
+    List.foldl
+        (\item acc ->
+            if List.member item acc then
+                acc
+
+            else
+                acc ++ [ item ]
+        )
+        []
+        lists
+
+
+enumHelpers : List String -> String
+enumHelpers variants =
+    let
+        typeName =
+            TypeMapping.toElmType (FEnum variants)
+    in
+    TypeMapping.enumTypeDeclaration typeName variants
+        ++ "\n\n\n"
+        ++ TypeMapping.enumFromStringFunction variants
+        ++ "\n\n\n"
+        ++ TypeMapping.enumToStringFunction variants
+
+
+enumHelpersWithDecoder : List String -> String
+enumHelpersWithDecoder variants =
+    enumHelpers variants
+        ++ "\n\n\n"
+        ++ TypeMapping.enumDecoderFunction variants
+
+
+collectObjectFields : Dict String SchemaParser.FieldSchema -> List ( String, Dict String SchemaParser.FieldSchema )
+collectObjectFields fields =
+    Dict.toList fields
+        |> List.filterMap
+            (\( name, field ) ->
+                case field.fieldType of
+                    FObject subFields ->
+                        Just ( name, subFields )
+
+                    _ ->
+                        Nothing
+            )
+
+
+objectTypeName : String -> String
+objectTypeName fieldName =
+    TypeMapping.capitalizeFirst fieldName ++ "Object"
+
+
+objectFnBaseName : String -> String
+objectFnBaseName fieldName =
+    fieldName ++ "Object"
+
+
+objectHelpers : ( String, Dict String SchemaParser.FieldSchema ) -> String
+objectHelpers ( fieldName, subFields ) =
+    let
+        typeName =
+            objectTypeName fieldName
+
+        baseName =
+            objectFnBaseName fieldName
+
+        sortedFields =
+            Dict.toList subFields |> List.sortBy Tuple.first
+
+        -- type alias
+        typeFields =
+            List.map
+                (\( name, field ) ->
+                    let
+                        elmType =
+                            if field.required then
+                                fieldToElmType name field.fieldType
+
+                            else
+                                "Maybe " ++ fieldToElmType name field.fieldType
+                    in
+                    name ++ " : " ++ elmType
+                )
+                sortedFields
+
+        typeBody =
+            case typeFields of
+                [] ->
+                    "    {}"
+
+                first :: rest ->
+                    "    { "
+                        ++ first
+                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
+                        ++ "\n    }"
+
+        typeAliasCode =
+            "type alias " ++ typeName ++ " =\n" ++ typeBody
+
+        -- decoder (ResolvedValue pipeline)
+        decoderSteps =
+            List.map
+                (\( name, field ) ->
+                    let
+                        extractor =
+                            fieldToExtractor name field.fieldType
+                    in
+                    if field.required then
+                        "        |> ResolvedValue.required \"" ++ name ++ "\" " ++ extractor
+
+                    else
+                        "        |> ResolvedValue.optional \"" ++ name ++ "\" " ++ extractor ++ " Nothing"
+                )
+                sortedFields
+
+        decoderCode =
+            baseName
+                ++ "Decoder : Dict String ResolvedValue -> Result String "
+                ++ typeName
+                ++ "\n"
+                ++ baseName
+                ++ "Decoder =\n"
+                ++ "    ResolvedValue.succeed "
+                ++ typeName
+                ++ "\n"
+                ++ String.join "\n" decoderSteps
+
+        -- encoder
+        encoderFields =
+            List.map
+                (\( name, field ) ->
+                    let
+                        encoder =
+                            fieldToEncoder name field.fieldType
+                    in
+                    if field.required then
+                        "        ( \"" ++ name ++ "\", " ++ encoder ++ " record." ++ name ++ " )"
+
+                    else
+                        "        ( \""
+                            ++ name
+                            ++ "\", record."
+                            ++ name
+                            ++ " |> Maybe.map "
+                            ++ encoder
+                            ++ " |> Maybe.withDefault Json.Encode.null )"
+                )
+                sortedFields
+
+        encoderBody =
+            case encoderFields of
+                [] ->
+                    "    Json.Encode.object []"
+
+                _ ->
+                    "    Json.Encode.object\n"
+                        ++ "        [ "
+                        ++ String.join "\n        , " (List.map String.trimLeft encoderFields)
+                        ++ "\n        ]"
+
+        encoderCode =
+            baseName
+                ++ "Encoder : "
+                ++ typeName
+                ++ " -> Value\n"
+                ++ baseName
+                ++ "Encoder record =\n"
+                ++ encoderBody
+    in
+    typeAliasCode ++ "\n\n\n" ++ decoderCode ++ "\n\n\n" ++ encoderCode
+
+
+fieldToElmType : String -> SchemaParser.FieldType -> String
+fieldToElmType fieldName fieldType =
+    case fieldType of
+        FObject _ ->
+            objectTypeName fieldName
+
+        _ ->
+            TypeMapping.toElmType fieldType
+
+
+fieldToExtractor : String -> SchemaParser.FieldType -> String
+fieldToExtractor fieldName fieldType =
+    case fieldType of
+        FObject _ ->
+            "(\\rv -> ResolvedValue.object rv |> Result.andThen " ++ objectFnBaseName fieldName ++ "Decoder)"
+
+        _ ->
+            TypeMapping.toResolvedValueExtractor fieldType
+
+
+fieldToEncoder : String -> SchemaParser.FieldType -> String
+fieldToEncoder fieldName fieldType =
+    case fieldType of
+        FObject _ ->
+            objectFnBaseName fieldName ++ "Encoder"
+
+        _ ->
+            TypeMapping.toValueEncoder fieldType
+
+
 handleActionFunction : String
 handleActionFunction =
     "handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\n"
@@ -397,6 +683,22 @@ actionConfigFunction =
 actionsModule : String -> Dict String ActionSchema -> String
 actionsModule namespace actions =
     let
+        enums =
+            Dict.values actions
+                |> List.concatMap (\schema -> collectEnumsFromFields schema.params)
+                |> dedupLists
+
+        enumExposing =
+            List.map (\variants -> TypeMapping.toElmType (FEnum variants) ++ "(..)") enums
+
+        exposingItems =
+            enumExposing
+                ++ [ "Action(..)"
+                   , "actionConfig"
+                   , "decodeAction"
+                   , "handleAction"
+                   ]
+
         paramsTypes =
             Dict.toList actions
                 |> List.sortBy Tuple.first
@@ -417,6 +719,16 @@ actionsModule namespace actions =
                 _ ->
                     String.join "\n\n\n" paramsTypes ++ "\n\n\n"
 
+        enumSection =
+            case enums of
+                [] ->
+                    ""
+
+                _ ->
+                    List.map enumHelpersWithDecoder enums
+                        |> String.join "\n\n\n"
+                        |> (\s -> s ++ "\n\n\n")
+
         imports =
             "import Dict exposing (Dict)\n"
                 ++ "import Json.Decode as Decode\n"
@@ -425,9 +737,12 @@ actionsModule namespace actions =
     in
     "module "
         ++ namespace
-        ++ ".Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\n"
+        ++ ".Actions exposing ("
+        ++ String.join ", " exposingItems
+        ++ ")\n\n"
         ++ imports
         ++ "\n\n"
+        ++ enumSection
         ++ paramsTypesStr
         ++ actionType actions
         ++ "\n\n"
@@ -444,6 +759,20 @@ functionsModule namespace functions =
         sortedFunctions =
             Dict.toList functions |> List.sortBy Tuple.first
 
+        enums =
+            List.concatMap (\( _, schema ) -> collectEnumsFromFields schema.params) sortedFunctions
+                |> dedupLists
+
+        enumExposing =
+            List.map (\variants -> TypeMapping.toElmType (FEnum variants) ++ "(..)") enums
+
+        exposingItems =
+            enumExposing
+                ++ [ "Functions"
+                   , "functions"
+                   , "toFunctionDict"
+                   ]
+
         paramsTypes =
             List.map
                 (\( name, schema ) ->
@@ -459,12 +788,25 @@ functionsModule namespace functions =
 
         toFunctionDictCode =
             toFunctionDict sortedFunctions
+
+        enumSection =
+            case enums of
+                [] ->
+                    ""
+
+                _ ->
+                    List.map enumHelpers enums
+                        |> String.join "\n\n\n"
+                        |> (\s -> s ++ "\n\n\n")
     in
     "module "
         ++ namespace
-        ++ ".Functions exposing (Functions, functions, toFunctionDict)\n\n"
+        ++ ".Functions exposing ("
+        ++ String.join ", " exposingItems
+        ++ ")\n\n"
         ++ "import Dict exposing (Dict)\n"
         ++ "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue(..))\n\n\n"
+        ++ enumSection
         ++ String.join "\n\n\n" paramsTypes
         ++ "\n\n\n"
         ++ functionsType

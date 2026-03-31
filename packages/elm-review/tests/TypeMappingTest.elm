@@ -70,12 +70,69 @@ suite =
             \_ ->
                 TypeMapping.toJsonDecoder (FList FInt)
                     |> Expect.equal "(Decode.list Decode.int)"
-        , test "toJsonDecoder maps enum to Decode.string" <|
+        , test "toJsonDecoder maps enum to named decoder" <|
             \_ ->
                 TypeMapping.toJsonDecoder (FEnum [ "a", "b" ])
-                    |> Expect.equal "Decode.string"
+                    |> Expect.equal "aOrBDecoder"
+        , test "toResolvedValueExtractor maps enum to composed extractor" <|
+            \_ ->
+                TypeMapping.toResolvedValueExtractor (FEnum [ "left", "right" ])
+                    |> Expect.equal "(\\rv -> ResolvedValue.string rv |> Result.andThen leftOrRightFromString)"
+        , test "enumFnBaseName lowercases first char of type name" <|
+            \_ ->
+                TypeMapping.enumFnBaseName [ "primary", "secondary" ]
+                    |> Expect.equal "primaryOrSecondary"
+        , test "enumFromStringFunction generates case expression" <|
+            \_ ->
+                TypeMapping.enumFromStringFunction [ "a", "b" ]
+                    |> Expect.all
+                        [ \c -> String.contains "aOrBFromString : String -> Result String AOrB" c |> Expect.equal True
+                        , \c -> String.contains "\"a\" ->\n            Ok A" c |> Expect.equal True
+                        , \c -> String.contains "\"b\" ->\n            Ok B" c |> Expect.equal True
+                        , \c -> String.contains "Expected one of: a, b" c |> Expect.equal True
+                        ]
+        , test "enumToStringFunction generates case expression" <|
+            \_ ->
+                TypeMapping.enumToStringFunction [ "a", "b" ]
+                    |> Expect.all
+                        [ \c -> String.contains "aOrBToString : AOrB -> String" c |> Expect.equal True
+                        , \c -> String.contains "A ->\n            \"a\"" c |> Expect.equal True
+                        , \c -> String.contains "B ->\n            \"b\"" c |> Expect.equal True
+                        ]
+        , test "enumDecoderFunction generates Decode.andThen pipeline" <|
+            \_ ->
+                TypeMapping.enumDecoderFunction [ "x", "y" ]
+                    |> Expect.all
+                        [ \c -> String.contains "xOrYDecoder : Decode.Decoder XOrY" c |> Expect.equal True
+                        , \c -> String.contains "Decode.string" c |> Expect.equal True
+                        , \c -> String.contains "xOrYFromString" c |> Expect.equal True
+                        ]
         , test "toJsonDecoder maps object to Decode.value" <|
             \_ ->
                 TypeMapping.toJsonDecoder (FObject Dict.empty)
                     |> Expect.equal "Decode.value"
+        , test "toValueEncoder maps string to Json.Encode.string" <|
+            \_ ->
+                TypeMapping.toValueEncoder FString
+                    |> Expect.equal "Json.Encode.string"
+        , test "toValueEncoder maps int to Json.Encode.int" <|
+            \_ ->
+                TypeMapping.toValueEncoder FInt
+                    |> Expect.equal "Json.Encode.int"
+        , test "toValueEncoder maps bool to Json.Encode.bool" <|
+            \_ ->
+                TypeMapping.toValueEncoder FBool
+                    |> Expect.equal "Json.Encode.bool"
+        , test "toValueEncoder maps enum to toString composition" <|
+            \_ ->
+                TypeMapping.toValueEncoder (FEnum [ "a", "b" ])
+                    |> Expect.equal "(Json.Encode.string << aOrBToString)"
+        , test "toValueEncoder maps list to Json.Encode.list" <|
+            \_ ->
+                TypeMapping.toValueEncoder (FList FInt)
+                    |> Expect.equal "(Json.Encode.list Json.Encode.int)"
+        , test "toValueEncoder maps object to identity" <|
+            \_ ->
+                TypeMapping.toValueEncoder (FObject Dict.empty)
+                    |> Expect.equal "identity"
         ]

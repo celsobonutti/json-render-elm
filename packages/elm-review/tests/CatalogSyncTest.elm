@@ -17,6 +17,101 @@ baseConfig =
     }
 
 
+{-| A Card component module whose scaffold matches what ElmCodeGen generates
+for the sampleSchemaJson Card schema. The view function is user-owned.
+-}
+validCardSource : String
+validCardSource =
+    """module Catalog.Components.Card exposing (CardBindings, CardProps, bindingsDecoder, component, propsDecoder)
+
+import Dict exposing (Dict)
+import Html exposing (Html)
+import Json.Encode exposing (Value)
+import JsonRender.Bind as Bind
+import JsonRender.Events exposing (EventHandle)
+import JsonRender.Render exposing (Component, ComponentContext, register)
+import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
+
+
+type alias CardProps =
+    { title : String
+    }
+
+
+type alias CardBindings msg =
+    { title : Maybe (String -> EventHandle msg)
+    }
+
+
+propsDecoder : Dict String ResolvedValue -> Result String CardProps
+propsDecoder =
+    ResolvedValue.succeed CardProps
+        |> ResolvedValue.required "title" ResolvedValue.string
+
+
+bindingsDecoder : Dict String (Value -> EventHandle msg) -> CardBindings msg
+bindingsDecoder =
+    Bind.succeed CardBindings
+        |> Bind.bindableTyped "title" Json.Encode.string
+
+
+component : Component msg
+component =
+    register propsDecoder bindingsDecoder view
+
+
+view : ComponentContext CardProps (CardBindings msg) msg -> Html msg
+view ctx =
+    Html.text "card"
+"""
+
+
+validButtonSource : String
+validButtonSource =
+    """module Catalog.Components.Button exposing (ButtonBindings, ButtonProps, bindingsDecoder, component, propsDecoder)
+
+import Dict exposing (Dict)
+import Html exposing (Html)
+import Json.Encode exposing (Value)
+import JsonRender.Bind as Bind
+import JsonRender.Events exposing (EventHandle)
+import JsonRender.Render exposing (Component, ComponentContext, register)
+import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
+
+
+type alias ButtonProps =
+    { label : String
+    }
+
+
+type alias ButtonBindings msg =
+    { label : Maybe (String -> EventHandle msg)
+    }
+
+
+propsDecoder : Dict String ResolvedValue -> Result String ButtonProps
+propsDecoder =
+    ResolvedValue.succeed ButtonProps
+        |> ResolvedValue.required "label" ResolvedValue.string
+
+
+bindingsDecoder : Dict String (Value -> EventHandle msg) -> ButtonBindings msg
+bindingsDecoder =
+    Bind.succeed ButtonBindings
+        |> Bind.bindableTyped "label" Json.Encode.string
+
+
+component : Component msg
+component =
+    register propsDecoder bindingsDecoder view
+
+
+view : ComponentContext ButtonProps (ButtonBindings msg) msg -> Html msg
+view ctx =
+    Html.text "button"
+"""
+
+
 suite : Test
 suite =
     describe "CatalogSync rule"
@@ -38,13 +133,7 @@ main = Html.text "hello"
                         ]
         , test "reports missing registry and actions in a single error" <|
             \_ ->
-                [ """module Catalog.Components.Card exposing (..)
-type alias CardProps = { title : String }
-propsDecoder = identity
-component = ()
-view ctx = ()
-"""
-                ]
+                [ validCardSource ]
                     |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
                     |> Review.Test.expectGlobalErrors
                         [ { message = "Missing modules: Registry, Actions"
@@ -57,12 +146,7 @@ view ctx = ()
                         ]
         , test "no errors when component and registry exist" <|
             \_ ->
-                [ """module Catalog.Components.Card exposing (..)
-type alias CardProps = { title : String }
-propsDecoder = identity
-component = ()
-view ctx = ()
-"""
+                [ validCardSource
                 , """module Catalog.Registry exposing (registry)
 import Dict
 import Catalog.Components.Card
@@ -88,16 +172,8 @@ handleAction action model = ()
                         , catalogNamespace = "Catalog"
                         }
                 in
-                [ """module Catalog.Components.Card exposing (..)
-type alias CardProps = { title : String }
-propsDecoder = identity
-component = ()
-"""
-                , """module Catalog.Components.Button exposing (..)
-type alias ButtonProps = { label : String }
-propsDecoder = identity
-component = ()
-"""
+                [ validCardSource
+                , validButtonSource
                 , """module Catalog.Registry exposing (registry)
 import Dict
 import Catalog.Components.Card
@@ -138,12 +214,7 @@ registry =
                         ]
         , test "reports missing actions module" <|
             \_ ->
-                [ """module Catalog.Components.Card exposing (..)
-type alias CardProps = { title : String }
-propsDecoder = identity
-component = ()
-view ctx = ()
-"""
+                [ validCardSource
                 , """module Catalog.Registry exposing (registry)
 import Dict
 import Catalog.Components.Card
@@ -162,12 +233,7 @@ registry = Dict.fromList [ ( "Card", Catalog.Components.Card.component ) ]
                         ]
         , test "no errors when component, registry, and actions modules exist with correct type" <|
             \_ ->
-                [ """module Catalog.Components.Card exposing (..)
-type alias CardProps = { title : String }
-propsDecoder = identity
-component = ()
-view ctx = ()
-"""
+                [ validCardSource
                 , """module Catalog.Registry exposing (registry)
 import Dict
 import Catalog.Components.Card
@@ -193,12 +259,7 @@ handleAction action model = ()
                         , catalogNamespace = "Catalog"
                         }
                 in
-                [ """module Catalog.Components.Card exposing (..)
-type alias CardProps = { title : String }
-propsDecoder = identity
-component = ()
-view ctx = ()
-"""
+                [ validCardSource
                 , """module Catalog.Registry exposing (registry)
 import Dict
 import Catalog.Components.Card
@@ -234,12 +295,7 @@ type Action = Press
                         , catalogNamespace = "Catalog"
                         }
                 in
-                [ """module Catalog.Components.Card exposing (..)
-type alias CardProps = { title : String }
-propsDecoder = identity
-component = ()
-view ctx = ()
-"""
+                [ validCardSource
                 , """module Catalog.Registry exposing (registry)
 import Dict
 import Catalog.Components.Card
@@ -256,12 +312,7 @@ handleAction action model = ()
                     |> Review.Test.expectNoErrors
         , test "reports missing actionConfig and handleAction when variants are correct" <|
             \_ ->
-                [ """module Catalog.Components.Card exposing (..)
-type alias CardProps = { title : String }
-propsDecoder = identity
-component = ()
-view ctx = ()
-"""
+                [ validCardSource
                 , """module Catalog.Registry exposing (registry)
 import Dict
 import Catalog.Components.Card
@@ -298,12 +349,7 @@ decodeAction name params = Ok Press
                         , catalogNamespace = "Catalog"
                         }
                 in
-                [ """module Catalog.Components.Card exposing (..)
-type alias CardProps = { title : String }
-propsDecoder = identity
-component = ()
-view ctx = ()
-"""
+                [ validCardSource
                 , """module Catalog.Registry exposing (registry)
 import Dict
 import Catalog.Components.Card
@@ -314,12 +360,7 @@ registry = Dict.fromList [ ( "Card", Catalog.Components.Card.component ) ]
                     |> Review.Test.expectNoErrors
         , test "fixes stub actions module" <|
             \_ ->
-                [ """module Catalog.Components.Card exposing (..)
-type alias CardProps = { title : String }
-propsDecoder = identity
-component = ()
-view ctx = ()
-"""
+                [ validCardSource
                 , """module Catalog.Registry exposing (registry)
 import Dict
 import Catalog.Components.Card
@@ -341,6 +382,154 @@ placeholder = ()
                                 , under = "module Catalog.Actions exposing (..)"
                                 }
                                 |> Review.Test.whenFixed ("module Catalog.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\nimport JsonRender.Actions as Actions\n\n\ntype Action\n    = Press\n\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n\n\nhandleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\nhandleAction action model =\n    ()\n\n\nactionConfig : Actions.ActionConfig Action\nactionConfig =\n    { handleAction = handleAction\n    , decodeAction = decodeAction\n    }\n")
+                            ]
+                          )
+                        ]
+        , test "reports outdated component when scaffold differs" <|
+            \_ ->
+                [ """module Catalog.Components.Card exposing (..)
+type alias CardProps = { title : String }
+propsDecoder = identity
+component = ()
+view ctx = Html.text "my card"
+"""
+                , """module Catalog.Registry exposing (registry)
+import Dict
+import Catalog.Components.Card
+registry = Dict.fromList [ ( "Card", Catalog.Components.Card.component ) ]
+"""
+                , """module Catalog.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)
+type Action = Press
+actionConfig = ()
+decodeAction name params = Ok Press
+handleAction action model = ()
+"""
+                ]
+                    |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
+                    |> Review.Test.expectErrorsForModules
+                        [ ( "Catalog.Components.Card"
+                          , [ Review.Test.error
+                                { message = "Card component types are out of sync with the catalog"
+                                , details =
+                                    [ "The generated types and decoders in this module don't match the catalog schema."
+                                    , "Accept the fix to regenerate them. Your view function will be preserved."
+                                    ]
+                                , under = "module Catalog.Components.Card exposing (..)"
+                                }
+                                |> Review.Test.whenFixed
+                                    ("""module Catalog.Components.Card exposing (CardBindings, CardProps, bindingsDecoder, component, propsDecoder)
+
+import Dict exposing (Dict)
+import Html exposing (Html)
+import Json.Encode exposing (Value)
+import JsonRender.Bind as Bind
+import JsonRender.Events exposing (EventHandle)
+import JsonRender.Render exposing (Component, ComponentContext, register)
+import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
+
+
+type alias CardProps =
+    { title : String
+    }
+
+
+type alias CardBindings msg =
+    { title : Maybe (String -> EventHandle msg)
+    }
+
+
+propsDecoder : Dict String ResolvedValue -> Result String CardProps
+propsDecoder =
+    ResolvedValue.succeed CardProps
+        |> ResolvedValue.required "title" ResolvedValue.string
+
+
+bindingsDecoder : Dict String (Value -> EventHandle msg) -> CardBindings msg
+bindingsDecoder =
+    Bind.succeed CardBindings
+        |> Bind.bindableTyped "title" Json.Encode.string
+
+
+component : Component msg
+component =
+    register propsDecoder bindingsDecoder view
+
+view ctx = Html.text "my card"
+""")
+                            ]
+                          )
+                        ]
+        , test "fixes stub component module" <|
+            \_ ->
+                [ """module Catalog.Components.Card exposing (..)
+placeholder = ()
+"""
+                , """module Catalog.Registry exposing (registry)
+import Dict
+import Catalog.Components.Card
+registry = Dict.fromList [ ( "Card", Catalog.Components.Card.component ) ]
+"""
+                , """module Catalog.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)
+type Action = Press
+actionConfig = ()
+decodeAction name params = Ok Press
+handleAction action model = ()
+"""
+                ]
+                    |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
+                    |> Review.Test.expectErrorsForModules
+                        [ ( "Catalog.Components.Card"
+                          , [ Review.Test.error
+                                { message = "Card component is missing view function"
+                                , details =
+                                    [ "This module should contain types, decoders, and a view function matching the catalog."
+                                    , "Accept the fix to generate the correct code with a view placeholder."
+                                    ]
+                                , under = "module Catalog.Components.Card exposing (..)"
+                                }
+                                |> Review.Test.whenFixed
+                                    ("""module Catalog.Components.Card exposing (CardBindings, CardProps, bindingsDecoder, component, propsDecoder)
+
+import Dict exposing (Dict)
+import Html exposing (Html)
+import Json.Encode exposing (Value)
+import JsonRender.Bind as Bind
+import JsonRender.Events exposing (EventHandle)
+import JsonRender.Render exposing (Component, ComponentContext, register)
+import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
+
+
+type alias CardProps =
+    { title : String
+    }
+
+
+type alias CardBindings msg =
+    { title : Maybe (String -> EventHandle msg)
+    }
+
+
+propsDecoder : Dict String ResolvedValue -> Result String CardProps
+propsDecoder =
+    ResolvedValue.succeed CardProps
+        |> ResolvedValue.required "title" ResolvedValue.string
+
+
+bindingsDecoder : Dict String (Value -> EventHandle msg) -> CardBindings msg
+bindingsDecoder =
+    Bind.succeed CardBindings
+        |> Bind.bindableTyped "title" Json.Encode.string
+
+
+component : Component msg
+component =
+    register propsDecoder bindingsDecoder view
+
+
+view : ComponentContext CardProps (CardBindings msg) msg -> Html msg
+view ctx =
+    ()
+""")
                             ]
                           )
                         ]

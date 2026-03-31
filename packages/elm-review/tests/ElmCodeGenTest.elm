@@ -19,6 +19,40 @@ cardSchema =
     }
 
 
+cardWithObjectSchema : ComponentSchema
+cardWithObjectSchema =
+    { fields =
+        Dict.fromList
+            [ ( "title", { fieldType = FString, required = True } )
+            , ( "meta"
+              , { fieldType =
+                    FObject
+                        (Dict.fromList
+                            [ ( "author", { fieldType = FString, required = True } )
+                            , ( "count", { fieldType = FInt, required = False } )
+                            ]
+                        )
+                , required = True
+                }
+              )
+            ]
+    , description = "A card with object field"
+    , slots = []
+    }
+
+
+badgeSchema : ComponentSchema
+badgeSchema =
+    { fields =
+        Dict.fromList
+            [ ( "label", { fieldType = FString, required = True } )
+            , ( "color", { fieldType = FEnum [ "green", "red", "blue" ], required = False } )
+            ]
+    , description = "A badge"
+    , slots = []
+    }
+
+
 exportAction : ActionSchema
 exportAction =
     { params =
@@ -107,8 +141,8 @@ suite =
                 in
                 Expect.all
                     [ \c -> String.contains "type alias CardBindings msg" c |> Expect.equal True
-                    , \c -> String.contains "subtitle : Maybe (Value -> EventHandle msg)" c |> Expect.equal True
-                    , \c -> String.contains "title : Maybe (Value -> EventHandle msg)" c |> Expect.equal True
+                    , \c -> String.contains "subtitle : Maybe (String -> EventHandle msg)" c |> Expect.equal True
+                    , \c -> String.contains "title : Maybe (String -> EventHandle msg)" c |> Expect.equal True
                     ]
                     code
         , test "generates bindings decoder" <|
@@ -119,8 +153,8 @@ suite =
                 in
                 Expect.all
                     [ \c -> String.contains "Bind.succeed CardBindings" c |> Expect.equal True
-                    , \c -> String.contains "|> Bind.bindable \"subtitle\"" c |> Expect.equal True
-                    , \c -> String.contains "|> Bind.bindable \"title\"" c |> Expect.equal True
+                    , \c -> String.contains "|> Bind.bindableTyped \"subtitle\" Json.Encode.string" c |> Expect.equal True
+                    , \c -> String.contains "|> Bind.bindableTyped \"title\" Json.Encode.string" c |> Expect.equal True
                     ]
                     code
         , test "component module includes bindings" <|
@@ -319,6 +353,90 @@ suite =
                     |> Expect.all
                         [ \c -> String.contains "case name of" c |> Expect.equal True
                         , \c -> String.contains "Err (\"Unknown action: \" ++ name)" c |> Expect.equal True
+                        ]
+        , test "component module with enum includes type declaration" <|
+            \_ ->
+                ElmCodeGen.componentModule "Catalog" "Badge" badgeSchema
+                    |> Expect.all
+                        [ \c -> String.contains "type GreenOrRedOrBlue\n    = Green\n    | Red\n    | Blue" c |> Expect.equal True
+                        , \c -> String.contains "greenOrRedOrBlueFromString" c |> Expect.equal True
+                        , \c -> String.contains "greenOrRedOrBlueToString" c |> Expect.equal True
+                        ]
+        , test "component module with enum has typed bindings" <|
+            \_ ->
+                ElmCodeGen.componentModule "Catalog" "Badge" badgeSchema
+                    |> Expect.all
+                        [ \c -> String.contains "color : Maybe (GreenOrRedOrBlue -> EventHandle msg)" c |> Expect.equal True
+                        , \c -> String.contains "label : Maybe (String -> EventHandle msg)" c |> Expect.equal True
+                        , \c -> String.contains "Bind.bindableTyped \"color\" (Json.Encode.string << greenOrRedOrBlueToString)" c |> Expect.equal True
+                        , \c -> String.contains "Bind.bindableTyped \"label\" Json.Encode.string" c |> Expect.equal True
+                        ]
+        , test "component module with enum exposes type with constructors" <|
+            \_ ->
+                ElmCodeGen.componentModule "Catalog" "Badge" badgeSchema
+                    |> String.contains "GreenOrRedOrBlue(..)"
+                    |> Expect.equal True
+        , test "component module enum props use composed extractor" <|
+            \_ ->
+                ElmCodeGen.componentModule "Catalog" "Badge" badgeSchema
+                    |> String.contains "Result.andThen greenOrRedOrBlueFromString"
+                    |> Expect.equal True
+        , test "component module without enums has no enum declarations" <|
+            \_ ->
+                ElmCodeGen.componentModule "Catalog" "Card" cardSchema
+                    |> String.contains "FromString"
+                    |> Expect.equal False
+        , test "component module with object field generates record type" <|
+            \_ ->
+                ElmCodeGen.componentModule "Catalog" "Card" cardWithObjectSchema
+                    |> Expect.all
+                        [ \c -> String.contains "type alias MetaObject" c |> Expect.equal True
+                        , \c -> String.contains "author : String" c |> Expect.equal True
+                        , \c -> String.contains "count : Maybe Int" c |> Expect.equal True
+                        , \c -> String.contains "meta : MetaObject" c |> Expect.equal True
+                        ]
+        , test "component module with object field generates decoder and encoder" <|
+            \_ ->
+                ElmCodeGen.componentModule "Catalog" "Card" cardWithObjectSchema
+                    |> Expect.all
+                        [ \c -> String.contains "metaObjectDecoder" c |> Expect.equal True
+                        , \c -> String.contains "metaObjectEncoder" c |> Expect.equal True
+                        , \c -> String.contains "ResolvedValue.object" c |> Expect.equal True
+                        , \c -> String.contains "Json.Encode.object" c |> Expect.equal True
+                        ]
+        , test "component module with object field has typed binding" <|
+            \_ ->
+                ElmCodeGen.componentModule "Catalog" "Card" cardWithObjectSchema
+                    |> Expect.all
+                        [ \c -> String.contains "meta : Maybe (MetaObject -> EventHandle msg)" c |> Expect.equal True
+                        , \c -> String.contains "Bind.bindableTyped \"meta\" metaObjectEncoder" c |> Expect.equal True
+                        ]
+        , test "component module with object field exposes type" <|
+            \_ ->
+                ElmCodeGen.componentModule "Catalog" "Card" cardWithObjectSchema
+                    |> String.contains "MetaObject"
+                    |> Expect.equal True
+        , test "actions module with enum params includes enum helpers with decoder" <|
+            \_ ->
+                let
+                    enumActions =
+                        Dict.fromList
+                            [ ( "setTheme"
+                              , { params =
+                                    Dict.fromList
+                                        [ ( "theme", { fieldType = FEnum [ "light", "dark" ], required = True } ) ]
+                                , description = "Set theme"
+                                }
+                              )
+                            ]
+                in
+                ElmCodeGen.actionsModule "Catalog" enumActions
+                    |> Expect.all
+                        [ \c -> String.contains "type LightOrDark\n    = Light\n    | Dark" c |> Expect.equal True
+                        , \c -> String.contains "lightOrDarkFromString" c |> Expect.equal True
+                        , \c -> String.contains "lightOrDarkToString" c |> Expect.equal True
+                        , \c -> String.contains "lightOrDarkDecoder" c |> Expect.equal True
+                        , \c -> String.contains "LightOrDark(..)" c |> Expect.equal True
                         ]
         , test "actions module with only empty-param actions has no params type aliases" <|
             \_ ->

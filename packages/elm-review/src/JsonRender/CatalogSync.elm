@@ -55,6 +55,7 @@ type alias ModuleContext =
     , moduleKey : Rule.ModuleKey
     , moduleRange : Maybe Range
     , hasPropsDecoder : Bool
+    , extractSourceCode : Range -> String
     }
 
 
@@ -98,7 +99,7 @@ moduleVisitor schema =
 fromProjectToModule : Maybe CatalogSchema -> Config -> Rule.ContextCreator ProjectContext ModuleContext
 fromProjectToModule catalog config =
     Rule.initContextCreator
-        (\moduleKey moduleName _ ->
+        (\moduleKey moduleName extractSourceCode _ ->
             let
                 moduleStr =
                     String.join "." (Node.value moduleName)
@@ -137,10 +138,12 @@ fromProjectToModule catalog config =
             , moduleKey = moduleKey
             , moduleRange = Nothing
             , hasPropsDecoder = False
+            , extractSourceCode = extractSourceCode
             }
         )
         |> Rule.withModuleKey
         |> Rule.withModuleNameNode
+        |> Rule.withSourceCodeExtractor
 
 
 fromModuleToProject : Rule.ContextCreator ModuleContext ProjectContext
@@ -357,46 +360,98 @@ declarationListVisitor declarations context =
                 case context.isComponentModule of
                     Just componentName ->
                         let
-                            hasDecoder =
-                                List.any (hasFunction "propsDecoder") declarations
-
                             errors =
-                                if hasDecoder then
-                                    []
-
-                                else
-                                    case ( context.moduleRange, Dict.get componentName catalog.components ) of
-                                        ( Just range, Just schema ) ->
-                                            let
-                                                fullRange =
-                                                    { start = range.start
-                                                    , end = lastDeclarationEnd declarations range
-                                                    }
-
-                                                generatedCode =
-                                                    ElmCodeGen.componentModule
-                                                        context.config.catalogNamespace
-                                                        componentName
-                                                        schema
-                                            in
-                                            [ Rule.errorWithFix
-                                                { message = componentName ++ " component is missing propsDecoder"
-                                                , details =
-                                                    [ "This module should contain a propsDecoder and component definition matching the catalog."
-                                                    , "Accept the fix to generate the correct types, decoder, and a view placeholder."
-                                                    ]
+                                case ( context.moduleRange, Dict.get componentName catalog.components ) of
+                                    ( Just range, Just schema ) ->
+                                        let
+                                            fullRange =
+                                                { start = range.start
+                                                , end = lastDeclarationEnd declarations range
                                                 }
-                                                range
-                                                [ Fix.replaceRangeBy fullRange generatedCode ]
-                                            ]
 
-                                        _ ->
-                                            []
+                                            expectedScaffold =
+                                                ElmCodeGen.componentScaffold
+                                                    context.config.catalogNamespace
+                                                    componentName
+                                                    schema
+
+                                            viewRange =
+                                                findFunctionRange "view" declarations
+                                        in
+                                        case viewRange of
+                                            Nothing ->
+                                                -- No view function: generate full module (new stub)
+                                                [ Rule.errorWithFix
+                                                    { message = componentName ++ " component is missing view function"
+                                                    , details =
+                                                        [ "This module should contain types, decoders, and a view function matching the catalog."
+                                                        , "Accept the fix to generate the correct code with a view placeholder."
+                                                        ]
+                                                    }
+                                                    range
+                                                    [ Fix.replaceRangeBy fullRange
+                                                        (ElmCodeGen.componentModule
+                                                            context.config.catalogNamespace
+                                                            componentName
+                                                            schema
+                                                        )
+                                                    ]
+                                                ]
+
+                                            Just vRange ->
+                                                let
+                                                    scaffoldRange =
+                                                        { start = range.start
+                                                        , end = vRange.start
+                                                        }
+
+                                                    currentScaffold =
+                                                        context.extractSourceCode scaffoldRange
+
+                                                    expectedWithTrailing =
+                                                        expectedScaffold ++ "\n\n\n"
+                                                in
+                                                if String.trim currentScaffold == String.trim expectedWithTrailing then
+                                                    []
+
+                                                else
+                                                    [ Rule.errorWithFix
+                                                        { message = componentName ++ " component types are out of sync with the catalog"
+                                                        , details =
+                                                            [ "The generated types and decoders in this module don't match the catalog schema."
+                                                            , "Accept the fix to regenerate them. Your view function will be preserved."
+                                                            ]
+                                                        }
+                                                        range
+                                                        [ Fix.replaceRangeBy scaffoldRange expectedWithTrailing ]
+                                                    ]
+
+                                    _ ->
+                                        []
                         in
                         ( errors, context )
 
                     Nothing ->
                         ( [], context )
+
+
+findFunctionRange : String -> List (Node Declaration) -> Maybe Range
+findFunctionRange name declarations =
+    List.filterMap
+        (\(Node range decl) ->
+            case decl of
+                Declaration.FunctionDeclaration func ->
+                    if Node.value (Node.value func.declaration).name == name then
+                        Just range
+
+                    else
+                        Nothing
+
+                _ ->
+                    Nothing
+        )
+        declarations
+        |> List.head
 
 
 hasFunction : String -> Node Declaration -> Bool

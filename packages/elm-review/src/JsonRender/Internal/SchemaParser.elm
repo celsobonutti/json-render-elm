@@ -131,7 +131,7 @@ fieldTypeDecoder =
                             |> Decode.map FList
 
                     else if t == "object" then
-                        Decode.field "properties" (Decode.lazy (\_ -> propsObjectDecoder))
+                        Decode.lazy (\_ -> propsObjectDecoder)
                             |> Decode.map FObject
 
                     else
