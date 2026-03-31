@@ -385,28 +385,17 @@ handleActionFunction =
         ++ "    ()\n"
 
 
-actionConfigFunction : String -> Bool -> String
-actionConfigFunction namespace hasFunctions =
-    let
-        functionsExpr =
-            if hasFunctions then
-                namespace ++ ".Functions.toFunctionDict " ++ namespace ++ ".Functions.functions"
-
-            else
-                "Dict.empty"
-    in
+actionConfigFunction : String
+actionConfigFunction =
     "actionConfig : Actions.ActionConfig Action\n"
         ++ "actionConfig =\n"
         ++ "    { handleAction = handleAction\n"
         ++ "    , decodeAction = decodeAction\n"
-        ++ "    , functions = "
-        ++ functionsExpr
-        ++ "\n"
         ++ "    }\n"
 
 
-actionsModule : String -> Dict String ActionSchema -> Bool -> String
-actionsModule namespace actions hasFunctions =
+actionsModule : String -> Dict String ActionSchema -> String
+actionsModule namespace actions =
     let
         paramsTypes =
             Dict.toList actions
@@ -428,19 +417,11 @@ actionsModule namespace actions hasFunctions =
                 _ ->
                     String.join "\n\n\n" paramsTypes ++ "\n\n\n"
 
-        functionsImport =
-            if hasFunctions then
-                "import " ++ namespace ++ ".Functions\n"
-
-            else
-                ""
-
         imports =
             "import Dict exposing (Dict)\n"
                 ++ "import Json.Decode as Decode\n"
                 ++ "import Json.Encode exposing (Value)\n"
                 ++ "import JsonRender.Actions as Actions\n"
-                ++ functionsImport
     in
     "module "
         ++ namespace
@@ -454,7 +435,7 @@ actionsModule namespace actions hasFunctions =
         ++ "\n\n\n"
         ++ handleActionFunction
         ++ "\n\n"
-        ++ actionConfigFunction namespace hasFunctions
+        ++ actionConfigFunction
 
 
 functionsModule : String -> Dict String SchemaParser.FunctionSchema -> String

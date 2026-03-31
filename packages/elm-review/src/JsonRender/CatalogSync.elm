@@ -303,7 +303,6 @@ declarationListVisitor declarations context =
                                             ElmCodeGen.actionsModule
                                                 context.config.componentsNamespace
                                                 catalog.actions
-                                                (not (Dict.isEmpty catalog.functions))
                                     in
                                     [ Rule.errorWithFix
                                         { message = errorMessage
