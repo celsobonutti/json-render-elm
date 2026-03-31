@@ -20,7 +20,7 @@ baseConfig =
 suite : Test
 suite =
     describe "CatalogSync rule"
-        [ test "reports missing component module, registry, and actions" <|
+        [ test "reports all missing modules in a single error" <|
             \_ ->
                 """module Main exposing (..)
 import Html
@@ -28,29 +28,15 @@ main = Html.text "hello"
 """
                     |> Review.Test.run (CatalogSync.rule baseConfig)
                     |> Review.Test.expectGlobalErrors
-                        [ { message = "Missing component modules: Card"
+                        [ { message = "Missing modules: Card, Registry, Actions"
                           , details =
-                                [ "Create these files: src/Components/Card.elm"
-                                , "Quick stub command:\n\nmkdir -p src/Components && \\\n  echo 'module Components.Card exposing (..)' > src/Components/Card.elm"
+                                [ "Create these files: src/Components/Card.elm, src/Components/Registry.elm, src/Components/Actions.elm"
+                                , "Quick stub command:\n\nmkdir -p src/Components && \\\n  echo 'module Components.Card exposing (..)' > src/Components/Card.elm && \\\n  echo 'module Components.Registry exposing (..)' > src/Components/Registry.elm && \\\n  echo 'module Components.Actions exposing (..)' > src/Components/Actions.elm"
                                 , "Then run elm-review --fix to fill them in."
                                 ]
                           }
-                        , { message = "Missing registry module: Components.Registry"
-                          , details =
-                                [ "Create: src/Components/Registry.elm"
-                                , "Quick stub: echo 'module Components.Registry exposing (..)' > src/Components/Registry.elm"
-                                , "Then run elm-review --fix to fill it in."
-                                ]
-                          }
-                        , { message = "Missing actions module: Components.Actions"
-                          , details =
-                                [ "The catalog defines actions but no Components.Actions module exists."
-                                , "Quick stub:\n\nmkdir -p src/Components && echo 'module Components.Actions exposing (..)' > src/Components/Actions.elm"
-                                , "Then run elm-review --fix to fill it in."
-                                ]
-                          }
                         ]
-        , test "reports missing registry and actions modules" <|
+        , test "reports missing registry and actions in a single error" <|
             \_ ->
                 [ """module Components.Card exposing (..)
 type alias CardProps = { title : String }
@@ -61,18 +47,11 @@ view ctx = ()
                 ]
                     |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
                     |> Review.Test.expectGlobalErrors
-                        [ { message = "Missing registry module: Components.Registry"
+                        [ { message = "Missing modules: Registry, Actions"
                           , details =
-                                [ "Create: src/Components/Registry.elm"
-                                , "Quick stub: echo 'module Components.Registry exposing (..)' > src/Components/Registry.elm"
-                                , "Then run elm-review --fix to fill it in."
-                                ]
-                          }
-                        , { message = "Missing actions module: Components.Actions"
-                          , details =
-                                [ "The catalog defines actions but no Components.Actions module exists."
-                                , "Quick stub:\n\nmkdir -p src/Components && echo 'module Components.Actions exposing (..)' > src/Components/Actions.elm"
-                                , "Then run elm-review --fix to fill it in."
+                                [ "Create these files: src/Components/Registry.elm, src/Components/Actions.elm"
+                                , "Quick stub command:\n\nmkdir -p src/Components && \\\n  echo 'module Components.Registry exposing (..)' > src/Components/Registry.elm && \\\n  echo 'module Components.Actions exposing (..)' > src/Components/Actions.elm"
+                                , "Then run elm-review --fix to fill them in."
                                 ]
                           }
                         ]
@@ -173,11 +152,11 @@ registry = Dict.fromList [ ( "Card", Components.Card.component ) ]
                 ]
                     |> Review.Test.runOnModules (CatalogSync.rule baseConfig)
                     |> Review.Test.expectGlobalErrors
-                        [ { message = "Missing actions module: Components.Actions"
+                        [ { message = "Missing modules: Actions"
                           , details =
-                                [ "The catalog defines actions but no Components.Actions module exists."
-                                , "Quick stub:\n\nmkdir -p src/Components && echo 'module Components.Actions exposing (..)' > src/Components/Actions.elm"
-                                , "Then run elm-review --fix to fill it in."
+                                [ "Create these files: src/Components/Actions.elm"
+                                , "Quick stub command:\n\nmkdir -p src/Components && \\\n  echo 'module Components.Actions exposing (..)' > src/Components/Actions.elm"
+                                , "Then run elm-review --fix to fill them in."
                                 ]
                           }
                         ]

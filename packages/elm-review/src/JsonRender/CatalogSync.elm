@@ -523,109 +523,69 @@ finalEvaluation config projectCtx =
 
         Just catalog ->
             let
-                missingModules =
+                nsPath =
+                    String.replace "." "/" config.componentsNamespace
+
+                missingComponents =
                     Dict.keys catalog.components
                         |> List.filter (\name -> not (Set.member name projectCtx.seenModules))
                         |> List.sort
 
-                missingModuleError =
-                    if List.isEmpty missingModules then
+                missingInfra =
+                    (if not projectCtx.registrySeen then
+                        [ "Registry" ]
+
+                     else
                         []
+                    )
+                        ++ (if not projectCtx.actionsSeen && not (Dict.isEmpty catalog.actions) then
+                                [ "Actions" ]
 
-                    else
-                        let
-                            fileList =
-                                missingModules
-                                    |> List.map
-                                        (\name ->
-                                            "src/"
-                                                ++ String.replace "." "/" config.componentsNamespace
-                                                ++ "/"
-                                                ++ name
-                                                ++ ".elm"
-                                        )
-                                    |> String.join ", "
+                            else
+                                []
+                           )
+                        ++ (if not projectCtx.functionsSeen && not (Dict.isEmpty catalog.functions) then
+                                [ "Functions" ]
 
-                            nsPath =
-                                String.replace "." "/" config.componentsNamespace
+                            else
+                                []
+                           )
 
-                            stubHint =
-                                missingModules
-                                    |> List.map
-                                        (\name ->
-                                            "  echo 'module "
-                                                ++ config.componentsNamespace
-                                                ++ "."
-                                                ++ name
-                                                ++ " exposing (..)' > src/"
-                                                ++ nsPath
-                                                ++ "/"
-                                                ++ name
-                                                ++ ".elm"
-                                        )
-                                    |> String.join " && \\\n"
-                        in
-                        [ Rule.globalError
-                            { message = "Missing component modules: " ++ String.join ", " missingModules
-                            , details =
-                                [ "Create these files: " ++ fileList
-                                , "Quick stub command:\n\nmkdir -p src/" ++ nsPath ++ " && \\\n" ++ stubHint
-                                , "Then run elm-review --fix to fill them in."
-                                ]
-                            }
-                        ]
-
-                missingRegistryError =
-                    if not projectCtx.registrySeen then
-                        [ Rule.globalError
-                            { message = "Missing registry module: " ++ config.componentsNamespace ++ ".Registry"
-                            , details =
-                                [ "Create: src/" ++ String.replace "." "/" config.componentsNamespace ++ "/Registry.elm"
-                                , "Quick stub: echo 'module " ++ config.componentsNamespace ++ ".Registry exposing (..)' > src/" ++ String.replace "." "/" config.componentsNamespace ++ "/Registry.elm"
-                                , "Then run elm-review --fix to fill it in."
-                                ]
-                            }
-                        ]
-
-                    else
-                        []
-
-                missingActionsError =
-                    if not projectCtx.actionsSeen && not (Dict.isEmpty catalog.actions) then
-                        let
-                            nsPath =
-                                String.replace "." "/" config.componentsNamespace
-                        in
-                        [ Rule.globalError
-                            { message = "Missing actions module: " ++ config.componentsNamespace ++ ".Actions"
-                            , details =
-                                [ "The catalog defines actions but no " ++ config.componentsNamespace ++ ".Actions module exists."
-                                , "Quick stub:\n\nmkdir -p src/" ++ nsPath ++ " && echo 'module " ++ config.componentsNamespace ++ ".Actions exposing (..)' > src/" ++ nsPath ++ "/Actions.elm"
-                                , "Then run elm-review --fix to fill it in."
-                                ]
-                            }
-                        ]
-
-                    else
-                        []
-
-                missingFunctionsError =
-                    if not projectCtx.functionsSeen && not (Dict.isEmpty catalog.functions) then
-                        let
-                            nsPath =
-                                String.replace "." "/" config.componentsNamespace
-                        in
-                        [ Rule.globalError
-                            { message = "Missing functions module: " ++ config.componentsNamespace ++ ".Functions"
-                            , details =
-                                [ "The catalog defines functions but no " ++ config.componentsNamespace ++ ".Functions module exists."
-                                , "Quick stub:\n\nmkdir -p src/" ++ nsPath ++ " && echo 'module " ++ config.componentsNamespace ++ ".Functions exposing (..)' > src/" ++ nsPath ++ "/Functions.elm"
-                                , "Then run elm-review --fix to fill it in."
-                                ]
-                            }
-                        ]
-
-                    else
-                        []
+                allMissing =
+                    missingComponents ++ missingInfra
             in
-            missingModuleError ++ missingRegistryError ++ missingActionsError ++ missingFunctionsError
+            if List.isEmpty allMissing then
+                []
+
+            else
+                let
+                    stubCommand =
+                        allMissing
+                            |> List.map
+                                (\name ->
+                                    "echo 'module "
+                                        ++ config.componentsNamespace
+                                        ++ "."
+                                        ++ name
+                                        ++ " exposing (..)' > src/"
+                                        ++ nsPath
+                                        ++ "/"
+                                        ++ name
+                                        ++ ".elm"
+                                )
+                            |> String.join " && \\\n  "
+
+                    fileList =
+                        allMissing
+                            |> List.map (\name -> "src/" ++ nsPath ++ "/" ++ name ++ ".elm")
+                            |> String.join ", "
+                in
+                [ Rule.globalError
+                    { message = "Missing modules: " ++ String.join ", " allMissing
+                    , details =
+                        [ "Create these files: " ++ fileList
+                        , "Quick stub command:\n\nmkdir -p src/" ++ nsPath ++ " && \\\n  " ++ stubCommand
+                        , "Then run elm-review --fix to fill them in."
+                        ]
+                    }
+                ]
