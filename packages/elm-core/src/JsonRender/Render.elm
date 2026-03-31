@@ -18,9 +18,10 @@ import Html.Keyed
 import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions exposing (Msg(..))
+import JsonRender.Internal.EventHandle as EventHandle exposing (EventHandle)
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext, ResolvedValue)
-import JsonRender.Spec exposing (Element, EventHandler, Repeat, Spec)
+import JsonRender.Spec exposing (Element, EventHandler, Repeat, Spec, shouldPreventDefault)
 import JsonRender.State as State
 import JsonRender.Visibility as Visibility
 
@@ -29,15 +30,15 @@ type alias ComponentContext props bindings msg =
     { props : props
     , bindings : bindings
     , children : List (Html msg)
-    , emit : String -> msg
+    , emit : String -> EventHandle msg
     }
 
 
 type alias RawComponentContext msg =
     { props : Dict String ResolvedValue
-    , bindings : Dict String (Value -> msg)
+    , bindings : Dict String (Value -> EventHandle msg)
     , children : List (Html msg)
-    , emit : String -> msg
+    , emit : String -> EventHandle msg
     }
 
 
@@ -53,7 +54,7 @@ type alias Registry msg =
 
 register :
     (Dict String ResolvedValue -> Result String props)
-    -> (Dict String (Value -> msg) -> bindings)
+    -> (Dict String (Value -> EventHandle msg) -> bindings)
     -> (ComponentContext props bindings msg -> Html msg)
     -> Component msg
 register propsDecoder bindingsDecoder view =
@@ -81,13 +82,13 @@ register propsDecoder bindingsDecoder view =
         )
 
 
-extractBindings : Maybe RepeatContext -> Dict String PropValue -> Dict String (Value -> Msg action)
+extractBindings : Maybe RepeatContext -> Dict String PropValue -> Dict String (Value -> EventHandle (Msg action))
 extractBindings repeatCtx props =
     Dict.foldl
         (\key propValue acc ->
             case propValue of
                 BindStateExpr path ->
-                    Dict.insert key (\val -> BindingUpdate path val) acc
+                    Dict.insert key (\val -> EventHandle.fromMsg (BindingUpdate path val)) acc
 
                 BindItemExpr field ->
                     case repeatCtx of
@@ -100,7 +101,7 @@ extractBindings repeatCtx props =
                                     else
                                         ctx.basePath ++ "/" ++ field
                             in
-                            Dict.insert key (\val -> BindingUpdate path val) acc
+                            Dict.insert key (\val -> EventHandle.fromMsg (BindingUpdate path val)) acc
 
                         Nothing ->
                             acc
@@ -115,14 +116,16 @@ extractBindings repeatCtx props =
 {-| Build an emit function from an element's `on` dict and the current repeat context.
 Looks up the event name in the `on` dict and produces the appropriate Msg.
 -}
-buildEmit : Dict String EventHandler -> Maybe RepeatContext -> String -> Msg action
+buildEmit : Dict String EventHandler -> Maybe RepeatContext -> String -> EventHandle (Msg action)
 buildEmit onHandlers repeatCtx eventName =
     case Dict.get eventName onHandlers of
         Just handler ->
-            ExecuteAction handler repeatCtx
+            EventHandle.withPreventDefault
+                (shouldPreventDefault handler)
+                (ExecuteAction handler repeatCtx)
 
         Nothing ->
-            ActionError ("No handler for event: " ++ eventName)
+            EventHandle.fromMsg (ActionError ("No handler for event: " ++ eventName))
 
 
 renderChildren : Registry (Msg action) -> Value -> Maybe RepeatContext -> Spec -> List String -> List (Html (Msg action))
