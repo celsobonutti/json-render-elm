@@ -100,6 +100,9 @@ export const schema = defineSchema(
       // Expression support
       'Dynamic props: use { "$state": "/path" } to read from state, { "$bindState": "/path" } for two-way binding (read and write), { "$item": "field" } in repeat contexts, { "$index": true } for loop index, { "$template": "Hello ${/name}" } for string interpolation, { "$computed": "funcName", "args": { "argName": <expression> } } for computed values from registered functions.',
 
+      // Props integrity
+      "Every prop listed WITHOUT a `?` suffix is REQUIRED and must always be provided — even inside repeat contexts. Omitting a required prop causes a visible error.",
+
       // Design quality
       "Design with visual hierarchy: use container components to group content, proper spacing, and status indicators. ONLY use components from the AVAILABLE COMPONENTS list.",
       "Always include realistic, professional-looking sample data. Never leave data empty.",
