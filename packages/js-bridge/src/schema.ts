@@ -95,6 +95,7 @@ export const schema = defineSchema(
       'The "visible" field goes on the ELEMENT object, NOT inside "props". Correct: {"type":"Card","props":{},"visible":{"$state":"/show"},"children":[...]}.',
       'Visibility conditions: sources are { "$state": "/path" }, { "$item": "field" } (in repeat), or { "$index": true } (in repeat). Operators: "eq", "neq" (any value), "gt", "gte", "lt", "lte" (numeric). Right-hand side can be a literal or { "$state": "/otherPath" }. Invert with "not": true. Combine with { "$and": [...] }, { "$or": [...] }, or an array (implicit AND). Boolean true/false for always/never.',
       'The "on" field goes on the ELEMENT object, NOT inside "props". Use it to bind events to actions: {"on":{"press":{"action":"setState","params":{"path":"/clicked","value":true}}}}. Chain multiple actions with an array: {"on":{"press":[{"action":"setState",...},{"action":"myAction",...}]}}.',
+      'Add "preventDefault": true to an action binding to prevent default browser behavior (e.g., form submission page reload). Example: {"on":{"press":{"action":"setState","params":{...},"preventDefault":true}}}.',
       'The "watch" field goes on the ELEMENT object. It maps state paths to actions that fire when the value at that path changes (not on initial render). Same format as "on" actions: {"watch":{"/form/country":{"action":"setState","params":{"path":"/form/city","value":""}}}}. Use for cascading updates and derived state.',
 
       // Expression support
