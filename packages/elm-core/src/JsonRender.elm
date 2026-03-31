@@ -15,6 +15,15 @@ module JsonRender exposing
 Use `create` to wire a `Registry` and `ActionConfig` into ready-to-use
 `update` and `render` functions with zero boilerplate.
 
+For types, import the specific modules:
+
+  - `JsonRender.Spec` for `Spec`, `Element`
+  - `JsonRender.Internal.PropValue` for `PropValue(..)`
+  - `JsonRender.Resolve` for `ResolvedValue(..)`
+  - `JsonRender.Render` for `Component`, `Registry`, `ComponentContext`
+  - `JsonRender.Actions` for `Msg(..)`, `ActionConfig`
+  - `JsonRender.Bind` for binding combinators
+
 -}
 
 import Dict exposing (Dict)
@@ -28,10 +37,14 @@ import JsonRender.Spec as Spec exposing (Spec)
 import Random
 
 
+{-| The json-render model. Store this in your application model.
+-}
 type alias Model =
     Actions.Model
 
 
+{-| Configuration for `create`.
+-}
 type alias Config action model msg =
     { actionConfig : Actions.ActionConfig action
     , registry : Registry (Msg action)
@@ -41,12 +54,16 @@ type alias Config action model msg =
     }
 
 
+{-| The wired-up update and render functions returned by `create`.
+-}
 type alias App action model msg =
     { update : Msg action -> model -> ( model, Cmd msg )
     , render : model -> Html msg
     }
 
 
+{-| Create an empty json-render model.
+-}
 init : Random.Seed -> Model
 init seed =
     { spec = Nothing
@@ -55,6 +72,8 @@ init seed =
     }
 
 
+{-| Decode and apply an incoming spec to the model.
+-}
 receiveSpec : Value -> Model -> Result String Model
 receiveSpec val model =
     case Decode.decodeValue Spec.decoder val of
@@ -69,6 +88,8 @@ receiveSpec val model =
             Err (Decode.errorToString err)
 
 
+{-| Wire a Registry and ActionConfig into ready-to-use update and render functions.
+-}
 create : Config action model msg -> App action model msg
 create config =
     let
@@ -97,11 +118,15 @@ create config =
     }
 
 
+{-| Render a spec to Html using the given registry and state.
+-}
 render : Registry (Msg action) -> Value -> Spec -> Html (Msg action)
 render =
     Render.render
 
 
+{-| Register a component with a props decoder, bindings decoder, and view function.
+-}
 register :
     (Dict String ResolvedValue -> Result String props)
     -> (Dict String (Value -> Msg action) -> bindings)
@@ -111,6 +136,8 @@ register =
     Render.register
 
 
+{-| Decoder for json-render specs.
+-}
 specDecoder : Decoder Spec
 specDecoder =
     Spec.decoder
