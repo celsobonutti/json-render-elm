@@ -19,6 +19,8 @@ import JsonRender.Resolve as Resolve exposing (RepeatContext)
 import JsonRender.Spec exposing (ActionBinding, EventHandler(..), Spec)
 import JsonRender.State as State
 import Random
+import Recursion
+import Recursion.Fold
 import UUID
 
 
@@ -110,6 +112,11 @@ Each "$id" gets a different UUID; the seed threads through.
 -}
 substituteIds : Random.Seed -> Value -> ( Value, Random.Seed )
 substituteIds seed value =
+    Recursion.runRecursion substituteIdsStep ( seed, value )
+
+
+substituteIdsStep : ( Random.Seed, Value ) -> Recursion.Rec ( Random.Seed, Value ) ( Value, Random.Seed ) ( Value, Random.Seed )
+substituteIdsStep ( seed, value ) =
     case Decode.decodeValue Decode.string value of
         Ok str ->
             if str == "$id" then
@@ -117,49 +124,45 @@ substituteIds seed value =
                     ( uuid, newSeed ) =
                         Random.step UUID.generator seed
                 in
-                ( Json.Encode.string (UUID.toString uuid), newSeed )
+                Recursion.base ( Json.Encode.string (UUID.toString uuid), newSeed )
 
             else
-                ( value, seed )
+                Recursion.base ( value, seed )
 
         Err _ ->
             case Decode.decodeValue (Decode.keyValuePairs Decode.value) value of
                 Ok pairs ->
-                    let
-                        ( newPairs, newSeed ) =
-                            List.foldl
-                                (\( key, val ) ( accPairs, accSeed ) ->
-                                    let
-                                        ( newVal, nextSeed ) =
-                                            substituteIds accSeed val
-                                    in
-                                    ( ( key, newVal ) :: accPairs, nextSeed )
-                                )
-                                ( [], seed )
-                                pairs
-                    in
-                    ( Json.Encode.object (List.reverse newPairs), newSeed )
+                    Recursion.Fold.foldMapList
+                        (\( key, val ) ( accPairs, accSeed ) ->
+                            Recursion.recurseThen ( accSeed, val ) <|
+                                \( newVal, newSeed ) ->
+                                    Recursion.base ( ( key, newVal ) :: accPairs, newSeed )
+                        )
+                        ( [], seed )
+                        pairs
+                        |> Recursion.map
+                            (\( processedPairs, finalSeed ) ->
+                                ( Json.Encode.object (List.reverse processedPairs), finalSeed )
+                            )
 
                 Err _ ->
                     case Decode.decodeValue (Decode.list Decode.value) value of
                         Ok items ->
-                            let
-                                ( newItems, newSeed ) =
-                                    List.foldl
-                                        (\item ( accItems, accSeed ) ->
-                                            let
-                                                ( newItem, nextSeed ) =
-                                                    substituteIds accSeed item
-                                            in
-                                            ( newItem :: accItems, nextSeed )
-                                        )
-                                        ( [], seed )
-                                        items
-                            in
-                            ( Json.Encode.list identity (List.reverse newItems), newSeed )
+                            Recursion.Fold.foldMapList
+                                (\item ( accItems, accSeed ) ->
+                                    Recursion.recurseThen ( accSeed, item ) <|
+                                        \( newItem, newSeed ) ->
+                                            Recursion.base ( newItem :: accItems, newSeed )
+                                )
+                                ( [], seed )
+                                items
+                                |> Recursion.map
+                                    (\( processedItems, finalSeed ) ->
+                                        ( Json.Encode.list identity (List.reverse processedItems), finalSeed )
+                                    )
 
                         Err _ ->
-                            ( value, seed )
+                            Recursion.base ( value, seed )
 
 
 {-| Resolve an ActionBinding into a typed ResolvedAction.

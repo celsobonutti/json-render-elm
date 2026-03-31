@@ -45,6 +45,8 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Internal.PropValue as PropValue exposing (PropValue(..))
 import JsonRender.State as State
+import Recursion
+import Recursion.Fold
 
 
 type VisibilityCondition
@@ -83,50 +85,49 @@ type alias RepeatContext =
 
 
 evaluate : Value -> Maybe RepeatContext -> VisibilityCondition -> Result String Bool
-evaluate state repeatCtx condition =
-    case condition of
-        Compare source operator ->
-            let
-                maybeLhs =
-                    resolveSource state repeatCtx source
-            in
-            applyOperator state operator maybeLhs
+evaluate state repeatCtx =
+    Recursion.runRecursion <|
+        \condition ->
+            case condition of
+                Compare source operator ->
+                    Recursion.base (applyOperator state operator (resolveSource state repeatCtx source))
 
-        Not inner ->
-            evaluate state repeatCtx inner
-                |> Result.map not
+                Not inner ->
+                    Recursion.recurseThen inner <|
+                        \result ->
+                            Recursion.base (Result.map not result)
 
-        And conditions ->
-            List.foldl
-                (\c acc ->
-                    case acc of
-                        Err err ->
-                            Err err
+                And conditions ->
+                    Recursion.Fold.foldMapList
+                        (\c acc ->
+                            case acc of
+                                Err _ ->
+                                    Recursion.base acc
 
-                        Ok True ->
-                            evaluate state repeatCtx c
+                                Ok False ->
+                                    Recursion.base acc
 
-                        Ok False ->
-                            Ok False
-                )
-                (Ok True)
-                conditions
+                                Ok True ->
+                                    Recursion.recurse c
+                        )
+                        (Ok True)
+                        conditions
 
-        Or conditions ->
-            List.foldl
-                (\c acc ->
-                    case acc of
-                        Err err ->
-                            Err err
+                Or conditions ->
+                    Recursion.Fold.foldMapList
+                        (\c acc ->
+                            case acc of
+                                Err _ ->
+                                    Recursion.base acc
 
-                        Ok True ->
-                            Ok True
+                                Ok True ->
+                                    Recursion.base acc
 
-                        Ok False ->
-                            evaluate state repeatCtx c
-                )
-                (Ok False)
-                conditions
+                                Ok False ->
+                                    Recursion.recurse c
+                        )
+                        (Ok False)
+                        conditions
 
 
 resolveSource : Value -> Maybe RepeatContext -> Source -> Maybe Value

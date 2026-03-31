@@ -25,6 +25,8 @@ import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.State as State
+import Recursion
+import Recursion.Traverse
 
 
 type ResolvedValue
@@ -66,34 +68,35 @@ resolveProps =
 {-| Convert a ResolvedValue back to a JSON Value. Inverse of jsonValueToResolved.
 -}
 resolvedToValue : ResolvedValue -> Value
-resolvedToValue resolved =
-    case resolved of
-        RString s ->
-            Encode.string s
+resolvedToValue =
+    Recursion.runRecursion <|
+        \resolved ->
+            case resolved of
+                RString s ->
+                    Recursion.base (Encode.string s)
 
-        RInt i ->
-            Encode.int i
+                RInt i ->
+                    Recursion.base (Encode.int i)
 
-        RFloat f ->
-            Encode.float f
+                RFloat f ->
+                    Recursion.base (Encode.float f)
 
-        RBool b ->
-            Encode.bool b
+                RBool b ->
+                    Recursion.base (Encode.bool b)
 
-        RNull ->
-            Encode.null
+                RNull ->
+                    Recursion.base Encode.null
 
-        RList items ->
-            Encode.list resolvedToValue items
+                RError err ->
+                    Recursion.base (Encode.string ("ERROR: " ++ err))
 
-        RObject obj ->
-            obj
-                |> Dict.toList
-                |> List.map (\( k, v ) -> ( k, resolvedToValue v ))
-                |> Encode.object
+                RList items ->
+                    Recursion.Traverse.sequenceList items
+                        |> Recursion.map (Encode.list identity)
 
-        RError err ->
-            Encode.string ("ERROR: " ++ err)
+                RObject obj ->
+                    Recursion.Traverse.sequenceDict obj
+                        |> Recursion.map (Dict.toList >> Encode.object)
 
 
 {-| Resolve action params: resolve each PropValue to a JSON Value.
@@ -155,111 +158,111 @@ resolvePropValue =
 
 
 resolvePropValueWith : FunctionDict -> Value -> Maybe RepeatContext -> PropValue -> ResolvedValue
-resolvePropValueWith functions state repeatCtx prop =
-    case prop of
-        StringValue s ->
-            RString s
+resolvePropValueWith functions state repeatCtx =
+    Recursion.runRecursion <|
+        \prop ->
+            case prop of
+                StringValue s ->
+                    Recursion.base (RString s)
 
-        IntValue i ->
-            RInt i
+                IntValue i ->
+                    Recursion.base (RInt i)
 
-        FloatValue f ->
-            RFloat f
+                FloatValue f ->
+                    Recursion.base (RFloat f)
 
-        BoolValue b ->
-            RBool b
+                BoolValue b ->
+                    Recursion.base (RBool b)
 
-        NullValue ->
-            RNull
+                NullValue ->
+                    Recursion.base RNull
 
-        ListValue items ->
-            RList (List.map (resolvePropValueWith functions state repeatCtx) items)
+                ListValue items ->
+                    Recursion.Traverse.sequenceList items
+                        |> Recursion.map RList
 
-        ObjectValue obj ->
-            RObject (Dict.map (\_ v -> resolvePropValueWith functions state repeatCtx v) obj)
+                ObjectValue obj ->
+                    Recursion.Traverse.sequenceDict obj
+                        |> Recursion.map RObject
 
-        StateExpr path ->
-            jsonValueToResolved (State.get path state |> Maybe.withDefault Encode.null)
+                StateExpr path ->
+                    Recursion.base (jsonValueToResolved (State.get path state |> Maybe.withDefault Encode.null))
 
-        ItemExpr field ->
-            case repeatCtx of
-                Just ctx ->
-                    if field == "" then
-                        jsonValueToResolved ctx.item
+                ItemExpr field ->
+                    case repeatCtx of
+                        Just ctx ->
+                            if field == "" then
+                                Recursion.base (jsonValueToResolved ctx.item)
 
-                    else
-                        case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
-                            Ok val ->
-                                jsonValueToResolved val
+                            else
+                                case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
+                                    Ok val ->
+                                        Recursion.base (jsonValueToResolved val)
 
-                            Err _ ->
-                                RNull
-
-                Nothing ->
-                    RNull
-
-        IndexExpr ->
-            case repeatCtx of
-                Just ctx ->
-                    RInt ctx.index
-
-                Nothing ->
-                    RInt 0
-
-        TemplateExpr template ->
-            RString (resolveTemplate state template)
-
-        BindStateExpr path ->
-            jsonValueToResolved (State.get path state |> Maybe.withDefault Encode.null)
-
-        BindItemExpr field ->
-            case repeatCtx of
-                Just ctx ->
-                    if field == "" then
-                        jsonValueToResolved ctx.item
-
-                    else
-                        case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
-                            Ok val ->
-                                jsonValueToResolved val
-
-                            Err _ ->
-                                RNull
-
-                Nothing ->
-                    RNull
-
-        ConditionalExpr cond thenVal elseVal ->
-            let
-                condResolved =
-                    resolvePropValueWith functions state repeatCtx cond
-            in
-            case isResolvedTruthy condResolved of
-                Ok True ->
-                    resolvePropValueWith functions state repeatCtx thenVal
-
-                Ok False ->
-                    resolvePropValueWith functions state repeatCtx elseVal
-
-                Err err ->
-                    RError err
-
-        ComputedExpr name args ->
-            let
-                resolvedArgs =
-                    Dict.map (\_ v -> resolvePropValueWith functions state repeatCtx v) args
-            in
-            case findError resolvedArgs of
-                Just err ->
-                    err
-
-                Nothing ->
-                    case Dict.get name functions of
-                        Just fn ->
-                            fn resolvedArgs
+                                    Err _ ->
+                                        Recursion.base RNull
 
                         Nothing ->
-                            RError ("Unknown function: " ++ name)
+                            Recursion.base RNull
+
+                IndexExpr ->
+                    case repeatCtx of
+                        Just ctx ->
+                            Recursion.base (RInt ctx.index)
+
+                        Nothing ->
+                            Recursion.base (RInt 0)
+
+                TemplateExpr template ->
+                    Recursion.base (RString (resolveTemplate state template))
+
+                BindStateExpr path ->
+                    Recursion.base (jsonValueToResolved (State.get path state |> Maybe.withDefault Encode.null))
+
+                BindItemExpr field ->
+                    case repeatCtx of
+                        Just ctx ->
+                            if field == "" then
+                                Recursion.base (jsonValueToResolved ctx.item)
+
+                            else
+                                case Decode.decodeValue (Decode.field field Decode.value) ctx.item of
+                                    Ok val ->
+                                        Recursion.base (jsonValueToResolved val)
+
+                                    Err _ ->
+                                        Recursion.base RNull
+
+                        Nothing ->
+                            Recursion.base RNull
+
+                ConditionalExpr cond thenVal elseVal ->
+                    Recursion.recurseThen cond <|
+                        \condResolved ->
+                            case isResolvedTruthy condResolved of
+                                Ok True ->
+                                    Recursion.recurse thenVal
+
+                                Ok False ->
+                                    Recursion.recurse elseVal
+
+                                Err err ->
+                                    Recursion.base (RError err)
+
+                ComputedExpr name args ->
+                    Recursion.Traverse.sequenceDictThen args <|
+                        \resolvedArgs ->
+                            case findError resolvedArgs of
+                                Just err ->
+                                    Recursion.base err
+
+                                Nothing ->
+                                    case Dict.get name functions of
+                                        Just fn ->
+                                            Recursion.base (fn resolvedArgs)
+
+                                        Nothing ->
+                                            Recursion.base (RError ("Unknown function: " ++ name))
 
 
 findError : Dict String ResolvedValue -> Maybe ResolvedValue
@@ -311,43 +314,47 @@ isResolvedTruthy resolved =
 
 
 jsonValueToResolved : Value -> ResolvedValue
-jsonValueToResolved value =
-    case Decode.decodeValue Decode.string value of
-        Ok s ->
-            RString s
-
-        Err _ ->
-            case Decode.decodeValue Decode.int value of
-                Ok i ->
-                    RInt i
+jsonValueToResolved =
+    Recursion.runRecursion <|
+        \value ->
+            case Decode.decodeValue Decode.string value of
+                Ok s ->
+                    Recursion.base (RString s)
 
                 Err _ ->
-                    case Decode.decodeValue Decode.float value of
-                        Ok f ->
-                            RFloat f
+                    case Decode.decodeValue Decode.int value of
+                        Ok i ->
+                            Recursion.base (RInt i)
 
                         Err _ ->
-                            case Decode.decodeValue Decode.bool value of
-                                Ok b ->
-                                    RBool b
+                            case Decode.decodeValue Decode.float value of
+                                Ok f ->
+                                    Recursion.base (RFloat f)
 
                                 Err _ ->
-                                    case Decode.decodeValue (Decode.null ()) value of
-                                        Ok _ ->
-                                            RNull
+                                    case Decode.decodeValue Decode.bool value of
+                                        Ok b ->
+                                            Recursion.base (RBool b)
 
                                         Err _ ->
-                                            case Decode.decodeValue (Decode.list Decode.value) value of
-                                                Ok items ->
-                                                    RList (List.map jsonValueToResolved items)
+                                            case Decode.decodeValue (Decode.null ()) value of
+                                                Ok _ ->
+                                                    Recursion.base RNull
 
                                                 Err _ ->
-                                                    case Decode.decodeValue (Decode.keyValuePairs Decode.value) value of
-                                                        Ok pairs ->
-                                                            RObject (Dict.fromList (List.map (\( k, v ) -> ( k, jsonValueToResolved v )) pairs))
+                                                    case Decode.decodeValue (Decode.list Decode.value) value of
+                                                        Ok items ->
+                                                            Recursion.Traverse.sequenceList items
+                                                                |> Recursion.map RList
 
                                                         Err _ ->
-                                                            RNull
+                                                            case Decode.decodeValue (Decode.keyValuePairs Decode.value) value of
+                                                                Ok pairs ->
+                                                                    Recursion.Traverse.sequenceDict (Dict.fromList pairs)
+                                                                        |> Recursion.map RObject
+
+                                                                Err _ ->
+                                                                    Recursion.base RNull
 
 
 resolveTemplate : Value -> String -> String

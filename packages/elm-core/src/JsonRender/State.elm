@@ -81,23 +81,26 @@ set path newValue state =
 
 setBySegments : List String -> Value -> Value -> Value
 setBySegments segments newValue state =
+    let
+        context =
+            collectContext segments state []
+    in
+    List.foldl (\( segment, parentState ) childValue -> setField segment childValue parentState) newValue context
+
+
+collectContext : List String -> Value -> List ( String, Value ) -> List ( String, Value )
+collectContext segments state acc =
     case segments of
         [] ->
-            newValue
+            acc
 
         [ segment ] ->
-            setField segment newValue state
+            ( segment, state ) :: acc
 
         segment :: rest ->
-            let
-                child =
-                    get ("/" ++ segment) state
-                        |> Maybe.withDefault (Encode.object [])
-
-                updatedChild =
-                    setBySegments rest newValue child
-            in
-            setField segment updatedChild state
+            collectContext rest
+                (get ("/" ++ segment) state |> Maybe.withDefault (Encode.object []))
+                (( segment, state ) :: acc)
 
 
 setField : String -> Value -> Value -> Value
