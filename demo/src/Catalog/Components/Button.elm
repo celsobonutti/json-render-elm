@@ -3,7 +3,7 @@ module Catalog.Components.Button exposing (ButtonProps, component, propsDecoder)
 import Dict exposing (Dict)
 import Html exposing (Html, button, text)
 import Html.Attributes exposing (class)
-import Html.Events exposing (onClick)
+import JsonRender.Events as Events
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -42,6 +42,6 @@ view ctx =
     in
     button
         [ class ("jr-button " ++ variantClass)
-        , onClick (ctx.emit "press")
+        , Events.onClick (ctx.emit "press")
         ]
         [ text ctx.props.label ]

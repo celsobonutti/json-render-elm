@@ -1,0 +1,29 @@
+{
+  "state": { "submitted": false },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["btn", "status"]
+    },
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Submit" },
+      "children": [],
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": { "statePath": "/submitted", "value": true },
+          "preventDefault": true
+        }
+      }
+    },
+    "status": {
+      "type": "Text",
+      "props": { "content": "Submitted!" },
+      "children": [],
+      "visible": { "$state": "/submitted" }
+    }
+  }
+}

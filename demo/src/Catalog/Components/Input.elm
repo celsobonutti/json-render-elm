@@ -3,7 +3,7 @@ module Catalog.Components.Input exposing (InputBindings, InputProps, component, 
 import Dict exposing (Dict)
 import Html exposing (Html, div, input, label, text)
 import Html.Attributes exposing (class, placeholder, type_)
-import Html.Events
+import JsonRender.Events as Events exposing (EventHandle)
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Bind as Bind
 import JsonRender.Render exposing (Component, ComponentContext, register)
@@ -18,9 +18,9 @@ type alias InputProps =
 
 
 type alias InputBindings msg =
-    { label : Maybe (Value -> msg)
-    , placeholder : Maybe (Value -> msg)
-    , value : Maybe (Value -> msg)
+    { label : Maybe (Value -> EventHandle msg)
+    , placeholder : Maybe (Value -> EventHandle msg)
+    , value : Maybe (Value -> EventHandle msg)
     }
 
 
@@ -32,7 +32,7 @@ propsDecoder =
         |> ResolvedValue.optional "value" ResolvedValue.string Nothing
 
 
-inputBindingsDecoder : Dict String (Value -> msg) -> InputBindings msg
+inputBindingsDecoder : Dict String (Value -> EventHandle msg) -> InputBindings msg
 inputBindingsDecoder =
     Bind.succeed InputBindings
         |> Bind.bindable "label"
@@ -62,7 +62,7 @@ view ctx =
                     , Html.Attributes.value (Maybe.withDefault "" ctx.props.value)
                     , case ctx.bindings.value of
                         Just setValue ->
-                            Html.Events.onInput (\s -> setValue (Encode.string s))
+                            Events.onInput (\s -> setValue (Encode.string s))
 
                         Nothing ->
                             class ""

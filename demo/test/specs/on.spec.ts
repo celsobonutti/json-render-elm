@@ -161,4 +161,25 @@ test.describe("on field - event handling", () => {
 
     await expect(items).toHaveCount(2)
   })
+
+  test("action with preventDefault does not trigger page navigation", async ({
+    page,
+  }) => {
+    await sendSpec(page, "on/prevent-default-form.json")
+
+    // Status should be hidden initially
+    await expect(page.locator(".jr-text")).toHaveCount(0)
+
+    // Record the URL before clicking
+    const urlBefore = page.url()
+
+    // Click the button with preventDefault
+    await page.locator(".jr-button").click()
+
+    // State should update — status text appears
+    await expect(page.locator(".jr-text")).toHaveText("Submitted!")
+
+    // URL should not have changed (no navigation)
+    expect(page.url()).toBe(urlBefore)
+  })
 })
