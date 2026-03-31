@@ -89,7 +89,7 @@ bindingsTypeAlias componentName schema =
         fields =
             Dict.keys schema.fields
                 |> List.sort
-                |> List.map (\name -> name ++ " : Maybe (Value -> Msg)")
+                |> List.map (\name -> name ++ " : Maybe (Value -> EventHandle msg)")
 
         body =
             case fields of
@@ -102,7 +102,7 @@ bindingsTypeAlias componentName schema =
                         ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
                         ++ "\n    }"
     in
-    "type alias " ++ componentName ++ "Bindings =\n" ++ body
+    "type alias " ++ componentName ++ "Bindings msg =\n" ++ body
 
 
 bindingsDecoder : String -> ComponentSchema -> String
@@ -117,9 +117,9 @@ bindingsDecoder componentName schema =
                 (\name -> "        |> Bind.bindable \"" ++ name ++ "\"")
                 fields
     in
-    "bindingsDecoder : Dict String (Value -> Msg) -> "
+    "bindingsDecoder : Dict String (Value -> EventHandle msg) -> "
         ++ componentName
-        ++ "Bindings\nbindingsDecoder =\n"
+        ++ "Bindings msg\nbindingsDecoder =\n"
         ++ "    Bind.succeed "
         ++ componentName
         ++ "Bindings\n"
@@ -154,8 +154,8 @@ componentModule namespace componentName schema =
         ++ "import Dict exposing (Dict)\n"
         ++ "import Html exposing (Html)\n"
         ++ "import Json.Encode exposing (Value)\n"
-        ++ "import JsonRender.Actions exposing (Msg)\n"
         ++ "import JsonRender.Bind as Bind\n"
+        ++ "import JsonRender.Events exposing (EventHandle)\n"
         ++ "import JsonRender.Render exposing (ComponentContext, Component, register)\n"
         ++ "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)\n\n\n"
         ++ typeAlias
@@ -166,12 +166,12 @@ componentModule namespace componentName schema =
         ++ "\n\n\n"
         ++ bindingsDecoderCode
         ++ "\n\n\n"
-        ++ "component : Component\ncomponent =\n    register propsDecoder bindingsDecoder view\n\n\n"
+        ++ "component : Component msg\ncomponent =\n    register propsDecoder bindingsDecoder view\n\n\n"
         ++ "view : ComponentContext "
         ++ componentName
-        ++ "Props "
+        ++ "Props ("
         ++ componentName
-        ++ "Bindings -> Html Msg\nview ctx =\n    ()\n"
+        ++ "Bindings msg) msg -> Html msg\nview ctx =\n    ()\n"
 
 
 actionParamsType : String -> ActionSchema -> String

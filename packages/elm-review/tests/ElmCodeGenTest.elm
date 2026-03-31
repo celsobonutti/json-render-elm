@@ -106,9 +106,9 @@ suite =
                         ElmCodeGen.bindingsTypeAlias "Card" cardSchema
                 in
                 Expect.all
-                    [ \c -> String.contains "type alias CardBindings" c |> Expect.equal True
-                    , \c -> String.contains "subtitle : Maybe (Value -> Msg)" c |> Expect.equal True
-                    , \c -> String.contains "title : Maybe (Value -> Msg)" c |> Expect.equal True
+                    [ \c -> String.contains "type alias CardBindings msg" c |> Expect.equal True
+                    , \c -> String.contains "subtitle : Maybe (Value -> EventHandle msg)" c |> Expect.equal True
+                    , \c -> String.contains "title : Maybe (Value -> EventHandle msg)" c |> Expect.equal True
                     ]
                     code
         , test "generates bindings decoder" <|
@@ -133,7 +133,8 @@ suite =
                     [ \c -> String.contains "CardBindings" c |> Expect.equal True
                     , \c -> String.contains "import JsonRender.Bind as Bind" c |> Expect.equal True
                     , \c -> String.contains "register propsDecoder bindingsDecoder view" c |> Expect.equal True
-                    , \c -> String.contains "ComponentContext CardProps CardBindings" c |> Expect.equal True
+                    , \c -> String.contains "import JsonRender.Events exposing (EventHandle)" c |> Expect.equal True
+                    , \c -> String.contains "ComponentContext CardProps (CardBindings msg) msg" c |> Expect.equal True
                     ]
                     code
         , test "generates action params type alias" <|
