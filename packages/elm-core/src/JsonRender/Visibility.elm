@@ -45,6 +45,8 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Internal.PropValue as PropValue exposing (PropValue(..))
 import JsonRender.State as State
+import Recursion
+import Recursion.Fold
 
 
 type VisibilityCondition
@@ -83,69 +85,49 @@ type alias RepeatContext =
 
 
 evaluate : Value -> Maybe RepeatContext -> VisibilityCondition -> Result String Bool
-evaluate state repeatCtx condition =
-    case condition of
-        Compare source operator ->
-            applyOperator state operator (resolveSource state repeatCtx source)
-
-        Not inner ->
-            case inner of
+evaluate state repeatCtx =
+    Recursion.runRecursion <|
+        \condition ->
+            case condition of
                 Compare source operator ->
-                    applyOperator state operator (resolveSource state repeatCtx source)
-                        |> Result.map not
+                    Recursion.base (applyOperator state operator (resolveSource state repeatCtx source))
 
-                Not doubleNeg ->
-                    evaluate state repeatCtx doubleNeg
+                Not inner ->
+                    Recursion.recurseThen inner <|
+                        \result ->
+                            Recursion.base (Result.map not result)
 
                 And conditions ->
-                    -- De Morgan: not(A and B) = (not A) or (not B)
-                    evaluateOr state repeatCtx (List.map Not conditions)
+                    Recursion.Fold.foldMapList
+                        (\c acc ->
+                            case acc of
+                                Err _ ->
+                                    Recursion.base acc
+
+                                Ok False ->
+                                    Recursion.base acc
+
+                                Ok True ->
+                                    Recursion.recurse c
+                        )
+                        (Ok True)
+                        conditions
 
                 Or conditions ->
-                    -- De Morgan: not(A or B) = (not A) and (not B)
-                    evaluateAnd state repeatCtx (List.map Not conditions)
+                    Recursion.Fold.foldMapList
+                        (\c acc ->
+                            case acc of
+                                Err _ ->
+                                    Recursion.base acc
 
-        And conditions ->
-            evaluateAnd state repeatCtx conditions
+                                Ok True ->
+                                    Recursion.base acc
 
-        Or conditions ->
-            evaluateOr state repeatCtx conditions
-
-
-evaluateAnd : Value -> Maybe RepeatContext -> List VisibilityCondition -> Result String Bool
-evaluateAnd state repeatCtx conditions =
-    case conditions of
-        [] ->
-            Ok True
-
-        c :: rest ->
-            case evaluate state repeatCtx c of
-                Err err ->
-                    Err err
-
-                Ok False ->
-                    Ok False
-
-                Ok True ->
-                    evaluateAnd state repeatCtx rest
-
-
-evaluateOr : Value -> Maybe RepeatContext -> List VisibilityCondition -> Result String Bool
-evaluateOr state repeatCtx conditions =
-    case conditions of
-        [] ->
-            Ok False
-
-        c :: rest ->
-            case evaluate state repeatCtx c of
-                Err err ->
-                    Err err
-
-                Ok True ->
-                    Ok True
-
-                Ok False ->
-                    evaluateOr state repeatCtx rest
+                                Ok False ->
+                                    Recursion.recurse c
+                        )
+                        (Ok False)
+                        conditions
 
 
 resolveSource : Value -> Maybe RepeatContext -> Source -> Maybe Value
