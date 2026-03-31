@@ -563,6 +563,143 @@ suite =
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)
+            , test "decodes action binding with preventDefault true" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "btn",
+                              "elements": {
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Submit" },
+                                  "children": [],
+                                  "on": {
+                                    "press": {
+                                      "action": "setState",
+                                      "params": { "statePath": "/x", "value": true },
+                                      "preventDefault": true
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "btn" spec.elements of
+                                Just el ->
+                                    case Dict.get "press" el.on of
+                                        Just (SingleAction binding) ->
+                                            Expect.equal True binding.preventDefault
+
+                                        Just (ChainedActions _) ->
+                                            Expect.fail "expected SingleAction"
+
+                                        Nothing ->
+                                            Expect.fail "press handler not found"
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "preventDefault defaults to False when omitted" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "btn",
+                              "elements": {
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Click" },
+                                  "children": [],
+                                  "on": {
+                                    "press": {
+                                      "action": "setState",
+                                      "params": { "statePath": "/x", "value": 1 }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "btn" spec.elements of
+                                Just el ->
+                                    case Dict.get "press" el.on of
+                                        Just (SingleAction binding) ->
+                                            Expect.equal False binding.preventDefault
+
+                                        _ ->
+                                            Expect.fail "expected SingleAction"
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "chained actions decode preventDefault on individual bindings" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "btn",
+                              "elements": {
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Go" },
+                                  "children": [],
+                                  "on": {
+                                    "press": [
+                                      { "action": "setState", "params": { "statePath": "/a", "value": 1 }, "preventDefault": true },
+                                      { "action": "setState", "params": { "statePath": "/b", "value": 2 } }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            case Dict.get "btn" spec.elements of
+                                Just el ->
+                                    case Dict.get "press" el.on of
+                                        Just (ChainedActions bindings) ->
+                                            Expect.all
+                                                [ \bs ->
+                                                    case List.head bs of
+                                                        Just first ->
+                                                            Expect.equal True first.preventDefault
+
+                                                        Nothing ->
+                                                            Expect.fail "empty chain"
+                                                , \bs ->
+                                                    case List.drop 1 bs |> List.head of
+                                                        Just second ->
+                                                            Expect.equal False second.preventDefault
+
+                                                        Nothing ->
+                                                            Expect.fail "missing second"
+                                                ]
+                                                bindings
+
+                                        _ ->
+                                            Expect.fail "expected ChainedActions"
+
+                                Nothing ->
+                                    Expect.fail "element not found"
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
             ]
         , describe "$computed decoding"
             [ test "decodes $computed expression in props" <|

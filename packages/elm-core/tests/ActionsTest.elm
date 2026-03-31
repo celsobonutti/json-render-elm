@@ -55,12 +55,12 @@ testModel state =
 
 executeAction : String -> List ( String, PropValue ) -> Msg TestAction
 executeAction name params =
-    Actions.ExecuteAction (SingleAction { action = name, params = Dict.fromList params }) Nothing
+    Actions.ExecuteAction (SingleAction { action = name, params = Dict.fromList params, preventDefault = False }) Nothing
 
 
 executeChain : List { action : String, params : List ( String, PropValue ) } -> Msg TestAction
 executeChain bindings =
-    Actions.ExecuteAction (ChainedActions (List.map (\b -> { action = b.action, params = Dict.fromList b.params }) bindings)) Nothing
+    Actions.ExecuteAction (ChainedActions (List.map (\b -> { action = b.action, params = Dict.fromList b.params, preventDefault = False }) bindings)) Nothing
 
 
 setStateMsg : String -> PropValue -> Msg TestAction
@@ -163,6 +163,7 @@ suite =
                                     [ ( "statePath", StringValue "/clicked" )
                                     , ( "value", BoolValue True )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -187,6 +188,7 @@ suite =
                                     [ ( "statePath", StringValue "/items" )
                                     , ( "value", StringValue "second" )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -211,6 +213,7 @@ suite =
                             , params =
                                 Dict.fromList
                                     [ ( "statePath", StringValue "/temp" ) ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -249,6 +252,7 @@ suite =
                             , params =
                                 Dict.fromList
                                     [ ( "format", StringValue "csv" ) ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -266,6 +270,7 @@ suite =
                         binding =
                             { action = "nonexistentAction"
                             , params = Dict.empty
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -292,6 +297,7 @@ suite =
                                     [ ( "statePath", StringValue "/items" )
                                     , ( "value", StateExpr "/source" )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -320,6 +326,7 @@ suite =
                                         [ ( "statePath", StringValue "/loading" )
                                         , ( "value", BoolValue True )
                                         ]
+                              , preventDefault = False
                               }
                             , { action = "pushState"
                               , params =
@@ -327,6 +334,7 @@ suite =
                                         [ ( "statePath", StringValue "/items" )
                                         , ( "value", StringValue "new item" )
                                         ]
+                              , preventDefault = False
                               }
                             ]
 
@@ -363,6 +371,7 @@ suite =
                                         [ ( "statePath", StringValue "/items" )
                                         , ( "value", StateExpr "/input" )
                                         ]
+                              , preventDefault = False
                               }
                             , -- Second: clear input
                               { action = "setState"
@@ -371,6 +380,7 @@ suite =
                                         [ ( "statePath", StringValue "/input" )
                                         , ( "value", StringValue "" )
                                         ]
+                              , preventDefault = False
                               }
                             ]
 
@@ -465,6 +475,7 @@ suite =
                                             )
                                       )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -509,6 +520,7 @@ suite =
                                             )
                                       )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -551,6 +563,7 @@ suite =
                                             )
                                       )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -593,6 +606,7 @@ suite =
                                             ]
                                       )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -630,6 +644,7 @@ suite =
                                             )
                                       )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -651,6 +666,7 @@ suite =
                                     [ ( "statePath", StringValue "/name" )
                                     , ( "value", StringValue "$id" )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -680,6 +696,7 @@ suite =
                                     , ( "value", StateExpr "/input" )
                                     , ( "clearStatePath", StringValue "/input" )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -714,6 +731,7 @@ suite =
                                     [ ( "statePath", StringValue "/items" )
                                     , ( "value", StateExpr "/input" )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -742,6 +760,7 @@ suite =
                                     , ( "value", StateExpr "/input" )
                                     , ( "clearStatePath", StateExpr "/clearTarget" )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -777,6 +796,7 @@ suite =
                                     , ( "value", BoolValue True )
                                     , ( "clearStatePath", StringValue "/input" )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -813,6 +833,7 @@ suite =
                                       )
                                     , ( "clearStatePath", StringValue "/input" )
                                     ]
+                            , preventDefault = False
                             }
 
                         ( newModel, _ ) =
@@ -867,6 +888,7 @@ suite =
                                                 )
                                           )
                                         ]
+                              , preventDefault = False
                               }
                             , { action = "pushState"
                               , params =
@@ -879,6 +901,7 @@ suite =
                                                 )
                                           )
                                         ]
+                              , preventDefault = False
                               }
                             ]
 
@@ -915,6 +938,7 @@ suite =
                                         , ( "value", StateExpr "/input" )
                                         , ( "clearStatePath", StringValue "/input" )
                                         ]
+                              , preventDefault = False
                               }
                             , { action = "setState"
                               , params =
@@ -922,6 +946,7 @@ suite =
                                         [ ( "statePath", StringValue "/lastInput" )
                                         , ( "value", StateExpr "/input" )
                                         ]
+                              , preventDefault = False
                               }
                             ]
 
@@ -959,6 +984,7 @@ suite =
                                     [ ( "statePath", StringValue "/name" )
                                     , ( "value", StringValue "Bob" )
                                     ]
+                            , preventDefault = False
                             }
 
                         result =
@@ -1006,6 +1032,7 @@ suite =
                                       )
                                     , ( "clearStatePath", StringValue "/input" )
                                     ]
+                            , preventDefault = False
                             }
 
                         result =
@@ -1048,6 +1075,7 @@ suite =
                                     [ ( "statePath", StringValue "/items" )
                                     , ( "index", IntValue 2 )
                                     ]
+                            , preventDefault = False
                             }
 
                         result =
@@ -1075,6 +1103,7 @@ suite =
                         binding =
                             { action = "press"
                             , params = Dict.empty
+                            , preventDefault = False
                             }
 
                         result =
@@ -1100,6 +1129,7 @@ suite =
                             , params =
                                 Dict.fromList
                                     [ ( "value", StringValue "hello" ) ]
+                            , preventDefault = False
                             }
 
                         result =

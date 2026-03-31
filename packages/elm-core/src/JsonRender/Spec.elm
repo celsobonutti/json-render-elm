@@ -50,6 +50,7 @@ type alias Repeat =
 type alias ActionBinding =
     { action : String
     , params : Dict String PropValue
+    , preventDefault : Bool
     }
 
 
@@ -90,6 +91,7 @@ actionBindingDecoder =
     Decode.succeed ActionBinding
         |> required "action" Decode.string
         |> optional "params" (Decode.dict PropValue.decoder) Dict.empty
+        |> optional "preventDefault" Decode.bool False
 
 
 eventHandlerDecoder : Decoder EventHandler
