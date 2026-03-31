@@ -87,7 +87,7 @@ extractBindings repeatCtx props =
         (\key propValue acc ->
             case propValue of
                 BindStateExpr path ->
-                    Dict.insert key (\val -> SetState path val) acc
+                    Dict.insert key (\val -> BindingUpdate path val) acc
 
                 BindItemExpr field ->
                     case repeatCtx of
@@ -100,7 +100,7 @@ extractBindings repeatCtx props =
                                     else
                                         ctx.basePath ++ "/" ++ field
                             in
-                            Dict.insert key (\val -> SetState path val) acc
+                            Dict.insert key (\val -> BindingUpdate path val) acc
 
                         Nothing ->
                             acc
@@ -118,11 +118,8 @@ Looks up the event name in the `on` dict and produces the appropriate Msg.
 buildEmit : Dict String EventHandler -> Maybe RepeatContext -> String -> Msg action
 buildEmit onHandlers repeatCtx eventName =
     case Dict.get eventName onHandlers of
-        Just (SingleAction binding) ->
-            ExecuteAction binding repeatCtx
-
-        Just (ChainedActions bindings) ->
-            ExecuteChain bindings repeatCtx
+        Just handler ->
+            ExecuteAction handler repeatCtx
 
         Nothing ->
             ActionError ("No handler for event: " ++ eventName)
@@ -300,7 +297,7 @@ renderWatcherTriggers state repeatCtx watchDict =
             Html.node "watcher-trigger"
                 [ Html.Attributes.attribute "value" watchedValue
                 , Html.Events.on "watcher-triggered"
-                    (Decode.succeed (WatcherTriggered handler repeatCtx))
+                    (Decode.succeed (ExecuteAction handler repeatCtx))
                 ]
                 []
                 :: acc

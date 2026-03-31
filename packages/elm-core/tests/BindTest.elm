@@ -35,7 +35,7 @@ suite =
             \_ ->
                 let
                     setter =
-                        \val -> SetState "/name" val
+                        \val -> BindingUpdate "/name" val
 
                     dict =
                         Dict.fromList [ ( "name", setter ) ]
@@ -63,7 +63,7 @@ suite =
             \_ ->
                 let
                     nameSetter =
-                        \val -> SetState "/name" val
+                        \val -> BindingUpdate "/name" val
 
                     dict =
                         Dict.fromList [ ( "name", nameSetter ) ]
