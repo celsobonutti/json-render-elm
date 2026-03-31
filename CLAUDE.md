@@ -197,11 +197,11 @@ Compared against the [json-render](https://github.com/nichochar/json-render) cor
 | Feature | Details |
 |---|---|
 | **Expressions** | All 8 types: `$state`, `$bindState`, `$item`, `$bindItem`, `$index`, `$template`, `$cond`, `$computed` |
-| **Actions** | `setState`, `pushState`, `removeState` + custom actions via `ActionConfig` |
+| **Actions** | `setState`, `pushState` (with `clearStatePath` + `$id` auto-generation), `removeState` + custom actions via `ActionConfig` |
 | **Chained actions** | Array of action bindings executed sequentially |
 | **Event bindings** | `on` field mapping event names to action bindings |
 | **Watchers** | `watch` field with state path triggers, repeat-aware |
-| **Visibility** | `$state` conditions with `eq`, `neq`, `not`, `$and`, `$or`, implicit AND, boolean literals |
+| **Visibility** | `$state`/`$item`/`$index` conditions with `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `not`, `$and`, `$or`, implicit AND, boolean literals, state-to-state comparison |
 | **Repeat** | `repeat` field with `statePath` + optional `key` for keyed rendering |
 | **State on spec** | `state` field on spec for initial state |
 | **Catalog schema** | `defineSchema` with components, actions, functions + `generateCatalogSchema` export |
@@ -211,17 +211,10 @@ Compared against the [json-render](https://github.com/nichochar/json-render) cor
 
 Gaps versus json-render core, grouped by area and roughly prioritized:
 
-#### Visibility gaps
-- **Comparison operators `gt`/`gte`/`lt`/`lte`** — only `eq`/`neq` are implemented
-- **`$item` and `$index` conditions** — visibility only evaluates `$state`, not repeat context expressions
-- **State-to-state comparison** — RHS of comparison operators is always a literal; upstream allows `{ "$state": "/path" }` as the comparand
-
 #### Action gaps
 - **`confirm` dialogs** — `{ "confirm": { "title": "...", "message": "...", "variant": "danger" } }` on action bindings to show a confirmation dialog before executing
 - **`onSuccess` / `onError` handlers** — post-action callbacks: navigate, set state, or chain another action
 - **`preventDefault` flag** — prevents default browser behavior on action trigger
-- **`pushState` `clearStatePath` param** — clears a state path after push (e.g., reset form input)
-- **`$id` auto-generation** — `"$id"` string in `pushState` value auto-generates a unique ID
 
 #### Larger features
 - **Named slots** — `ComponentContext props slots` with typed slot records decoded same way as props. The spec's `children` becomes `Dict String (List String)` keyed by slot name
