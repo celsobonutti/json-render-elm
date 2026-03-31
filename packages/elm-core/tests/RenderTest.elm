@@ -693,6 +693,69 @@ suite =
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)
+            , test "button with preventDefault on action binding renders correctly" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "btn",
+                              "elements": {
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Submit Form" },
+                                  "children": [],
+                                  "on": {
+                                    "press": {
+                                      "action": "setState",
+                                      "params": { "statePath": "/submitted", "value": true },
+                                      "preventDefault": true
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry Encode.null spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.class "button", Selector.text "Submit Form" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "button with preventDefault in chained actions renders correctly" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "btn",
+                              "elements": {
+                                "btn": {
+                                  "type": "Button",
+                                  "props": { "label": "Go" },
+                                  "children": [],
+                                  "on": {
+                                    "press": [
+                                      { "action": "setState", "params": { "statePath": "/a", "value": 1 }, "preventDefault": true },
+                                      { "action": "setState", "params": { "statePath": "/b", "value": 2 } }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                            """
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry Encode.null spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.class "button", Selector.text "Go" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
             ]
         , describe "nested $computed expressions"
             [ test "$computed with $state arg" <|
