@@ -5,6 +5,7 @@ module JsonRender.Internal.ElmCodeGen exposing
     , actionsModule
     , bindingsDecoder
     , bindingsTypeAlias
+    , componentBody
     , componentModule
     , componentScaffold
     , decodeActionFunction
@@ -133,35 +134,14 @@ bindingsDecoder componentName schema =
         ++ String.join "\n" pipelineSteps
 
 
-componentScaffold : String -> String -> ComponentSchema -> String
-componentScaffold namespace componentName schema =
+componentBody : String -> ComponentSchema -> String
+componentBody componentName schema =
     let
-        moduleName =
-            namespace ++ ".Components." ++ componentName
-
         enums =
             collectEnumsFromFields schema.fields
 
         objects =
             collectObjectFields schema.fields
-
-        enumExposing =
-            List.map (\variants -> TypeMapping.toElmType (FEnum variants) ++ "(..)") enums
-
-        objectExposing =
-            List.map (\( name, _ ) -> objectTypeName name) objects
-
-        exposingItems =
-            List.sort
-                (enumExposing
-                    ++ objectExposing
-                    ++ [ componentName ++ "Props"
-                       , componentName ++ "Bindings"
-                       , "propsDecoder"
-                       , "bindingsDecoder"
-                       , "component"
-                       ]
-                )
 
         typeAlias =
             propsTypeAlias componentName schema
@@ -195,6 +175,49 @@ componentScaffold namespace componentName schema =
                         |> String.join "\n\n\n"
                         |> (\s -> s ++ "\n\n\n")
     in
+    enumSection
+        ++ objectSection
+        ++ typeAlias
+        ++ "\n\n\n"
+        ++ bindingsType
+        ++ "\n\n\n"
+        ++ decoderCode
+        ++ "\n\n\n"
+        ++ bindingsDecoderCode
+        ++ "\n\n\n"
+        ++ "component : Component msg\ncomponent =\n    register propsDecoder bindingsDecoder view"
+
+
+componentScaffold : String -> String -> ComponentSchema -> String
+componentScaffold namespace componentName schema =
+    let
+        moduleName =
+            namespace ++ ".Components." ++ componentName
+
+        enums =
+            collectEnumsFromFields schema.fields
+
+        objects =
+            collectObjectFields schema.fields
+
+        enumExposing =
+            List.map (\variants -> TypeMapping.toElmType (FEnum variants) ++ "(..)") enums
+
+        objectExposing =
+            List.map (\( name, _ ) -> objectTypeName name) objects
+
+        exposingItems =
+            List.sort
+                (enumExposing
+                    ++ objectExposing
+                    ++ [ componentName ++ "Props"
+                       , componentName ++ "Bindings"
+                       , "propsDecoder"
+                       , "bindingsDecoder"
+                       , "component"
+                       ]
+                )
+    in
     "module "
         ++ moduleName
         ++ " exposing ("
@@ -207,17 +230,7 @@ componentScaffold namespace componentName schema =
         ++ "import JsonRender.Events exposing (EventHandle)\n"
         ++ "import JsonRender.Render exposing (Component, ComponentContext, register)\n"
         ++ "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)\n\n\n"
-        ++ enumSection
-        ++ objectSection
-        ++ typeAlias
-        ++ "\n\n\n"
-        ++ bindingsType
-        ++ "\n\n\n"
-        ++ decoderCode
-        ++ "\n\n\n"
-        ++ bindingsDecoderCode
-        ++ "\n\n\n"
-        ++ "component : Component msg\ncomponent =\n    register propsDecoder bindingsDecoder view"
+        ++ componentBody componentName schema
 
 
 defaultViewFunction : String -> String

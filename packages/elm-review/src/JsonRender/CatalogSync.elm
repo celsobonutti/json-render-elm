@@ -400,31 +400,51 @@ declarationListVisitor declarations context =
 
                                             Just vRange ->
                                                 let
-                                                    scaffoldRange =
-                                                        { start = range.start
-                                                        , end = vRange.start
-                                                        }
+                                                    expectedBody =
+                                                        ElmCodeGen.componentBody
+                                                            componentName
+                                                            schema
 
-                                                    currentScaffold =
-                                                        context.extractSourceCode scaffoldRange
+                                                    firstDeclStart =
+                                                        firstDeclarationStart declarations
 
-                                                    expectedWithTrailing =
-                                                        expectedScaffold ++ "\n\n\n"
+                                                    bodyRange =
+                                                        case firstDeclStart of
+                                                            Just declStart ->
+                                                                Just
+                                                                    { start = declStart
+                                                                    , end = vRange.start
+                                                                    }
+
+                                                            Nothing ->
+                                                                Nothing
                                                 in
-                                                if String.trim currentScaffold == String.trim expectedWithTrailing then
-                                                    []
+                                                case bodyRange of
+                                                    Just bRange ->
+                                                        let
+                                                            currentBody =
+                                                                context.extractSourceCode bRange
 
-                                                else
-                                                    [ Rule.errorWithFix
-                                                        { message = componentName ++ " component types are out of sync with the catalog"
-                                                        , details =
-                                                            [ "The generated types and decoders in this module don't match the catalog schema."
-                                                            , "Accept the fix to regenerate them. Your view function will be preserved."
+                                                            expectedWithTrailing =
+                                                                expectedBody ++ "\n\n\n"
+                                                        in
+                                                        if String.trim currentBody == String.trim expectedWithTrailing then
+                                                            []
+
+                                                        else
+                                                            [ Rule.errorWithFix
+                                                                { message = componentName ++ " component types are out of sync with the catalog"
+                                                                , details =
+                                                                    [ "The generated types and decoders in this module don't match the catalog schema."
+                                                                    , "Accept the fix to regenerate them. Your view function will be preserved."
+                                                                    ]
+                                                                }
+                                                                range
+                                                                [ Fix.replaceRangeBy bRange expectedWithTrailing ]
                                                             ]
-                                                        }
-                                                        range
-                                                        [ Fix.replaceRangeBy scaffoldRange expectedWithTrailing ]
-                                                    ]
+
+                                                    Nothing ->
+                                                        []
 
                                     _ ->
                                         []
@@ -433,6 +453,16 @@ declarationListVisitor declarations context =
 
                     Nothing ->
                         ( [], context )
+
+
+firstDeclarationStart : List (Node Declaration) -> Maybe { row : Int, column : Int }
+firstDeclarationStart declarations =
+    case declarations of
+        (Node range _) :: _ ->
+            Just range.start
+
+        [] ->
+            Nothing
 
 
 findFunctionRange : String -> List (Node Declaration) -> Maybe Range

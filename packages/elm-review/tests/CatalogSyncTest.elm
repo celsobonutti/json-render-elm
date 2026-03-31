@@ -417,17 +417,7 @@ handleAction action model = ()
                                 , under = "module Catalog.Components.Card exposing (..)"
                                 }
                                 |> Review.Test.whenFixed
-                                    ("""module Catalog.Components.Card exposing (CardBindings, CardProps, bindingsDecoder, component, propsDecoder)
-
-import Dict exposing (Dict)
-import Html exposing (Html)
-import Json.Encode exposing (Value)
-import JsonRender.Bind as Bind
-import JsonRender.Events exposing (EventHandle)
-import JsonRender.Render exposing (Component, ComponentContext, register)
-import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
-
-
+                                    ("""module Catalog.Components.Card exposing (..)
 type alias CardProps =
     { title : String
     }
