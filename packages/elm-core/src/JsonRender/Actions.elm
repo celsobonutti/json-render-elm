@@ -35,7 +35,6 @@ actions with a decoder that turns action name + resolved params into an action.
 type alias ActionConfig action =
     { handleAction : action -> Model -> ( Model, Cmd (Msg action) )
     , decodeAction : String -> Dict String Value -> Result String action
-    , functions : Resolve.FunctionDict
     }
 
 
@@ -55,8 +54,8 @@ type Msg action
     | ActionError String
 
 
-update : ActionConfig action -> Msg action -> Model -> ( Model, Cmd (Msg action) )
-update config msg model =
+update : Resolve.FunctionDict -> ActionConfig action -> Msg action -> Model -> ( Model, Cmd (Msg action) )
+update functions config msg model =
     case msg of
         SpecReceived _ ->
             ( model, Cmd.none )
@@ -65,7 +64,7 @@ update config msg model =
             ( { model | state = State.set path value model.state }, Cmd.none )
 
         ExecuteAction handler repeatCtx ->
-            executeHandler config handler repeatCtx model
+            executeHandler functions config handler repeatCtx model
 
         ActionError _ ->
             ( model, Cmd.none )
@@ -73,8 +72,8 @@ update config msg model =
 
 {-| Execute an EventHandler (single or chained actions) against the model.
 -}
-executeHandler : ActionConfig action -> EventHandler -> Maybe RepeatContext -> Model -> ( Model, Cmd (Msg action) )
-executeHandler config handler repeatCtx model =
+executeHandler : Resolve.FunctionDict -> ActionConfig action -> EventHandler -> Maybe RepeatContext -> Model -> ( Model, Cmd (Msg action) )
+executeHandler functions config handler repeatCtx model =
     let
         bindings =
             case handler of
@@ -86,7 +85,7 @@ executeHandler config handler repeatCtx model =
     in
     List.foldl
         (\binding ( accModel, accCmd ) ->
-            case resolveBinding config binding repeatCtx accModel of
+            case resolveBinding functions config binding repeatCtx accModel of
                 Ok ( resolved, newSeed ) ->
                     let
                         ( newModel, newCmd ) =
@@ -166,11 +165,11 @@ substituteIds seed value =
 {-| Resolve an ActionBinding into a typed ResolvedAction.
 Combines param resolution, $id substitution, and action decoding into one step.
 -}
-resolveBinding : ActionConfig action -> ActionBinding -> Maybe RepeatContext -> Model -> Result String ( ResolvedAction action, Random.Seed )
-resolveBinding config binding repeatCtx model =
+resolveBinding : Resolve.FunctionDict -> ActionConfig action -> ActionBinding -> Maybe RepeatContext -> Model -> Result String ( ResolvedAction action, Random.Seed )
+resolveBinding functions config binding repeatCtx model =
     let
         resolvedParams =
-            Resolve.resolveActionParamsWith config.functions model.state repeatCtx binding.params
+            Resolve.resolveActionParamsWith functions model.state repeatCtx binding.params
     in
     case binding.action of
         "setState" ->
