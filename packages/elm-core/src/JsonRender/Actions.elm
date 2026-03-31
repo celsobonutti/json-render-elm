@@ -19,6 +19,8 @@ import JsonRender.Resolve as Resolve exposing (RepeatContext)
 import JsonRender.Spec exposing (ActionBinding, EventHandler(..), Spec)
 import JsonRender.State as State
 import Random
+import Recursion
+import Recursion.Fold
 import UUID
 
 
@@ -110,86 +112,57 @@ Each "$id" gets a different UUID; the seed threads through.
 -}
 substituteIds : Random.Seed -> Value -> ( Value, Random.Seed )
 substituteIds seed value =
-    substituteIdsLoop seed (SubDescend value) []
+    Recursion.runRecursion substituteIdsStep ( seed, value )
 
 
-type SubStep
-    = SubDescend Value
-    | SubAscend Value
+substituteIdsStep : ( Random.Seed, Value ) -> Recursion.Rec ( Random.Seed, Value ) ( Value, Random.Seed ) ( Value, Random.Seed )
+substituteIdsStep ( seed, value ) =
+    case Decode.decodeValue Decode.string value of
+        Ok str ->
+            if str == "$id" then
+                let
+                    ( uuid, newSeed ) =
+                        Random.step UUID.generator seed
+                in
+                Recursion.base ( Json.Encode.string (UUID.toString uuid), newSeed )
 
+            else
+                Recursion.base ( value, seed )
 
-type SubFrame
-    = SubListFrame (List Value) (List Value)
-    | SubObjectFrame String (List ( String, Value )) (List ( String, Value ))
-
-
-substituteIdsLoop : Random.Seed -> SubStep -> List SubFrame -> ( Value, Random.Seed )
-substituteIdsLoop seed step stack =
-    case step of
-        SubDescend value ->
-            case Decode.decodeValue Decode.string value of
-                Ok str ->
-                    if str == "$id" then
-                        let
-                            ( uuid, newSeed ) =
-                                Random.step UUID.generator seed
-                        in
-                        substituteIdsLoop newSeed (SubAscend (Json.Encode.string (UUID.toString uuid))) stack
-
-                    else
-                        substituteIdsLoop seed (SubAscend value) stack
+        Err _ ->
+            case Decode.decodeValue (Decode.keyValuePairs Decode.value) value of
+                Ok pairs ->
+                    Recursion.Fold.foldMapList
+                        (\( key, val ) ( accPairs, accSeed ) ->
+                            Recursion.recurseThen ( accSeed, val ) <|
+                                \( newVal, newSeed ) ->
+                                    Recursion.base ( ( key, newVal ) :: accPairs, newSeed )
+                        )
+                        ( [], seed )
+                        pairs
+                        |> Recursion.map
+                            (\( processedPairs, finalSeed ) ->
+                                ( Json.Encode.object (List.reverse processedPairs), finalSeed )
+                            )
 
                 Err _ ->
-                    case Decode.decodeValue (Decode.keyValuePairs Decode.value) value of
-                        Ok pairs ->
-                            case pairs of
-                                [] ->
-                                    substituteIdsLoop seed (SubAscend (Json.Encode.object [])) stack
-
-                                ( k, v ) :: rest ->
-                                    substituteIdsLoop seed (SubDescend v) (SubObjectFrame k rest [] :: stack)
+                    case Decode.decodeValue (Decode.list Decode.value) value of
+                        Ok items ->
+                            Recursion.Fold.foldMapList
+                                (\item ( accItems, accSeed ) ->
+                                    Recursion.recurseThen ( accSeed, item ) <|
+                                        \( newItem, newSeed ) ->
+                                            Recursion.base ( newItem :: accItems, newSeed )
+                                )
+                                ( [], seed )
+                                items
+                                |> Recursion.map
+                                    (\( processedItems, finalSeed ) ->
+                                        ( Json.Encode.list identity (List.reverse processedItems), finalSeed )
+                                    )
 
                         Err _ ->
-                            case Decode.decodeValue (Decode.list Decode.value) value of
-                                Ok items ->
-                                    case items of
-                                        [] ->
-                                            substituteIdsLoop seed (SubAscend (Json.Encode.list identity [])) stack
-
-                                        first :: rest ->
-                                            substituteIdsLoop seed (SubDescend first) (SubListFrame rest [] :: stack)
-
-                                Err _ ->
-                                    substituteIdsLoop seed (SubAscend value) stack
-
-        SubAscend val ->
-            case stack of
-                [] ->
-                    ( val, seed )
-
-                (SubListFrame remaining done) :: rest ->
-                    let
-                        newDone =
-                            val :: done
-                    in
-                    case remaining of
-                        [] ->
-                            substituteIdsLoop seed (SubAscend (Json.Encode.list identity (List.reverse newDone))) rest
-
-                        next :: more ->
-                            substituteIdsLoop seed (SubDescend next) (SubListFrame more newDone :: rest)
-
-                (SubObjectFrame key remaining done) :: rest ->
-                    let
-                        newDone =
-                            ( key, val ) :: done
-                    in
-                    case remaining of
-                        [] ->
-                            substituteIdsLoop seed (SubAscend (Json.Encode.object (List.reverse newDone))) rest
-
-                        ( nextKey, nextVal ) :: more ->
-                            substituteIdsLoop seed (SubDescend nextVal) (SubObjectFrame nextKey more newDone :: rest)
+                            Recursion.base ( value, seed )
 
 
 {-| Resolve an ActionBinding into a typed ResolvedAction.
