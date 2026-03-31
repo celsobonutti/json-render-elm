@@ -86,47 +86,66 @@ evaluate : Value -> Maybe RepeatContext -> VisibilityCondition -> Result String 
 evaluate state repeatCtx condition =
     case condition of
         Compare source operator ->
-            let
-                maybeLhs =
-                    resolveSource state repeatCtx source
-            in
-            applyOperator state operator maybeLhs
+            applyOperator state operator (resolveSource state repeatCtx source)
 
         Not inner ->
-            evaluate state repeatCtx inner
-                |> Result.map not
+            case inner of
+                Compare source operator ->
+                    applyOperator state operator (resolveSource state repeatCtx source)
+                        |> Result.map not
+
+                Not doubleNeg ->
+                    evaluate state repeatCtx doubleNeg
+
+                And conditions ->
+                    -- De Morgan: not(A and B) = (not A) or (not B)
+                    evaluateOr state repeatCtx (List.map Not conditions)
+
+                Or conditions ->
+                    -- De Morgan: not(A or B) = (not A) and (not B)
+                    evaluateAnd state repeatCtx (List.map Not conditions)
 
         And conditions ->
-            List.foldl
-                (\c acc ->
-                    case acc of
-                        Err err ->
-                            Err err
-
-                        Ok True ->
-                            evaluate state repeatCtx c
-
-                        Ok False ->
-                            Ok False
-                )
-                (Ok True)
-                conditions
+            evaluateAnd state repeatCtx conditions
 
         Or conditions ->
-            List.foldl
-                (\c acc ->
-                    case acc of
-                        Err err ->
-                            Err err
+            evaluateOr state repeatCtx conditions
 
-                        Ok True ->
-                            Ok True
 
-                        Ok False ->
-                            evaluate state repeatCtx c
-                )
-                (Ok False)
-                conditions
+evaluateAnd : Value -> Maybe RepeatContext -> List VisibilityCondition -> Result String Bool
+evaluateAnd state repeatCtx conditions =
+    case conditions of
+        [] ->
+            Ok True
+
+        c :: rest ->
+            case evaluate state repeatCtx c of
+                Err err ->
+                    Err err
+
+                Ok False ->
+                    Ok False
+
+                Ok True ->
+                    evaluateAnd state repeatCtx rest
+
+
+evaluateOr : Value -> Maybe RepeatContext -> List VisibilityCondition -> Result String Bool
+evaluateOr state repeatCtx conditions =
+    case conditions of
+        [] ->
+            Ok False
+
+        c :: rest ->
+            case evaluate state repeatCtx c of
+                Err err ->
+                    Err err
+
+                Ok True ->
+                    Ok True
+
+                Ok False ->
+                    evaluateOr state repeatCtx rest
 
 
 resolveSource : Value -> Maybe RepeatContext -> Source -> Maybe Value

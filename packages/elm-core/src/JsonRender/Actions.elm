@@ -110,6 +110,16 @@ Each "$id" gets a different UUID; the seed threads through.
 -}
 substituteIds : Random.Seed -> Value -> ( Value, Random.Seed )
 substituteIds seed value =
+    substituteIdsHelp seed value []
+
+
+type SubFrame
+    = SubListFrame (List Value) (List Value)
+    | SubObjectFrame String (List ( String, Value )) (List ( String, Value ))
+
+
+substituteIdsHelp : Random.Seed -> Value -> List SubFrame -> ( Value, Random.Seed )
+substituteIdsHelp seed value stack =
     case Decode.decodeValue Decode.string value of
         Ok str ->
             if str == "$id" then
@@ -117,49 +127,64 @@ substituteIds seed value =
                     ( uuid, newSeed ) =
                         Random.step UUID.generator seed
                 in
-                ( Json.Encode.string (UUID.toString uuid), newSeed )
+                returnSubstituted newSeed (Json.Encode.string (UUID.toString uuid)) stack
 
             else
-                ( value, seed )
+                returnSubstituted seed value stack
 
         Err _ ->
             case Decode.decodeValue (Decode.keyValuePairs Decode.value) value of
                 Ok pairs ->
-                    let
-                        ( newPairs, newSeed ) =
-                            List.foldl
-                                (\( key, val ) ( accPairs, accSeed ) ->
-                                    let
-                                        ( newVal, nextSeed ) =
-                                            substituteIds accSeed val
-                                    in
-                                    ( ( key, newVal ) :: accPairs, nextSeed )
-                                )
-                                ( [], seed )
-                                pairs
-                    in
-                    ( Json.Encode.object (List.reverse newPairs), newSeed )
+                    case pairs of
+                        [] ->
+                            returnSubstituted seed (Json.Encode.object []) stack
+
+                        ( k, v ) :: rest ->
+                            substituteIdsHelp seed v (SubObjectFrame k rest [] :: stack)
 
                 Err _ ->
                     case Decode.decodeValue (Decode.list Decode.value) value of
                         Ok items ->
-                            let
-                                ( newItems, newSeed ) =
-                                    List.foldl
-                                        (\item ( accItems, accSeed ) ->
-                                            let
-                                                ( newItem, nextSeed ) =
-                                                    substituteIds accSeed item
-                                            in
-                                            ( newItem :: accItems, nextSeed )
-                                        )
-                                        ( [], seed )
-                                        items
-                            in
-                            ( Json.Encode.list identity (List.reverse newItems), newSeed )
+                            case items of
+                                [] ->
+                                    returnSubstituted seed (Json.Encode.list identity []) stack
+
+                                first :: rest ->
+                                    substituteIdsHelp seed first (SubListFrame rest [] :: stack)
 
                         Err _ ->
-                            ( value, seed )
+                            returnSubstituted seed value stack
+
+
+returnSubstituted : Random.Seed -> Value -> List SubFrame -> ( Value, Random.Seed )
+returnSubstituted seed val stack =
+    case stack of
+        [] ->
+            ( val, seed )
+
+        (SubListFrame remaining done) :: rest ->
+            let
+                newDone =
+                    val :: done
+            in
+            case remaining of
+                [] ->
+                    returnSubstituted seed (Json.Encode.list identity (List.reverse newDone)) rest
+
+                next :: more ->
+                    substituteIdsHelp seed next (SubListFrame more newDone :: rest)
+
+        (SubObjectFrame key remaining done) :: rest ->
+            let
+                newDone =
+                    ( key, val ) :: done
+            in
+            case remaining of
+                [] ->
+                    returnSubstituted seed (Json.Encode.object (List.reverse newDone)) rest
+
+                ( nextKey, nextVal ) :: more ->
+                    substituteIdsHelp seed nextVal (SubObjectFrame nextKey more newDone :: rest)
 
 
 {-| Resolve an ActionBinding into a typed ResolvedAction.
