@@ -1,4 +1,4 @@
-module Components.Card exposing (CardProps, component, propsDecoder)
+module Catalog.Components.Card exposing (CardProps, component, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, div, h3, p, text)

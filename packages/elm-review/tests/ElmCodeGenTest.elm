@@ -78,10 +78,10 @@ suite =
             \_ ->
                 let
                     code =
-                        ElmCodeGen.componentModule "Components" "Card" cardSchema
+                        ElmCodeGen.componentModule "Catalog" "Card" cardSchema
                 in
                 Expect.all
-                    [ \c -> String.contains "module Components.Card" c |> Expect.equal True
+                    [ \c -> String.contains "module Catalog.Components.Card" c |> Expect.equal True
                     , \c -> String.contains "view ctx =" c |> Expect.equal True
                     , \c -> String.contains "()" c |> Expect.equal True
                     ]
@@ -90,13 +90,13 @@ suite =
             \_ ->
                 let
                     code =
-                        ElmCodeGen.registryModule "Components" [ "Card", "Button" ] False
+                        ElmCodeGen.registryModule "Catalog" [ "Card", "Button" ] False
                 in
                 Expect.all
-                    [ \c -> String.contains "module Components.Registry" c |> Expect.equal True
-                    , \c -> String.contains "import Components.Card" c |> Expect.equal True
-                    , \c -> String.contains "import Components.Button" c |> Expect.equal True
-                    , \c -> String.contains "( \"Card\", Components.Card.component )" c |> Expect.equal True
+                    [ \c -> String.contains "module Catalog.Registry" c |> Expect.equal True
+                    , \c -> String.contains "import Catalog.Components.Card" c |> Expect.equal True
+                    , \c -> String.contains "import Catalog.Components.Button" c |> Expect.equal True
+                    , \c -> String.contains "( \"Card\", Catalog.Components.Card.component )" c |> Expect.equal True
                     ]
                     code
         , test "generates bindings type alias" <|
@@ -127,7 +127,7 @@ suite =
             \_ ->
                 let
                     code =
-                        ElmCodeGen.componentModule "Components" "Card" cardSchema
+                        ElmCodeGen.componentModule "Catalog" "Card" cardSchema
                 in
                 Expect.all
                     [ \c -> String.contains "CardBindings" c |> Expect.equal True
@@ -158,9 +158,9 @@ suite =
                     |> Expect.equal True
         , test "generates actions module" <|
             \_ ->
-                ElmCodeGen.actionsModule "Components" testActions
+                ElmCodeGen.actionsModule "Catalog" testActions
                     |> Expect.all
-                        [ \c -> String.contains "module Components.Actions" c |> Expect.equal True
+                        [ \c -> String.contains "module Catalog.Actions" c |> Expect.equal True
                         , \c -> String.contains "type Action" c |> Expect.equal True
                         , \c -> String.contains "type alias ExportParams" c |> Expect.equal True
                         , \c -> String.contains "decodeAction" c |> Expect.equal True
@@ -169,12 +169,12 @@ suite =
                         ]
         , test "actions module exposes actionConfig, decodeAction, handleAction" <|
             \_ ->
-                ElmCodeGen.actionsModule "Components" testActions
+                ElmCodeGen.actionsModule "Catalog" testActions
                     |> String.contains "exposing (Action(..), actionConfig, decodeAction, handleAction)"
                     |> Expect.equal True
         , test "actions module has correct imports" <|
             \_ ->
-                ElmCodeGen.actionsModule "Components" testActions
+                ElmCodeGen.actionsModule "Catalog" testActions
                     |> Expect.all
                         [ \c -> String.contains "import Dict exposing (Dict)" c |> Expect.equal True
                         , \c -> String.contains "import Json.Decode as Decode" c |> Expect.equal True
@@ -328,7 +328,7 @@ suite =
                             , ( "click", { params = Dict.empty, description = "Click" } )
                             ]
                 in
-                ElmCodeGen.actionsModule "Components" onlyEmptyActions
+                ElmCodeGen.actionsModule "Catalog" onlyEmptyActions
                     |> Expect.all
                         [ \c -> String.contains "type alias" c |> Expect.equal False
                         , \c -> String.contains "Ok Press" c |> Expect.equal True

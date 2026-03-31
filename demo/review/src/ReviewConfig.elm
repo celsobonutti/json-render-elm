@@ -43,7 +43,7 @@ config : List Rule
 config =
     [ JsonRender.CatalogSync.rule
         { schemaJson = CatalogData.schemaJson
-        , componentsNamespace = "Components"
+        , catalogNamespace = "Catalog"
         }
     , NoUnused.Variables.rule
     ]

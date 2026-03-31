@@ -28,7 +28,7 @@ import Set exposing (Set)
 
 type alias Config =
     { schemaJson : String
-    , componentsNamespace : String
+    , catalogNamespace : String
     }
 
 
@@ -103,24 +103,18 @@ fromProjectToModule catalog config =
                 moduleStr =
                     String.join "." (Node.value moduleName)
 
+                componentsPrefix =
+                    config.catalogNamespace ++ ".Components."
+
                 componentName =
                     case catalog of
                         Just cat ->
-                            if String.startsWith (config.componentsNamespace ++ ".") moduleStr then
+                            if String.startsWith componentsPrefix moduleStr then
                                 let
                                     suffix =
-                                        String.dropLeft (String.length config.componentsNamespace + 1) moduleStr
+                                        String.dropLeft (String.length componentsPrefix) moduleStr
                                 in
-                                if suffix == "Registry" then
-                                    Nothing
-
-                                else if suffix == "Actions" then
-                                    Nothing
-
-                                else if suffix == "Functions" then
-                                    Nothing
-
-                                else if Dict.member suffix cat.components then
+                                if Dict.member suffix cat.components then
                                     Just suffix
 
                                 else
@@ -136,9 +130,9 @@ fromProjectToModule catalog config =
             , config = config
             , moduleName = moduleStr
             , isComponentModule = componentName
-            , isRegistryModule = moduleStr == config.componentsNamespace ++ ".Registry"
-            , isActionsModule = moduleStr == config.componentsNamespace ++ ".Actions"
-            , isFunctionsModule = moduleStr == config.componentsNamespace ++ ".Functions"
+            , isRegistryModule = moduleStr == config.catalogNamespace ++ ".Registry"
+            , isActionsModule = moduleStr == config.catalogNamespace ++ ".Actions"
+            , isFunctionsModule = moduleStr == config.catalogNamespace ++ ".Functions"
             , registryEntries = Set.empty
             , moduleKey = moduleKey
             , moduleRange = Nothing
@@ -220,7 +214,7 @@ declarationListVisitor declarations context =
 
                                         generatedCode =
                                             ElmCodeGen.registryModule
-                                                context.config.componentsNamespace
+                                                context.config.catalogNamespace
                                                 (Dict.keys catalog.components |> List.sort)
                                                 (not (Dict.isEmpty catalog.functions))
                                     in
@@ -301,7 +295,7 @@ declarationListVisitor declarations context =
 
                                         generatedCode =
                                             ElmCodeGen.actionsModule
-                                                context.config.componentsNamespace
+                                                context.config.catalogNamespace
                                                 catalog.actions
                                     in
                                     [ Rule.errorWithFix
@@ -340,7 +334,7 @@ declarationListVisitor declarations context =
 
                                         generatedCode =
                                             ElmCodeGen.functionsModule
-                                                context.config.componentsNamespace
+                                                context.config.catalogNamespace
                                                 catalog.functions
                                     in
                                     [ Rule.errorWithFix
@@ -381,7 +375,7 @@ declarationListVisitor declarations context =
 
                                                 generatedCode =
                                                     ElmCodeGen.componentModule
-                                                        context.config.componentsNamespace
+                                                        context.config.catalogNamespace
                                                         componentName
                                                         schema
                                             in
@@ -524,7 +518,7 @@ finalEvaluation config projectCtx =
         Just catalog ->
             let
                 nsPath =
-                    String.replace "." "/" config.componentsNamespace
+                    String.replace "." "/" config.catalogNamespace
 
                 missingComponents =
                     Dict.keys catalog.components
@@ -552,39 +546,59 @@ finalEvaluation config projectCtx =
                            )
 
                 allMissing =
-                    missingComponents ++ missingInfra
+                    List.map (\name -> { name = name, isComponent = True }) missingComponents
+                        ++ List.map (\name -> { name = name, isComponent = False }) missingInfra
             in
             if List.isEmpty allMissing then
                 []
 
             else
                 let
+                    moduleAndPath entry =
+                        if entry.isComponent then
+                            { moduleName = config.catalogNamespace ++ ".Components." ++ entry.name
+                            , filePath = "src/" ++ nsPath ++ "/Components/" ++ entry.name ++ ".elm"
+                            }
+
+                        else
+                            { moduleName = config.catalogNamespace ++ "." ++ entry.name
+                            , filePath = "src/" ++ nsPath ++ "/" ++ entry.name ++ ".elm"
+                            }
+
+                    dirs =
+                        ("mkdir -p src/" ++ nsPath)
+                            ++ (if List.any .isComponent allMissing then
+                                    " src/" ++ nsPath ++ "/Components"
+
+                                else
+                                    ""
+                               )
+
                     stubCommand =
                         allMissing
                             |> List.map
-                                (\name ->
+                                (\entry ->
+                                    let
+                                        info =
+                                            moduleAndPath entry
+                                    in
                                     "echo 'module "
-                                        ++ config.componentsNamespace
-                                        ++ "."
-                                        ++ name
-                                        ++ " exposing (..)' > src/"
-                                        ++ nsPath
-                                        ++ "/"
-                                        ++ name
-                                        ++ ".elm"
+                                        ++ info.moduleName
+                                        ++ " exposing (..)' > "
+                                        ++ info.filePath
                                 )
                             |> String.join " && \\\n  "
 
                     fileList =
                         allMissing
-                            |> List.map (\name -> "src/" ++ nsPath ++ "/" ++ name ++ ".elm")
+                            |> List.map (\entry -> (moduleAndPath entry).filePath)
                             |> String.join ", "
                 in
                 [ Rule.globalError
-                    { message = "Missing modules: " ++ String.join ", " allMissing
+                    { message = "Missing modules: " ++ String.join ", " (List.map .name allMissing)
                     , details =
                         [ "Create these files: " ++ fileList
-                        , "Quick stub command:\n\nmkdir -p src/" ++ nsPath ++ " && \\\n  " ++ stubCommand
+                        , "Quick stub command:\n\n" ++ dirs ++ " && \\\n  " ++ stubCommand
                         , "Then run elm-review --fix to fill them in."
                         ]
                     }

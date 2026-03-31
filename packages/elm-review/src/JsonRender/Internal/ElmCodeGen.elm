@@ -130,7 +130,7 @@ componentModule : String -> String -> ComponentSchema -> String
 componentModule namespace componentName schema =
     let
         moduleName =
-            namespace ++ "." ++ componentName
+            namespace ++ ".Components." ++ componentName
 
         typeAlias =
             propsTypeAlias componentName schema
@@ -641,7 +641,7 @@ registryModule namespace componentNames hasFunctions =
     let
         imports =
             List.map
-                (\name -> "import " ++ namespace ++ "." ++ name)
+                (\name -> "import " ++ namespace ++ ".Components." ++ name)
                 componentNames
 
         functionsImport =
@@ -658,7 +658,7 @@ registryModule namespace componentNames hasFunctions =
                         ++ name
                         ++ "\", "
                         ++ namespace
-                        ++ "."
+                        ++ ".Components."
                         ++ name
                         ++ ".component )"
                 )

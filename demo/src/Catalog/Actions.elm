@@ -1,4 +1,4 @@
-module Components.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)
+module Catalog.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)
 
 import Dict exposing (Dict)
 import Json.Decode as Decode
