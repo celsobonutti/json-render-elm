@@ -31,6 +31,7 @@ import Html exposing (Html)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions as Actions exposing (Msg)
+import JsonRender.Internal.EventHandle exposing (EventHandle)
 import JsonRender.Render as Render exposing (Component, ComponentContext, Registry)
 import JsonRender.Resolve exposing (ResolvedValue)
 import JsonRender.Spec as Spec exposing (Spec)
@@ -129,7 +130,7 @@ render =
 -}
 register :
     (Dict String ResolvedValue -> Result String props)
-    -> (Dict String (Value -> Msg action) -> bindings)
+    -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
     -> (ComponentContext props bindings (Msg action) -> Html (Msg action))
     -> Component (Msg action)
 register =

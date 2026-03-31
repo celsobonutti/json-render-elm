@@ -4,7 +4,7 @@ import Dict
 import Expect
 import Html exposing (div, text)
 import Html.Attributes exposing (class)
-import Html.Events exposing (onClick)
+import JsonRender.Events as Events
 import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender.Internal.PropValue exposing (PropValue(..))
@@ -57,7 +57,7 @@ testRegistry =
                     (\ctx ->
                         Html.button
                             [ class "button"
-                            , onClick (ctx.emit "press")
+                            , Events.onClick (ctx.emit "press")
                             ]
                             [ text ctx.props ]
                     )
