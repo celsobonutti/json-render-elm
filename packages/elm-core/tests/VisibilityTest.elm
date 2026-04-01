@@ -3,11 +3,12 @@ module VisibilityTest exposing (..)
 import Expect
 import Json.Decode as Decode
 import Json.Encode as Encode
+import JsonRender.Internal.Condition as Condition
 import JsonRender.Visibility as Visibility
 import Test exposing (..)
 
 
-eval : Encode.Value -> Maybe Visibility.RepeatContext -> String -> Result String Bool
+eval : Encode.Value -> Maybe Condition.RepeatContext -> String -> Result String Bool
 eval state repeatCtx json =
     case Decode.decodeString Visibility.decoder json of
         Ok condition ->

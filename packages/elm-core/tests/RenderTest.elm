@@ -1051,4 +1051,304 @@ suite =
                         Err err ->
                             Expect.fail (Decode.errorToString err)
             ]
+        , describe "$cond conditions"
+            [ test "$cond with eq resolves matching branch" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$state": "/selected", "eq": "a" },
+                                      "$then": "primary",
+                                      "$else": "secondary"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "selected", Encode.string "a" ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "primary" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$cond with eq resolves else when no match" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$state": "/selected", "eq": "a" },
+                                      "$then": "primary",
+                                      "$else": "secondary"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "selected", Encode.string "b" ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "secondary" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$cond with neq resolves correctly" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$state": "/role", "neq": "admin" },
+                                      "$then": "restricted",
+                                      "$else": "full-access"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "role", Encode.string "admin" ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "full-access" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$cond with gt resolves correctly" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$state": "/count", "gt": 5 },
+                                      "$then": "many",
+                                      "$else": "few"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "count", Encode.int 3 ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "few" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$cond with $and combinator" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$and": [
+                                        { "$state": "/loggedIn" },
+                                        { "$state": "/role", "eq": "admin" }
+                                      ]},
+                                      "$then": "admin-panel",
+                                      "$else": "no-access"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object
+                                [ ( "loggedIn", Encode.bool True )
+                                , ( "role", Encode.string "admin" )
+                                ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "admin-panel" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$cond with not modifier" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$state": "/active", "not": true },
+                                      "$then": "inactive",
+                                      "$else": "active"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "active", Encode.bool True ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "active" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "nested $cond in $then branch" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$state": "/role", "eq": "admin" },
+                                      "$then": {
+                                        "$cond": { "$state": "/level", "gt": 5 },
+                                        "$then": "super-admin",
+                                        "$else": "admin"
+                                      },
+                                      "$else": "user"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object
+                                [ ( "role", Encode.string "admin" )
+                                , ( "level", Encode.int 10 )
+                                ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "super-admin" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$cond with $item source in repeat" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "card",
+                              "elements": {
+                                "card": {
+                                  "type": "Card",
+                                  "props": { "title": "Tasks" },
+                                  "children": ["item"],
+                                  "repeat": { "statePath": "/tasks", "key": "id" }
+                                },
+                                "item": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$item": "done", "eq": true },
+                                      "$then": "completed",
+                                      "$else": "pending"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object
+                                [ ( "tasks"
+                                  , Encode.list identity
+                                        [ Encode.object [ ( "id", Encode.string "1" ), ( "done", Encode.bool True ) ]
+                                        , Encode.object [ ( "id", Encode.string "2" ), ( "done", Encode.bool False ) ]
+                                        ]
+                                  )
+                                ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "completed", Selector.text "pending" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            ]
         ]
