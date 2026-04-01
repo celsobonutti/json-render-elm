@@ -497,4 +497,75 @@ suite =
    - bindingsDecoder
    - component
 -}"""
+        , test "expectedDeclarations for simple component has 5 entries" <|
+            \_ ->
+                ElmCodeGen.expectedDeclarations "Card" cardSchema
+                    |> List.length
+                    |> Expect.equal 5
+        , test "expectedDeclarations names are correct for simple component" <|
+            \_ ->
+                ElmCodeGen.expectedDeclarations "Card" cardSchema
+                    |> List.map .name
+                    |> Expect.equal [ "CardProps", "CardBindings", "propsDecoder", "bindingsDecoder", "component" ]
+        , test "expectedDeclarations kinds are correct for simple component" <|
+            \_ ->
+                ElmCodeGen.expectedDeclarations "Card" cardSchema
+                    |> List.map .kind
+                    |> Expect.equal
+                        [ ElmCodeGen.TypeAliasDecl
+                        , ElmCodeGen.TypeAliasDecl
+                        , ElmCodeGen.FunctionDecl
+                        , ElmCodeGen.FunctionDecl
+                        , ElmCodeGen.FunctionDecl
+                        ]
+        , test "expectedDeclarations includes enum helpers" <|
+            \_ ->
+                ElmCodeGen.expectedDeclarations "Badge" badgeSchema
+                    |> List.map .name
+                    |> Expect.equal
+                        [ "GreenOrRedOrBlue"
+                        , "greenOrRedOrBlueFromString"
+                        , "greenOrRedOrBlueToString"
+                        , "BadgeProps"
+                        , "BadgeBindings"
+                        , "propsDecoder"
+                        , "bindingsDecoder"
+                        , "component"
+                        ]
+        , test "expectedDeclarations includes object helpers" <|
+            \_ ->
+                ElmCodeGen.expectedDeclarations "Card" cardWithObjectSchema
+                    |> List.map .name
+                    |> Expect.equal
+                        [ "MetaObject"
+                        , "metaObjectDecoder"
+                        , "metaObjectEncoder"
+                        , "CardProps"
+                        , "CardBindings"
+                        , "propsDecoder"
+                        , "bindingsDecoder"
+                        , "component"
+                        ]
+        , test "expectedDeclarations enum kind is CustomTypeDecl" <|
+            \_ ->
+                ElmCodeGen.expectedDeclarations "Badge" badgeSchema
+                    |> List.filter (\d -> d.name == "GreenOrRedOrBlue")
+                    |> List.map .kind
+                    |> Expect.equal [ ElmCodeGen.CustomTypeDecl ]
+        , test "expectedDeclarations code for propsDecoder matches propsDecoder output" <|
+            \_ ->
+                let
+                    decls =
+                        ElmCodeGen.expectedDeclarations "Card" cardSchema
+
+                    propsDecoderDecl =
+                        List.filter (\d -> d.name == "propsDecoder") decls
+                            |> List.head
+                in
+                case propsDecoderDecl of
+                    Just d ->
+                        d.code |> Expect.equal (ElmCodeGen.propsDecoder "Card" cardSchema)
+
+                    Nothing ->
+                        Expect.fail "propsDecoder not found in expectedDeclarations"
         ]

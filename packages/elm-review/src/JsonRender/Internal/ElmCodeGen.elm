@@ -1,5 +1,7 @@
 module JsonRender.Internal.ElmCodeGen exposing
-    ( actionConfigFunction
+    ( DeclKind(..)
+    , ExpectedDecl
+    , actionConfigFunction
     , actionParamsType
     , actionType
     , actionsModule
@@ -10,6 +12,7 @@ module JsonRender.Internal.ElmCodeGen exposing
     , componentScaffold
     , decodeActionFunction
     , defaultViewFunction
+    , expectedDeclarations
     , functionsModule
     , generatedComment
     , handleActionFunction
@@ -415,6 +418,192 @@ generatedComment componentName schema =
         ++ "   These values were created by the rule, and will be overwritten by it if changed:\n"
         ++ String.join "\n" allEntries
         ++ "\n-}"
+
+
+type DeclKind
+    = FunctionDecl
+    | TypeAliasDecl
+    | CustomTypeDecl
+
+
+type alias ExpectedDecl =
+    { name : String
+    , kind : DeclKind
+    , code : String
+    }
+
+
+expectedDeclarations : String -> ComponentSchema -> List ExpectedDecl
+expectedDeclarations componentName schema =
+    let
+        enums =
+            collectEnumsFromFields schema.fields
+
+        objects =
+            collectObjectFields schema.fields
+
+        enumDecls =
+            List.concatMap
+                (\variants ->
+                    let
+                        typeName =
+                            TypeMapping.toElmType (SchemaParser.FEnum variants)
+
+                        baseName =
+                            TypeMapping.enumFnBaseName variants
+                    in
+                    [ { name = typeName
+                      , kind = CustomTypeDecl
+                      , code = TypeMapping.enumTypeDeclaration typeName variants
+                      }
+                    , { name = baseName ++ "FromString"
+                      , kind = FunctionDecl
+                      , code = TypeMapping.enumFromStringFunction variants
+                      }
+                    , { name = baseName ++ "ToString"
+                      , kind = FunctionDecl
+                      , code = TypeMapping.enumToStringFunction variants
+                      }
+                    ]
+                )
+                enums
+
+        objectDecls =
+            List.concatMap
+                (\( fieldName, subFields ) ->
+                    let
+                        typeName =
+                            objectTypeName fieldName
+
+                        baseName =
+                            objectFnBaseName fieldName
+
+                        sortedFields =
+                            Dict.toList subFields |> List.sortBy Tuple.first
+
+                        typeAliasCode =
+                            recordTypeAlias typeName
+                                (List.map
+                                    (\( name, field ) ->
+                                        ( name
+                                        , if field.required then
+                                            fieldToTypeAnnotation name field.fieldType
+
+                                          else
+                                            CG.maybeAnn (fieldToTypeAnnotation name field.fieldType)
+                                        )
+                                    )
+                                    sortedFields
+                                )
+                                |> renderDecl
+
+                        decoderPipelineSteps =
+                            List.map
+                                (\( name, field ) ->
+                                    let
+                                        extractor =
+                                            fieldToExtractorExpr name field.fieldType
+
+                                        args =
+                                            if field.required then
+                                                [ CG.fqVal [ "ResolvedValue" ] "required", CG.string name, extractor ]
+
+                                            else
+                                                [ CG.fqVal [ "ResolvedValue" ] "optional", CG.string name, extractor, CG.val "Nothing" ]
+                                    in
+                                    CG.apply args
+                                )
+                                sortedFields
+
+                        decoderBody =
+                            CG.pipe
+                                (CG.apply [ CG.fqVal [ "ResolvedValue" ] "succeed", CG.val typeName ])
+                                decoderPipelineSteps
+
+                        decoderTypeAnn =
+                            CG.funAnn
+                                (CG.typed "Dict" [ CG.stringAnn, CG.typed "ResolvedValue" [] ])
+                                (CG.typed "Result" [ CG.stringAnn, CG.typed typeName [] ])
+
+                        decoderCode =
+                            CG.funDecl Nothing (Just decoderTypeAnn) (baseName ++ "Decoder") [] decoderBody
+                                |> renderDecl
+
+                        encoderFieldExprs =
+                            List.map
+                                (\( name, field ) ->
+                                    let
+                                        encoder =
+                                            fieldToEncoderExpr name field.fieldType
+
+                                        valueExpr =
+                                            if field.required then
+                                                CG.apply [ encoder, CG.access (CG.val "record") name ]
+
+                                            else
+                                                CG.pipe
+                                                    (CG.access (CG.val "record") name)
+                                                    [ CG.apply [ CG.fqVal [ "Maybe" ] "map", encoder ]
+                                                    , CG.apply [ CG.fqVal [ "Maybe" ] "withDefault", CG.fqVal [ "Json", "Encode" ] "null" ]
+                                                    ]
+                                    in
+                                    CG.tuple [ CG.string name, valueExpr ]
+                                )
+                                sortedFields
+
+                        encoderBody =
+                            CG.apply [ CG.fqVal [ "Json", "Encode" ] "object", CG.list encoderFieldExprs ]
+
+                        encoderTypeAnn =
+                            CG.funAnn (CG.typed typeName []) (CG.typed "Value" [])
+
+                        encoderCode =
+                            CG.funDecl Nothing (Just encoderTypeAnn) (baseName ++ "Encoder") [ CG.varPattern "record" ] encoderBody
+                                |> renderDecl
+                    in
+                    [ { name = typeName
+                      , kind = TypeAliasDecl
+                      , code = typeAliasCode
+                      }
+                    , { name = baseName ++ "Decoder"
+                      , kind = FunctionDecl
+                      , code = decoderCode
+                      }
+                    , { name = baseName ++ "Encoder"
+                      , kind = FunctionDecl
+                      , code = encoderCode
+                      }
+                    ]
+                )
+                objects
+
+        coreDecls =
+            [ { name = componentName ++ "Props"
+              , kind = TypeAliasDecl
+              , code = propsTypeAlias componentName schema
+              }
+            , { name = componentName ++ "Bindings"
+              , kind = TypeAliasDecl
+              , code = bindingsTypeAlias componentName schema
+              }
+            , { name = "propsDecoder"
+              , kind = FunctionDecl
+              , code = propsDecoder componentName schema
+              }
+            , { name = "bindingsDecoder"
+              , kind = FunctionDecl
+              , code = bindingsDecoder componentName schema
+              }
+            , { name = "component"
+              , kind = FunctionDecl
+              , code =
+                    CG.funDecl Nothing (Just (CG.typed "Component" [ CG.typeVar "msg" ])) "component" []
+                        (CG.apply [ CG.val "register", CG.val "propsDecoder", CG.val "bindingsDecoder", CG.val "view" ])
+                        |> renderDecl
+              }
+            ]
+    in
+    enumDecls ++ objectDecls ++ coreDecls
 
 
 componentScaffold : String -> String -> ComponentSchema -> String
