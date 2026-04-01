@@ -1350,5 +1350,126 @@ suite =
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)
+            , test "$cond with $or combinator" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$or": [
+                                        { "$state": "/isAdmin" },
+                                        { "$state": "/isModerator" }
+                                      ]},
+                                      "$then": "authorized",
+                                      "$else": "denied"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object
+                                [ ( "isAdmin", Encode.bool False )
+                                , ( "isModerator", Encode.bool True )
+                                ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "authorized" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$cond with $index source in repeat" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "card",
+                              "elements": {
+                                "card": {
+                                  "type": "Card",
+                                  "props": { "title": "Items" },
+                                  "children": ["item"],
+                                  "repeat": { "statePath": "/items", "key": "id" }
+                                },
+                                "item": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$index": true, "eq": 0 },
+                                      "$then": "first",
+                                      "$else": "other"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object
+                                [ ( "items"
+                                  , Encode.list identity
+                                        [ Encode.object [ ( "id", Encode.string "1" ) ]
+                                        , Encode.object [ ( "id", Encode.string "2" ) ]
+                                        ]
+                                  )
+                                ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "first", Selector.text "other" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
+            , test "$cond with lte resolves correctly" <|
+                \_ ->
+                    let
+                        json =
+                            """
+                            {
+                              "root": "t",
+                              "elements": {
+                                "t": {
+                                  "type": "Text",
+                                  "props": {
+                                    "content": {
+                                      "$cond": { "$state": "/count", "lte": 5 },
+                                      "$then": "within-limit",
+                                      "$else": "over-limit"
+                                    }
+                                  },
+                                  "children": []
+                                }
+                              }
+                            }
+                            """
+
+                        state =
+                            Encode.object [ ( "count", Encode.int 5 ) ]
+                    in
+                    case Decode.decodeString Spec.decoder json of
+                        Ok spec ->
+                            Render.render testRegistry state spec
+                                |> Query.fromHtml
+                                |> Query.has [ Selector.text "within-limit" ]
+
+                        Err err ->
+                            Expect.fail (Decode.errorToString err)
             ]
         ]
