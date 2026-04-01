@@ -18,6 +18,7 @@ import Json.Encode exposing (Value)
 import JsonRender.Resolve as Resolve exposing (RepeatContext)
 import JsonRender.Spec exposing (ActionBinding, EventHandler(..), Spec)
 import JsonRender.State as State
+import JsonRender.Validation as Validation
 import Random
 import Recursion
 import Recursion.Fold
@@ -28,6 +29,7 @@ type alias Model =
     { spec : Maybe Spec
     , state : Value
     , seed : Random.Seed
+    , validationState : Dict String Validation.FieldValidation
     }
 
 
@@ -46,6 +48,7 @@ type ResolvedAction action
     = SetState { path : String, value : Value }
     | PushState { path : String, value : Value, clearPath : Maybe String }
     | RemoveState { path : String, index : Maybe Int }
+    | ValidateForm { statePath : String }
     | CustomAction action
 
 
@@ -54,6 +57,8 @@ type Msg action
     | ExecuteAction EventHandler (Maybe RepeatContext)
     | BindingUpdate String Value
     | ActionError String
+    | ValidateField String
+    | ValidateAndEmit String String (Maybe RepeatContext)
 
 
 update : Resolve.FunctionDict -> ActionConfig action -> Msg action -> Model -> ( Model, Cmd (Msg action) )
@@ -69,6 +74,12 @@ update functions config msg model =
             executeHandler functions config handler repeatCtx model
 
         ActionError _ ->
+            ( model, Cmd.none )
+
+        ValidateField _ ->
+            ( model, Cmd.none )
+
+        ValidateAndEmit _ _ _ ->
             ( model, Cmd.none )
 
 
@@ -227,6 +238,15 @@ resolveBinding functions config binding repeatCtx model =
                 Nothing ->
                     Err "removeState: missing statePath"
 
+        "validateForm" ->
+            let
+                statePath =
+                    Dict.get "statePath" resolvedParams
+                        |> Maybe.andThen (\v -> Decode.decodeValue Decode.string v |> Result.toMaybe)
+                        |> Maybe.withDefault "/formValidation"
+            in
+            Ok ( ValidateForm { statePath = statePath }, model.seed )
+
         _ ->
             case config.decodeAction binding.action resolvedParams of
                 Ok action ->
@@ -267,6 +287,9 @@ applyAction config resolved model =
                             path
             in
             ( { model | state = State.remove fullPath model.state }, Cmd.none )
+
+        ValidateForm _ ->
+            ( model, Cmd.none )
 
         CustomAction action ->
             config.handleAction action model

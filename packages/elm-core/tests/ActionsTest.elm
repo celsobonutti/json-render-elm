@@ -50,7 +50,7 @@ decodeTestAction name params =
 
 testModel : Encode.Value -> Actions.Model
 testModel state =
-    { spec = Nothing, state = state, seed = Random.initialSeed 42 }
+    { spec = Nothing, state = state, seed = Random.initialSeed 42, validationState = Dict.empty }
 
 
 executeAction : String -> List ( String, PropValue ) -> Msg TestAction

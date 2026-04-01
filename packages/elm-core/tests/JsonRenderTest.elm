@@ -1,5 +1,6 @@
 module JsonRenderTest exposing (..)
 
+import Dict
 import Expect
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -158,6 +159,7 @@ suite =
                                 Encode.object
                                     [ ( "existing", Encode.string "keep me" ) ]
                             , seed = testSeed
+                            , validationState = Dict.empty
                             }
 
                         result =

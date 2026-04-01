@@ -23,22 +23,29 @@ import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext, ResolvedValue)
 import JsonRender.Spec exposing (Element, EventHandler, Repeat, Spec, shouldPreventDefault)
 import JsonRender.State as State
+import JsonRender.Validation as Validation
 import JsonRender.Visibility as Visibility
 
 
-type alias ComponentContext props bindings msg =
+type alias ComponentContext props bindings validation msg =
     { props : props
     , bindings : bindings
+    , validation : validation
     , children : List (Html msg)
     , emit : String -> EventHandle msg
+    , validate : EventHandle msg
+    , validateAndEmit : String -> EventHandle msg
     }
 
 
 type alias RawComponentContext msg =
     { props : Dict String ResolvedValue
     , bindings : Dict String (Value -> EventHandle msg)
+    , validation : Dict String Validation.FieldValidation
     , children : List (Html msg)
     , emit : String -> EventHandle msg
+    , validate : EventHandle msg
+    , validateAndEmit : String -> EventHandle msg
     }
 
 
@@ -55,9 +62,10 @@ type alias Registry msg =
 register :
     (Dict String ResolvedValue -> Result String props)
     -> (Dict String (Value -> EventHandle msg) -> bindings)
-    -> (ComponentContext props bindings msg -> Html msg)
+    -> (Dict String Validation.FieldValidation -> validation)
+    -> (ComponentContext props bindings validation msg -> Html msg)
     -> Component msg
-register propsDecoder bindingsDecoder view =
+register propsDecoder bindingsDecoder validationDecoder view =
     Component
         (\raw ->
             case propsDecoder raw.props of
@@ -65,8 +73,11 @@ register propsDecoder bindingsDecoder view =
                     view
                         { props = typed
                         , bindings = bindingsDecoder raw.bindings
+                        , validation = validationDecoder raw.validation
                         , children = raw.children
                         , emit = raw.emit
+                        , validate = raw.validate
+                        , validateAndEmit = raw.validateAndEmit
                         }
 
                 Err err ->
@@ -113,6 +124,49 @@ extractBindings repeatCtx props =
         props
 
 
+findBindPropName : Dict String PropValue -> Maybe String
+findBindPropName props =
+    Dict.foldl
+        (\key propValue acc ->
+            case acc of
+                Just _ ->
+                    acc
+
+                Nothing ->
+                    case propValue of
+                        BindStateExpr _ ->
+                            Just key
+
+                        BindItemExpr _ ->
+                            Just key
+
+                        _ ->
+                            Nothing
+        )
+        Nothing
+        props
+
+
+findBindStatePath : Dict String PropValue -> Maybe String
+findBindStatePath props =
+    Dict.foldl
+        (\_ propValue acc ->
+            case acc of
+                Just _ ->
+                    acc
+
+                Nothing ->
+                    case propValue of
+                        BindStateExpr path ->
+                            Just path
+
+                        _ ->
+                            Nothing
+        )
+        Nothing
+        props
+
+
 {-| Build an emit function from an element's `on` dict and the current repeat context.
 Looks up the event name in the `on` dict and produces the appropriate Msg.
 -}
@@ -128,12 +182,12 @@ buildEmit onHandlers repeatCtx eventName =
             EventHandle.fromMsg (ActionError ("No handler for event: " ++ eventName))
 
 
-renderChildren : Registry (Msg action) -> Value -> Maybe RepeatContext -> Spec -> List String -> List (Html (Msg action))
-renderChildren registry state repeatCtx spec childIds =
+renderChildren : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> List String -> List (Html (Msg action))
+renderChildren registry state validationState repeatCtx spec childIds =
     List.filterMap
         (\id ->
             Dict.get id spec.elements
-                |> Maybe.map (renderElement registry state repeatCtx spec)
+                |> Maybe.map (renderElement registry state validationState repeatCtx spec)
         )
         childIds
 
@@ -163,8 +217,8 @@ getItemKey maybeKey index item =
             String.fromInt index
 
 
-renderRepeatedChildren : Registry (Msg action) -> Value -> Spec -> Element -> Repeat -> List (Html (Msg action))
-renderRepeatedChildren registry state spec element repeat =
+renderRepeatedChildren : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Spec -> Element -> Repeat -> List (Html (Msg action))
+renderRepeatedChildren registry state validationState spec element repeat =
     case State.get repeat.statePath state |> Maybe.andThen decodeList of
         Just items ->
             let
@@ -189,7 +243,7 @@ renderRepeatedChildren registry state spec element repeat =
                                 List.filterMap
                                     (\id ->
                                         Dict.get id spec.elements
-                                            |> Maybe.map (\el -> ( itemKey, renderElement registry state ctx spec el ))
+                                            |> Maybe.map (\el -> ( itemKey, renderElement registry state validationState ctx spec el ))
                                     )
                                     element.children
 
@@ -197,7 +251,7 @@ renderRepeatedChildren registry state spec element repeat =
                                 List.filterMap
                                     (\id ->
                                         Dict.get id spec.elements
-                                            |> Maybe.map (\el -> ( id ++ "-" ++ String.fromInt i ++ "-" ++ itemKey, renderElement registry state ctx spec el ))
+                                            |> Maybe.map (\el -> ( id ++ "-" ++ String.fromInt i ++ "-" ++ itemKey, renderElement registry state validationState ctx spec el ))
                                     )
                                     element.children
                         )
@@ -210,23 +264,23 @@ renderRepeatedChildren registry state spec element repeat =
             []
 
 
-render : Registry (Msg action) -> Value -> Spec -> Html (Msg action)
-render registry state spec =
+render : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Spec -> Html (Msg action)
+render registry state validationState spec =
     case Dict.get spec.root spec.elements of
         Just element ->
-            renderElement registry state Nothing spec element
+            renderElement registry state validationState Nothing spec element
 
         Nothing ->
             Html.text ""
 
 
-renderElement : Registry (Msg action) -> Value -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
-renderElement registry state repeatCtx spec element =
+renderElement : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
+renderElement registry state validationState repeatCtx spec element =
     case element.visible of
         Just condition ->
             case Visibility.evaluate state repeatCtx condition of
                 Ok True ->
-                    renderElementInner registry state repeatCtx spec element
+                    renderElementInner registry state validationState repeatCtx spec element
 
                 Ok False ->
                     Html.text ""
@@ -243,11 +297,11 @@ renderElement registry state repeatCtx spec element =
                         [ Html.text ("Visibility error: " ++ err) ]
 
         Nothing ->
-            renderElementInner registry state repeatCtx spec element
+            renderElementInner registry state validationState repeatCtx spec element
 
 
-renderElementInner : Registry (Msg action) -> Value -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
-renderElementInner registry state repeatCtx spec element =
+renderElementInner : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
+renderElementInner registry state validationState repeatCtx spec element =
     case Dict.get element.type_ registry.components of
         Just (Component componentFn) ->
             let
@@ -260,17 +314,55 @@ renderElementInner registry state repeatCtx spec element =
                 children =
                     case element.repeat of
                         Just repeat ->
-                            renderRepeatedChildren registry state spec element repeat
+                            renderRepeatedChildren registry state validationState spec element repeat
 
                         Nothing ->
-                            renderChildren registry state repeatCtx spec element.children
+                            renderChildren registry state validationState repeatCtx spec element.children
+
+                bindPropName =
+                    findBindPropName element.props
+
+                bindStatePath =
+                    findBindStatePath element.props
+
+                fieldValidation =
+                    case ( bindPropName, bindStatePath ) of
+                        ( Just propName, Just path ) ->
+                            case Dict.get path validationState of
+                                Just fv ->
+                                    Dict.singleton propName fv
+
+                                Nothing ->
+                                    Dict.empty
+
+                        _ ->
+                            Dict.empty
+
+                validateHandle =
+                    case bindStatePath of
+                        Just path ->
+                            EventHandle.fromMsg (ValidateField path)
+
+                        Nothing ->
+                            EventHandle.fromMsg (ActionError "No validation config")
+
+                validateAndEmitHandle eventName =
+                    case bindStatePath of
+                        Just path ->
+                            EventHandle.fromMsg (ValidateAndEmit path eventName repeatCtx)
+
+                        Nothing ->
+                            buildEmit element.on repeatCtx eventName
 
                 componentHtml =
                     componentFn
                         { props = resolved
                         , bindings = bindings
+                        , validation = fieldValidation
                         , children = children
                         , emit = buildEmit element.on repeatCtx
+                        , validate = validateHandle
+                        , validateAndEmit = validateAndEmitHandle
                         }
 
                 watcherTriggers =
