@@ -232,6 +232,7 @@ Discovered via parity tests (`demo/test/specs/parity/`). These are behavioral di
 | **Unknown `$computed` function** | Shows "Props error: Unknown function: X" | Returns `undefined`, renders empty content |
 | **`$id` generation format** | 36-char UUID v4 (via `TSFoster/elm-uuid`) | Timestamp-based ID (`Date.now()-counter`, ~15 chars) |
 | **Chained watcher actions** | All chained actions execute synchronously in order | First action triggers re-render, which cancels remaining chained actions via React's effect cleanup |
+| **`$computed` in `$cond` condition** | Evaluates the function result for truthiness | Silently returns `false` (unsupported) |
 
 ### Internal Improvements (not parity gaps)
 - **ElmCodeGen AST refactor** — replace string concatenation in `ElmCodeGen.elm` with `the-sett/elm-syntax-dsl` for AST-based code generation. See `docs/superpowers/specs/2026-03-26-elm-codegen-refactor.md`

@@ -225,6 +225,7 @@ cd demo && npx playwright test --project=parity
 | Unknown `$computed` function | Visible error message | Returns `undefined` |
 | `$id` generation | UUID v4 (36 chars) | Timestamp-based (`Date.now()-counter`) |
 | Chained watcher actions | All execute in order | Re-render cancels remaining chain |
+| `$computed` in `$cond` condition | Evaluates function result for truthiness | Silently returns `false` (unsupported) |
 
 ## elm-review CatalogSync
 
