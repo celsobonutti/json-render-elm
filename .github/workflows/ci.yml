@@ -104,6 +104,7 @@ jobs:
       - name: Install demo dependencies
         run: |
           cd demo && npm ci
+          cd ../packages/js-bridge && npm ci
           echo "$ELM_BIN" >> $GITHUB_PATH
 
       - name: Install Playwright browsers
