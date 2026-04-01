@@ -11,10 +11,7 @@ import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias InputProps =
-    { label : Maybe String
-    , placeholder : Maybe String
-    , value : Maybe String
-    }
+    { label : Maybe String, placeholder : Maybe String, value : Maybe String }
 
 
 type alias InputBindings msg =

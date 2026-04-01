@@ -53,22 +53,21 @@ smOrMdOrLgOrXlToString value =
 
 
 type alias TextProps =
-    { content : String
-    , size : Maybe SmOrMdOrLgOrXl
-    }
+    { content : String, size : Maybe SmOrMdOrLgOrXl }
 
 
 type alias TextBindings msg =
-    { content : Maybe (String -> EventHandle msg)
-    , size : Maybe (SmOrMdOrLgOrXl -> EventHandle msg)
-    }
+    { content : Maybe (String -> EventHandle msg), size : Maybe (SmOrMdOrLgOrXl -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String TextProps
 propsDecoder =
     ResolvedValue.succeed TextProps
         |> ResolvedValue.required "content" ResolvedValue.string
-        |> ResolvedValue.optional "size" (\rv -> ResolvedValue.string rv |> Result.andThen smOrMdOrLgOrXlFromString) Nothing
+        |> ResolvedValue.optional
+            "size"
+            (\rv -> ResolvedValue.string rv |> Result.andThen smOrMdOrLgOrXlFromString)
+            Nothing
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> TextBindings msg

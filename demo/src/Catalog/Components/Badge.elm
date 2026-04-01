@@ -60,21 +60,20 @@ greenOrRedOrYellowOrBlueOrGrayToString value =
 
 
 type alias BadgeProps =
-    { color : Maybe GreenOrRedOrYellowOrBlueOrGray
-    , label : String
-    }
+    { color : Maybe GreenOrRedOrYellowOrBlueOrGray, label : String }
 
 
 type alias BadgeBindings msg =
-    { color : Maybe (GreenOrRedOrYellowOrBlueOrGray -> EventHandle msg)
-    , label : Maybe (String -> EventHandle msg)
-    }
+    { color : Maybe (GreenOrRedOrYellowOrBlueOrGray -> EventHandle msg), label : Maybe (String -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String BadgeProps
 propsDecoder =
     ResolvedValue.succeed BadgeProps
-        |> ResolvedValue.optional "color" (\rv -> ResolvedValue.string rv |> Result.andThen greenOrRedOrYellowOrBlueOrGrayFromString) Nothing
+        |> ResolvedValue.optional
+            "color"
+            (\rv -> ResolvedValue.string rv |> Result.andThen greenOrRedOrYellowOrBlueOrGrayFromString)
+            Nothing
         |> ResolvedValue.required "label" ResolvedValue.string
 
 

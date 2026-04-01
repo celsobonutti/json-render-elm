@@ -11,15 +11,11 @@ import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias CardProps =
-    { subtitle : Maybe String
-    , title : String
-    }
+    { subtitle : Maybe String, title : String }
 
 
 type alias CardBindings msg =
-    { subtitle : Maybe (String -> EventHandle msg)
-    , title : Maybe (String -> EventHandle msg)
-    }
+    { subtitle : Maybe (String -> EventHandle msg), title : Maybe (String -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String CardProps
