@@ -1,4 +1,4 @@
-module JsonRender.CatalogSync exposing (Config, findDeclarationRange, findManagedCommentRange, rule)
+module JsonRender.CatalogSync exposing (Config, rule)
 
 {-| elm-review rule that keeps Elm component modules in sync with a json-render catalog.
 
@@ -385,7 +385,7 @@ declarationListVisitor declarations context =
                                     ( Just range, Just schema ) ->
                                         let
                                             viewRange =
-                                                findFunctionRange "view" declarations
+                                                findDeclarationRange "view" ElmCodeGen.FunctionDecl declarations
                                         in
                                         case viewRange of
                                             Nothing ->
@@ -511,25 +511,6 @@ requiredComponentImportLines =
     , ( "JsonRender.Render", "import JsonRender.Render exposing (Component, ComponentContext, register)" )
     , ( "JsonRender.Resolve", "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)" )
     ]
-
-
-findFunctionRange : String -> List (Node Declaration) -> Maybe Range
-findFunctionRange name declarations =
-    List.filterMap
-        (\(Node range decl) ->
-            case decl of
-                Declaration.FunctionDeclaration func ->
-                    if Node.value (Node.value func.declaration).name == name then
-                        Just range
-
-                    else
-                        Nothing
-
-                _ ->
-                    Nothing
-        )
-        declarations
-        |> List.head
 
 
 findDeclarationRange : String -> ElmCodeGen.DeclKind -> List (Node Declaration) -> Maybe Range
