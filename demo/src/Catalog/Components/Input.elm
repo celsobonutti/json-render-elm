@@ -8,20 +8,25 @@
 -}
 
 
-module Catalog.Components.Input exposing (InputBindings, InputProps, bindingsDecoder, component, propsDecoder)
+module Catalog.Components.Input exposing (InputBindings, InputProps, InputValidation, bindingsDecoder, component, propsDecoder, validationDecoder)
 
 import Dict exposing (Dict)
-import Html exposing (Html, div, input, label, text)
+import Html exposing (Html, div, input, label, p, text)
 import Html.Attributes exposing (class, placeholder, type_)
 import Json.Encode exposing (Value)
 import JsonRender.Bind as Bind
 import JsonRender.Events as Events exposing (EventHandle)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
+import JsonRender.Validation as Validation exposing (FieldValidation, ValidateOn(..))
 
 
 type alias InputProps =
-    { label : Maybe String, placeholder : Maybe String, value : Maybe String }
+    { label : Maybe String
+    , placeholder : Maybe String
+    , value : Maybe String
+    , validateOn : ValidateOn
+    }
 
 
 type alias InputBindings msg =
@@ -31,12 +36,37 @@ type alias InputBindings msg =
     }
 
 
+type alias InputValidation =
+    { value : Maybe FieldValidation
+    }
+
+
 propsDecoder : Dict String ResolvedValue -> Result String InputProps
 propsDecoder =
-    ResolvedValue.succeed InputProps
+    ResolvedValue.succeed (\l pl v vo -> InputProps l pl v (Maybe.withDefault OnSubmit vo))
         |> ResolvedValue.optional "label" ResolvedValue.string Nothing
         |> ResolvedValue.optional "placeholder" ResolvedValue.string Nothing
         |> ResolvedValue.optional "value" ResolvedValue.string Nothing
+        |> ResolvedValue.optional "validateOn" decodeValidateOn Nothing
+
+
+decodeValidateOn : ResolvedValue -> Result String ValidateOn
+decodeValidateOn rv =
+    case rv of
+        ResolvedValue.RString "change" ->
+            Ok OnChange
+
+        ResolvedValue.RString "blur" ->
+            Ok OnBlur
+
+        ResolvedValue.RString "submit" ->
+            Ok OnSubmit
+
+        ResolvedValue.RString other ->
+            Err ("Unknown validateOn: " ++ other)
+
+        _ ->
+            Err "validateOn must be a string"
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> InputBindings msg
@@ -47,12 +77,18 @@ bindingsDecoder =
         |> Bind.bindableTyped "value" Json.Encode.string
 
 
+validationDecoder : Dict String FieldValidation -> InputValidation
+validationDecoder =
+    Validation.succeed InputValidation
+        |> Validation.field "value"
+
+
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder (\_ -> ()) view
+    register propsDecoder bindingsDecoder validationDecoder view
 
 
-view : ComponentContext InputProps (InputBindings msg) () msg -> Html msg
+view : ComponentContext InputProps (InputBindings msg) InputValidation msg -> Html msg
 view ctx =
     div [ class "jr-input-wrapper" ]
         ((case ctx.props.label of
@@ -69,11 +105,29 @@ view ctx =
                     , Html.Attributes.value (Maybe.withDefault "" ctx.props.value)
                     , case ctx.bindings.value of
                         Just setValue ->
-                            Events.onInput setValue
+                            Events.onInput (\s -> setValue s)
 
                         Nothing ->
                             class ""
+                    , Events.onBlur
+                        (if ctx.props.validateOn == OnBlur then
+                            ctx.validateAndEmit "blur"
+
+                         else
+                            ctx.emit "blur"
+                        )
                     ]
                     []
+               , case ctx.validation.value of
+                    Just fv ->
+                        if not (List.isEmpty fv.errors) && fv.touched then
+                            p [ class "jr-input-error" ]
+                                [ text (List.head fv.errors |> Maybe.withDefault "") ]
+
+                        else
+                            text ""
+
+                    Nothing ->
+                        text ""
                ]
         )
