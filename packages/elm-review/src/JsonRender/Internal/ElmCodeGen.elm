@@ -470,30 +470,101 @@ actionType actions =
         |> renderDecl
 
 
-decodeActionFunction : Dict String ActionSchema -> String
-decodeActionFunction actions =
-    let
-        sortedActions =
-            Dict.toList actions
-                |> List.sortBy Tuple.first
+fieldToJsonDecoderExpr : SchemaParser.FieldType -> CG.Expression
+fieldToJsonDecoderExpr fieldType =
+    case fieldType of
+        SchemaParser.FString ->
+            CG.fqVal [ "Decode" ] "string"
 
-        branches =
-            List.map actionBranch sortedActions
+        SchemaParser.FInt ->
+            CG.fqVal [ "Decode" ] "int"
 
-        catchAll =
-            "        _ ->\n            Err (\"Unknown action: \" ++ name)"
+        SchemaParser.FFloat ->
+            CG.fqVal [ "Decode" ] "float"
 
-        allBranches =
-            branches ++ [ catchAll ]
-    in
-    "decodeAction : String -> Dict String Value -> Result String Action\n"
-        ++ "decodeAction name params =\n"
-        ++ "    case name of\n"
-        ++ String.join "\n\n" allBranches
+        SchemaParser.FBool ->
+            CG.fqVal [ "Decode" ] "bool"
+
+        SchemaParser.FNullable inner ->
+            CG.parens (CG.apply [ CG.fqVal [ "Decode" ] "nullable", fieldToJsonDecoderExpr inner ])
+
+        SchemaParser.FList inner ->
+            CG.parens (CG.apply [ CG.fqVal [ "Decode" ] "list", fieldToJsonDecoderExpr inner ])
+
+        SchemaParser.FEnum variants ->
+            CG.val (TypeMapping.enumFnBaseName variants ++ "Decoder")
+
+        SchemaParser.FObject _ ->
+            CG.fqVal [ "Decode" ] "value"
 
 
-actionBranch : ( String, ActionSchema ) -> String
-actionBranch ( name, schema ) =
+nestedParamDecodingExpr : List ( String, { a | fieldType : SchemaParser.FieldType, required : Bool } ) -> CG.Expression -> CG.Expression
+nestedParamDecodingExpr params successExpr =
+    case params of
+        [] ->
+            successExpr
+
+        ( pName, field ) :: rest ->
+            let
+                decoderExpr =
+                    fieldToJsonDecoderExpr field.fieldType
+
+                innerExpr =
+                    nestedParamDecodingExpr rest successExpr
+            in
+            if field.required then
+                -- case Dict.get "paramName" params of
+                --     Just paramName_raw ->
+                --         case Decode.decodeValue decoder paramName_raw of
+                --             Ok paramName -> <recurse>
+                --             Err _ -> Err "paramName must be a Type"
+                --     Nothing ->
+                --         Err "missing required param paramName"
+                CG.caseExpr
+                    (CG.apply [ CG.fqVal [ "Dict" ] "get", CG.string pName, CG.val "params" ])
+                    [ ( CG.namedPattern "Just" [ CG.varPattern (pName ++ "_raw") ]
+                      , CG.caseExpr
+                            (CG.apply [ CG.fqVal [ "Decode" ] "decodeValue", decoderExpr, CG.val (pName ++ "_raw") ])
+                            [ ( CG.namedPattern "Ok" [ CG.varPattern pName ]
+                              , innerExpr
+                              )
+                            , ( CG.namedPattern "Err" [ CG.allPattern ]
+                              , CG.apply [ CG.val "Err", CG.string (pName ++ " must be a " ++ TypeMapping.toElmType field.fieldType) ]
+                              )
+                            ]
+                      )
+                    , ( CG.namedPattern "Nothing" []
+                      , CG.apply [ CG.val "Err", CG.string ("missing required param " ++ pName) ]
+                      )
+                    ]
+
+            else
+                -- let
+                --     paramName =
+                --         Dict.get "paramName" params
+                --             |> Maybe.andThen (\raw -> Decode.decodeValue decoder raw |> Result.toMaybe)
+                -- in
+                -- <recurse>
+                CG.letExpr
+                    [ CG.letVal pName
+                        (CG.pipe
+                            (CG.apply [ CG.fqVal [ "Dict" ] "get", CG.string pName, CG.val "params" ])
+                            [ CG.apply
+                                [ CG.fqVal [ "Maybe" ] "andThen"
+                                , CG.lambda [ CG.varPattern "raw" ]
+                                    (CG.pipe
+                                        (CG.apply [ CG.fqVal [ "Decode" ] "decodeValue", decoderExpr, CG.val "raw" ])
+                                        [ CG.fqVal [ "Result" ] "toMaybe" ]
+                                    )
+                                ]
+                            ]
+                        )
+                    ]
+                    innerExpr
+
+
+actionBranchExpr : ( String, ActionSchema ) -> ( CG.Pattern, CG.Expression )
+actionBranchExpr ( name, schema ) =
     let
         capitalName =
             TypeMapping.capitalizeFirst name
@@ -509,7 +580,9 @@ actionBranch ( name, schema ) =
                 |> List.filter (\( _, field ) -> not field.required)
     in
     if Dict.isEmpty schema.params then
-        "        \"" ++ name ++ "\" ->\n            Ok " ++ capitalName
+        ( CG.stringPattern name
+        , CG.apply [ CG.val "Ok", CG.val capitalName ]
+        )
 
     else
         let
@@ -517,98 +590,46 @@ actionBranch ( name, schema ) =
                 sortedParams ++ optionalParams
 
             recordFields =
-                List.map
-                    (\( pName, _ ) -> pName ++ " = " ++ pName)
-                    allParams
-                    |> String.join ", "
+                List.map (\( pName, _ ) -> ( pName, CG.val pName )) allParams
 
             successExpr =
-                "Ok (" ++ capitalName ++ " { " ++ recordFields ++ " })"
+                CG.apply [ CG.val "Ok", CG.parens (CG.apply [ CG.val capitalName, CG.record recordFields ]) ]
         in
-        "        \""
-            ++ name
-            ++ "\" ->\n"
-            ++ nestedParamDecoding allParams successExpr 12
+        ( CG.stringPattern name
+        , nestedParamDecodingExpr allParams successExpr
+        )
 
 
-nestedParamDecoding : List ( String, { a | fieldType : SchemaParser.FieldType, required : Bool } ) -> String -> Int -> String
-nestedParamDecoding params successExpr baseIndent =
-    case params of
-        [] ->
-            indent baseIndent ++ successExpr
+decodeActionFunction : Dict String ActionSchema -> String
+decodeActionFunction actions =
+    let
+        sortedActions =
+            Dict.toList actions
+                |> List.sortBy Tuple.first
 
-        ( pName, field ) :: rest ->
-            let
-                decoderExpr =
-                    TypeMapping.toJsonDecoder field.fieldType
+        actionBranches =
+            List.map actionBranchExpr sortedActions
 
-                currentIndent =
-                    indent baseIndent
+        catchAll =
+            ( CG.allPattern
+            , CG.apply [ CG.val "Err", CG.parens (CG.applyBinOp (CG.string "Unknown action: ") CG.append (CG.val "name")) ]
+            )
 
-                innerIndent =
-                    indent (baseIndent + 4)
+        allBranches =
+            actionBranches ++ [ catchAll ]
 
-                innerInnerIndent =
-                    indent (baseIndent + 8)
-            in
-            if field.required then
-                currentIndent
-                    ++ "case Dict.get \""
-                    ++ pName
-                    ++ "\" params of\n"
-                    ++ innerIndent
-                    ++ "Just "
-                    ++ pName
-                    ++ "_raw ->\n"
-                    ++ innerInnerIndent
-                    ++ "case Decode.decodeValue "
-                    ++ decoderExpr
-                    ++ " "
-                    ++ pName
-                    ++ "_raw of\n"
-                    ++ indent (baseIndent + 12)
-                    ++ "Ok "
-                    ++ pName
-                    ++ " ->\n"
-                    ++ nestedParamDecoding rest successExpr (baseIndent + 16)
-                    ++ "\n\n"
-                    ++ indent (baseIndent + 12)
-                    ++ "Err _ ->\n"
-                    ++ indent (baseIndent + 16)
-                    ++ "Err \""
-                    ++ pName
-                    ++ " must be a "
-                    ++ TypeMapping.toElmType field.fieldType
-                    ++ "\"\n\n"
-                    ++ innerIndent
-                    ++ "Nothing ->\n"
-                    ++ innerInnerIndent
-                    ++ "Err \"missing required param "
-                    ++ pName
-                    ++ "\""
+        body =
+            CG.caseExpr (CG.val "name") allBranches
 
-            else
-                currentIndent
-                    ++ "let\n"
-                    ++ innerIndent
-                    ++ pName
-                    ++ " =\n"
-                    ++ innerInnerIndent
-                    ++ "Dict.get \""
-                    ++ pName
-                    ++ "\" params\n"
-                    ++ innerInnerIndent
-                    ++ "|> Maybe.andThen (\\raw -> Decode.decodeValue "
-                    ++ decoderExpr
-                    ++ " raw |> Result.toMaybe)\n"
-                    ++ currentIndent
-                    ++ "in\n"
-                    ++ nestedParamDecoding rest successExpr baseIndent
-
-
-indent : Int -> String
-indent n =
-    String.repeat n " "
+        typeAnn =
+            CG.funAnn CG.stringAnn
+                (CG.funAnn
+                    (CG.typed "Dict" [ CG.stringAnn, CG.typed "Value" [] ])
+                    (CG.typed "Result" [ CG.stringAnn, CG.typed "Action" [] ])
+                )
+    in
+    CG.funDecl Nothing (Just typeAnn) "decodeAction" [ CG.varPattern "name", CG.varPattern "params" ] body
+        |> renderDecl
 
 
 collectEnumsFromFields : Dict String SchemaParser.FieldSchema -> List (List String)
