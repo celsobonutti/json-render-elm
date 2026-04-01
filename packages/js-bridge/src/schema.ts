@@ -33,6 +33,8 @@ export const schema = defineSchema(
           on: s.any(),
           /** Watchers mapping state paths to action bindings that fire on change */
           watch: s.any(),
+          /** Condition for when validation is enabled on this element */
+          enabled: s.any(),
         }),
       ),
     }),
@@ -85,6 +87,11 @@ export const schema = defineSchema(
         description:
           "Remove a value from state at the given path. Params: { path: string }",
       },
+      {
+        name: "validateForm",
+        description:
+          "Validate all registered form fields and write the result to state. Params: { statePath?: string }. Defaults to /formValidation. Result: { valid: boolean, errors: Record<string, string[]> }.",
+      },
     ],
     defaultRules: [
       // Element integrity
@@ -103,6 +110,9 @@ export const schema = defineSchema(
 
       // Props integrity
       "Every prop listed WITHOUT a `?` suffix is REQUIRED and must always be provided — even inside repeat contexts. Omitting a required prop causes a visible error.",
+
+      // Validation
+      'Form validation: add "checks" prop to Input/Select components for validation. Each check: { "type": "required"|"email"|"minLength"|"maxLength"|"pattern"|"min"|"max"|"numeric"|"url"|"matches"|"equalTo"|"lessThan"|"greaterThan"|"requiredIf", "message": "error text", "args"?: { ... } }. Add "validateOn": "change"|"blur"|"submit" to control timing (default: submit). Use the "validateForm" action on submit buttons to validate all fields.',
 
       // Design quality
       "Design with visual hierarchy: use container components to group content, proper spacing, and status indicators. ONLY use components from the AVAILABLE COMPONENTS list.",
