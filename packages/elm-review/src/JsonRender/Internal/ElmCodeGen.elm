@@ -724,136 +724,89 @@ objectHelpers ( fieldName, subFields ) =
             Dict.toList subFields |> List.sortBy Tuple.first
 
         -- type alias
-        typeFields =
-            List.map
-                (\( name, field ) ->
-                    let
-                        elmType =
-                            if field.required then
-                                fieldToElmType name field.fieldType
-
-                            else
-                                "Maybe " ++ fieldToElmType name field.fieldType
-                    in
-                    name ++ " : " ++ elmType
-                )
-                sortedFields
-
-        typeBody =
-            case typeFields of
-                [] ->
-                    "    {}"
-
-                first :: rest ->
-                    "    { "
-                        ++ first
-                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
-                        ++ "\n    }"
-
         typeAliasCode =
-            "type alias " ++ typeName ++ " =\n" ++ typeBody
+            recordTypeAlias typeName
+                (List.map
+                    (\( name, field ) ->
+                        ( name
+                        , if field.required then
+                            fieldToTypeAnnotation name field.fieldType
+
+                          else
+                            CG.maybeAnn (fieldToTypeAnnotation name field.fieldType)
+                        )
+                    )
+                    sortedFields
+                )
+                |> renderDecl
 
         -- decoder (ResolvedValue pipeline)
-        decoderSteps =
+        decoderPipelineSteps =
             List.map
                 (\( name, field ) ->
                     let
                         extractor =
-                            fieldToExtractor name field.fieldType
-                    in
-                    if field.required then
-                        "        |> ResolvedValue.required \"" ++ name ++ "\" " ++ extractor
+                            fieldToExtractorExpr name field.fieldType
 
-                    else
-                        "        |> ResolvedValue.optional \"" ++ name ++ "\" " ++ extractor ++ " Nothing"
+                        args =
+                            if field.required then
+                                [ CG.fqVal [ "ResolvedValue" ] "required", CG.string name, extractor ]
+
+                            else
+                                [ CG.fqVal [ "ResolvedValue" ] "optional", CG.string name, extractor, CG.val "Nothing" ]
+                    in
+                    CG.apply args
                 )
                 sortedFields
 
+        decoderBody =
+            CG.pipe
+                (CG.apply [ CG.fqVal [ "ResolvedValue" ] "succeed", CG.val typeName ])
+                decoderPipelineSteps
+
+        decoderTypeAnn =
+            CG.funAnn
+                (CG.typed "Dict" [ CG.stringAnn, CG.typed "ResolvedValue" [] ])
+                (CG.typed "Result" [ CG.stringAnn, CG.typed typeName [] ])
+
         decoderCode =
-            baseName
-                ++ "Decoder : Dict String ResolvedValue -> Result String "
-                ++ typeName
-                ++ "\n"
-                ++ baseName
-                ++ "Decoder =\n"
-                ++ "    ResolvedValue.succeed "
-                ++ typeName
-                ++ "\n"
-                ++ String.join "\n" decoderSteps
+            CG.funDecl Nothing (Just decoderTypeAnn) (baseName ++ "Decoder") [] decoderBody
+                |> renderDecl
 
         -- encoder
-        encoderFields =
+        encoderFieldExprs =
             List.map
                 (\( name, field ) ->
                     let
                         encoder =
-                            fieldToEncoder name field.fieldType
-                    in
-                    if field.required then
-                        "        ( \"" ++ name ++ "\", " ++ encoder ++ " record." ++ name ++ " )"
+                            fieldToEncoderExpr name field.fieldType
 
-                    else
-                        "        ( \""
-                            ++ name
-                            ++ "\", record."
-                            ++ name
-                            ++ " |> Maybe.map "
-                            ++ encoder
-                            ++ " |> Maybe.withDefault Json.Encode.null )"
+                        valueExpr =
+                            if field.required then
+                                CG.apply [ encoder, CG.access (CG.val "record") name ]
+
+                            else
+                                CG.pipe
+                                    (CG.access (CG.val "record") name)
+                                    [ CG.apply [ CG.fqVal [ "Maybe" ] "map", encoder ]
+                                    , CG.apply [ CG.fqVal [ "Maybe" ] "withDefault", CG.fqVal [ "Json", "Encode" ] "null" ]
+                                    ]
+                    in
+                    CG.tuple [ CG.string name, valueExpr ]
                 )
                 sortedFields
 
         encoderBody =
-            case encoderFields of
-                [] ->
-                    "    Json.Encode.object []"
+            CG.apply [ CG.fqVal [ "Json", "Encode" ] "object", CG.list encoderFieldExprs ]
 
-                _ ->
-                    "    Json.Encode.object\n"
-                        ++ "        [ "
-                        ++ String.join "\n        , " (List.map String.trimLeft encoderFields)
-                        ++ "\n        ]"
+        encoderTypeAnn =
+            CG.funAnn (CG.typed typeName []) (CG.typed "Value" [])
 
         encoderCode =
-            baseName
-                ++ "Encoder : "
-                ++ typeName
-                ++ " -> Value\n"
-                ++ baseName
-                ++ "Encoder record =\n"
-                ++ encoderBody
+            CG.funDecl Nothing (Just encoderTypeAnn) (baseName ++ "Encoder") [ CG.varPattern "record" ] encoderBody
+                |> renderDecl
     in
     typeAliasCode ++ "\n\n\n" ++ decoderCode ++ "\n\n\n" ++ encoderCode
-
-
-fieldToElmType : String -> SchemaParser.FieldType -> String
-fieldToElmType fieldName fieldType =
-    case fieldType of
-        FObject _ ->
-            objectTypeName fieldName
-
-        _ ->
-            TypeMapping.toElmType fieldType
-
-
-fieldToExtractor : String -> SchemaParser.FieldType -> String
-fieldToExtractor fieldName fieldType =
-    case fieldType of
-        FObject _ ->
-            "(\\rv -> ResolvedValue.object rv |> Result.andThen " ++ objectFnBaseName fieldName ++ "Decoder)"
-
-        _ ->
-            TypeMapping.toResolvedValueExtractor fieldType
-
-
-fieldToEncoder : String -> SchemaParser.FieldType -> String
-fieldToEncoder fieldName fieldType =
-    case fieldType of
-        FObject _ ->
-            objectFnBaseName fieldName ++ "Encoder"
-
-        _ ->
-            TypeMapping.toValueEncoder fieldType
 
 
 handleActionFunction : String
