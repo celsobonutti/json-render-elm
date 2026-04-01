@@ -3,34 +3,78 @@ module Catalog.Components.Stack exposing (StackProps, component, propsDecoder)
 import Dict exposing (Dict)
 import Html exposing (Html, div)
 import Html.Attributes exposing (class, style)
+import Json.Encode exposing (Value)
+import JsonRender.Bind as Bind
+import JsonRender.Events exposing (EventHandle)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
+type VerticalOrHorizontal
+    = Vertical
+    | Horizontal
+
+
+verticalOrHorizontalFromString : String -> Result String VerticalOrHorizontal
+verticalOrHorizontalFromString str =
+    case str of
+        "vertical" ->
+            Ok Vertical
+
+        "horizontal" ->
+            Ok Horizontal
+
+        _ ->
+            Err ("Unknown value: " ++ str ++ ". Expected one of: vertical, horizontal")
+
+
+verticalOrHorizontalToString : VerticalOrHorizontal -> String
+verticalOrHorizontalToString value =
+    case value of
+        Vertical ->
+            "vertical"
+
+        Horizontal ->
+            "horizontal"
+
+
 type alias StackProps =
-    { direction : Maybe String
+    { direction : Maybe VerticalOrHorizontal
     , gap : Maybe Int
+    }
+
+
+type alias StackBindings msg =
+    { direction : Maybe (VerticalOrHorizontal -> EventHandle msg)
+    , gap : Maybe (Int -> EventHandle msg)
     }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String StackProps
 propsDecoder =
     ResolvedValue.succeed StackProps
-        |> ResolvedValue.optional "direction" ResolvedValue.string Nothing
+        |> ResolvedValue.optional "direction" (\rv -> ResolvedValue.string rv |> Result.andThen verticalOrHorizontalFromString) Nothing
         |> ResolvedValue.optional "gap" ResolvedValue.int Nothing
+
+
+bindingsDecoder : Dict String (Value -> EventHandle msg) -> StackBindings msg
+bindingsDecoder =
+    Bind.succeed StackBindings
+        |> Bind.bindableTyped "direction" (Json.Encode.string << verticalOrHorizontalToString)
+        |> Bind.bindableTyped "gap" Json.Encode.int
 
 
 component : Component msg
 component =
-    register propsDecoder (\_ -> ()) view
+    register propsDecoder bindingsDecoder view
 
 
-view : ComponentContext StackProps () msg -> Html msg
+view : ComponentContext StackProps (StackBindings msg) msg -> Html msg
 view ctx =
     let
         dirClass =
             case ctx.props.direction of
-                Just "horizontal" ->
+                Just Horizontal ->
                     "jr-stack-horizontal"
 
                 _ ->

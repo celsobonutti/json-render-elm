@@ -3,35 +3,100 @@ module Catalog.Components.Badge exposing (BadgeProps, component, propsDecoder)
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)
 import Html.Attributes exposing (class)
+import Json.Encode exposing (Value)
+import JsonRender.Bind as Bind
+import JsonRender.Events exposing (EventHandle)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
+type GreenOrRedOrYellowOrBlueOrGray
+    = Green
+    | Red
+    | Yellow
+    | Blue
+    | Gray
+
+
+greenOrRedOrYellowOrBlueOrGrayFromString : String -> Result String GreenOrRedOrYellowOrBlueOrGray
+greenOrRedOrYellowOrBlueOrGrayFromString str =
+    case str of
+        "green" ->
+            Ok Green
+
+        "red" ->
+            Ok Red
+
+        "yellow" ->
+            Ok Yellow
+
+        "blue" ->
+            Ok Blue
+
+        "gray" ->
+            Ok Gray
+
+        _ ->
+            Err ("Unknown value: " ++ str ++ ". Expected one of: green, red, yellow, blue, gray")
+
+
+greenOrRedOrYellowOrBlueOrGrayToString : GreenOrRedOrYellowOrBlueOrGray -> String
+greenOrRedOrYellowOrBlueOrGrayToString value =
+    case value of
+        Green ->
+            "green"
+
+        Red ->
+            "red"
+
+        Yellow ->
+            "yellow"
+
+        Blue ->
+            "blue"
+
+        Gray ->
+            "gray"
+
+
 type alias BadgeProps =
-    { color : Maybe String
+    { color : Maybe GreenOrRedOrYellowOrBlueOrGray
     , label : String
+    }
+
+
+type alias BadgeBindings msg =
+    { color : Maybe (GreenOrRedOrYellowOrBlueOrGray -> EventHandle msg)
+    , label : Maybe (String -> EventHandle msg)
     }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String BadgeProps
 propsDecoder =
     ResolvedValue.succeed BadgeProps
-        |> ResolvedValue.optional "color" ResolvedValue.string Nothing
+        |> ResolvedValue.optional "color" (\rv -> ResolvedValue.string rv |> Result.andThen greenOrRedOrYellowOrBlueOrGrayFromString) Nothing
         |> ResolvedValue.required "label" ResolvedValue.string
+
+
+bindingsDecoder : Dict String (Value -> EventHandle msg) -> BadgeBindings msg
+bindingsDecoder =
+    Bind.succeed BadgeBindings
+        |> Bind.bindableTyped "color" (Json.Encode.string << greenOrRedOrYellowOrBlueOrGrayToString)
+        |> Bind.bindableTyped "label" Json.Encode.string
 
 
 component : Component msg
 component =
-    register propsDecoder (\_ -> ()) view
+    register propsDecoder bindingsDecoder view
 
 
-view : ComponentContext BadgeProps () msg -> Html msg
+view : ComponentContext BadgeProps (BadgeBindings msg) msg -> Html msg
 view ctx =
     let
         colorClass =
             case ctx.props.color of
                 Just c ->
-                    "jr-badge-" ++ c
+                    "jr-badge-" ++ greenOrRedOrYellowOrBlueOrGrayToString c
 
                 Nothing ->
                     "jr-badge-gray"

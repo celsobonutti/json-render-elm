@@ -14,6 +14,7 @@ Workflow:
 import Dict
 import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Expression as Expression exposing (Expression)
+import Elm.Syntax.Import exposing (Import)
 import Elm.Syntax.Module as Module
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range exposing (Range)
@@ -56,6 +57,8 @@ type alias ModuleContext =
     , moduleRange : Maybe Range
     , hasPropsDecoder : Bool
     , extractSourceCode : Range -> String
+    , importedModules : Set String
+    , lastImportEnd : Maybe { row : Int, column : Int }
     }
 
 
@@ -93,6 +96,7 @@ moduleVisitor : Rule.ModuleRuleSchema {} ModuleContext -> Rule.ModuleRuleSchema 
 moduleVisitor schema =
     schema
         |> Rule.withModuleDefinitionVisitor moduleDefinitionVisitor
+        |> Rule.withImportVisitor importVisitor
         |> Rule.withDeclarationListVisitor declarationListVisitor
 
 
@@ -139,6 +143,8 @@ fromProjectToModule catalog config =
             , moduleRange = Nothing
             , hasPropsDecoder = False
             , extractSourceCode = extractSourceCode
+            , importedModules = Set.empty
+            , lastImportEnd = Nothing
             }
         )
         |> Rule.withModuleKey
@@ -182,6 +188,20 @@ foldProjectContexts a b =
 moduleDefinitionVisitor : Node Module.Module -> ModuleContext -> ( List (Rule.Error {}), ModuleContext )
 moduleDefinitionVisitor (Node range _) context =
     ( [], { context | moduleRange = Just range } )
+
+
+importVisitor : Node Import -> ModuleContext -> ( List (Rule.Error {}), ModuleContext )
+importVisitor (Node range import_) context =
+    let
+        moduleName =
+            String.join "." (Node.value import_.moduleName)
+    in
+    ( []
+    , { context
+        | importedModules = Set.insert moduleName context.importedModules
+        , lastImportEnd = Just range.end
+      }
+    )
 
 
 declarationListVisitor : List (Node Declaration) -> ModuleContext -> ( List (Rule.Error {}), ModuleContext )
@@ -427,8 +447,32 @@ declarationListVisitor declarations context =
 
                                                             expectedWithTrailing =
                                                                 expectedBody ++ "\n\n\n"
+
+                                                            bodyOutdated =
+                                                                String.trim currentBody /= String.trim expectedWithTrailing
+
+                                                            missingImportLines =
+                                                                requiredComponentImportLines
+                                                                    |> List.filter (\( modName, _ ) -> not (Set.member modName context.importedModules))
+
+                                                            importFixes =
+                                                                case ( missingImportLines, context.lastImportEnd ) of
+                                                                    ( _ :: _, Just insertPos ) ->
+                                                                        List.map
+                                                                            (\( _, line ) -> Fix.insertAt insertPos ("\n" ++ line))
+                                                                            missingImportLines
+
+                                                                    _ ->
+                                                                        []
+
+                                                            bodyFixes =
+                                                                if bodyOutdated then
+                                                                    [ Fix.replaceRangeBy bRange expectedWithTrailing ]
+
+                                                                else
+                                                                    []
                                                         in
-                                                        if String.trim currentBody == String.trim expectedWithTrailing then
+                                                        if not bodyOutdated && List.isEmpty importFixes then
                                                             []
 
                                                         else
@@ -440,7 +484,7 @@ declarationListVisitor declarations context =
                                                                     ]
                                                                 }
                                                                 range
-                                                                [ Fix.replaceRangeBy bRange expectedWithTrailing ]
+                                                                (importFixes ++ bodyFixes)
                                                             ]
 
                                                     Nothing ->
@@ -453,6 +497,17 @@ declarationListVisitor declarations context =
 
                     Nothing ->
                         ( [], context )
+
+
+requiredComponentImportLines : List ( String, String )
+requiredComponentImportLines =
+    [ ( "Dict", "import Dict exposing (Dict)" )
+    , ( "Json.Encode", "import Json.Encode exposing (Value)" )
+    , ( "JsonRender.Bind", "import JsonRender.Bind as Bind" )
+    , ( "JsonRender.Events", "import JsonRender.Events exposing (EventHandle)" )
+    , ( "JsonRender.Render", "import JsonRender.Render exposing (Component, ComponentContext, register)" )
+    , ( "JsonRender.Resolve", "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)" )
+    ]
 
 
 firstDeclarationStart : List (Node Declaration) -> Maybe { row : Int, column : Int }

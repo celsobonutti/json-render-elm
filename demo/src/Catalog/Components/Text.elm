@@ -3,13 +3,64 @@ module Catalog.Components.Text exposing (TextProps, component, propsDecoder)
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)
 import Html.Attributes exposing (class)
+import Json.Encode exposing (Value)
+import JsonRender.Bind as Bind
+import JsonRender.Events exposing (EventHandle)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
+type SmOrMdOrLgOrXl
+    = Sm
+    | Md
+    | Lg
+    | Xl
+
+
+smOrMdOrLgOrXlFromString : String -> Result String SmOrMdOrLgOrXl
+smOrMdOrLgOrXlFromString str =
+    case str of
+        "sm" ->
+            Ok Sm
+
+        "md" ->
+            Ok Md
+
+        "lg" ->
+            Ok Lg
+
+        "xl" ->
+            Ok Xl
+
+        _ ->
+            Err ("Unknown value: " ++ str ++ ". Expected one of: sm, md, lg, xl")
+
+
+smOrMdOrLgOrXlToString : SmOrMdOrLgOrXl -> String
+smOrMdOrLgOrXlToString value =
+    case value of
+        Sm ->
+            "sm"
+
+        Md ->
+            "md"
+
+        Lg ->
+            "lg"
+
+        Xl ->
+            "xl"
+
+
 type alias TextProps =
     { content : String
-    , size : Maybe String
+    , size : Maybe SmOrMdOrLgOrXl
+    }
+
+
+type alias TextBindings msg =
+    { content : Maybe (String -> EventHandle msg)
+    , size : Maybe (SmOrMdOrLgOrXl -> EventHandle msg)
     }
 
 
@@ -17,21 +68,28 @@ propsDecoder : Dict String ResolvedValue -> Result String TextProps
 propsDecoder =
     ResolvedValue.succeed TextProps
         |> ResolvedValue.required "content" ResolvedValue.string
-        |> ResolvedValue.optional "size" ResolvedValue.string Nothing
+        |> ResolvedValue.optional "size" (\rv -> ResolvedValue.string rv |> Result.andThen smOrMdOrLgOrXlFromString) Nothing
+
+
+bindingsDecoder : Dict String (Value -> EventHandle msg) -> TextBindings msg
+bindingsDecoder =
+    Bind.succeed TextBindings
+        |> Bind.bindableTyped "content" Json.Encode.string
+        |> Bind.bindableTyped "size" (Json.Encode.string << smOrMdOrLgOrXlToString)
 
 
 component : Component msg
 component =
-    register propsDecoder (\_ -> ()) view
+    register propsDecoder bindingsDecoder view
 
 
-view : ComponentContext TextProps () msg -> Html msg
+view : ComponentContext TextProps (TextBindings msg) msg -> Html msg
 view ctx =
     let
         sizeClass =
             case ctx.props.size of
                 Just s ->
-                    "jr-text-" ++ s
+                    "jr-text-" ++ smOrMdOrLgOrXlToString s
 
                 Nothing ->
                     "jr-text-md"

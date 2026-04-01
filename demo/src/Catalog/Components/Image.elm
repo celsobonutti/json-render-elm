@@ -3,6 +3,9 @@ module Catalog.Components.Image exposing (ImageProps, component, propsDecoder)
 import Dict exposing (Dict)
 import Html exposing (Html, img)
 import Html.Attributes exposing (alt, class, src)
+import Json.Encode exposing (Value)
+import JsonRender.Bind as Bind
+import JsonRender.Events exposing (EventHandle)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -13,6 +16,12 @@ type alias ImageProps =
     }
 
 
+type alias ImageBindings msg =
+    { alt : Maybe (String -> EventHandle msg)
+    , src : Maybe (String -> EventHandle msg)
+    }
+
+
 propsDecoder : Dict String ResolvedValue -> Result String ImageProps
 propsDecoder =
     ResolvedValue.succeed ImageProps
@@ -20,12 +29,19 @@ propsDecoder =
         |> ResolvedValue.required "src" ResolvedValue.string
 
 
+bindingsDecoder : Dict String (Value -> EventHandle msg) -> ImageBindings msg
+bindingsDecoder =
+    Bind.succeed ImageBindings
+        |> Bind.bindableTyped "alt" Json.Encode.string
+        |> Bind.bindableTyped "src" Json.Encode.string
+
+
 component : Component msg
 component =
-    register propsDecoder (\_ -> ()) view
+    register propsDecoder bindingsDecoder view
 
 
-view : ComponentContext ImageProps () msg -> Html msg
+view : ComponentContext ImageProps (ImageBindings msg) msg -> Html msg
 view ctx =
     img
         [ src ctx.props.src

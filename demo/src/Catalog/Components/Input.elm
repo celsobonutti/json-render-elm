@@ -1,11 +1,11 @@
-module Catalog.Components.Input exposing (InputBindings, InputProps, component, inputBindingsDecoder, propsDecoder)
+module Catalog.Components.Input exposing (InputBindings, InputProps, bindingsDecoder, component, propsDecoder)
 
 import Dict exposing (Dict)
 import Html exposing (Html, div, input, label, text)
 import Html.Attributes exposing (class, placeholder, type_)
-import JsonRender.Events as Events exposing (EventHandle)
-import Json.Encode as Encode exposing (Value)
+import Json.Encode exposing (Value)
 import JsonRender.Bind as Bind
+import JsonRender.Events as Events exposing (EventHandle)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -18,9 +18,9 @@ type alias InputProps =
 
 
 type alias InputBindings msg =
-    { label : Maybe (Value -> EventHandle msg)
-    , placeholder : Maybe (Value -> EventHandle msg)
-    , value : Maybe (Value -> EventHandle msg)
+    { label : Maybe (String -> EventHandle msg)
+    , placeholder : Maybe (String -> EventHandle msg)
+    , value : Maybe (String -> EventHandle msg)
     }
 
 
@@ -32,17 +32,17 @@ propsDecoder =
         |> ResolvedValue.optional "value" ResolvedValue.string Nothing
 
 
-inputBindingsDecoder : Dict String (Value -> EventHandle msg) -> InputBindings msg
-inputBindingsDecoder =
+bindingsDecoder : Dict String (Value -> EventHandle msg) -> InputBindings msg
+bindingsDecoder =
     Bind.succeed InputBindings
-        |> Bind.bindable "label"
-        |> Bind.bindable "placeholder"
-        |> Bind.bindable "value"
+        |> Bind.bindableTyped "label" Json.Encode.string
+        |> Bind.bindableTyped "placeholder" Json.Encode.string
+        |> Bind.bindableTyped "value" Json.Encode.string
 
 
 component : Component msg
 component =
-    register propsDecoder inputBindingsDecoder view
+    register propsDecoder bindingsDecoder view
 
 
 view : ComponentContext InputProps (InputBindings msg) msg -> Html msg
@@ -62,7 +62,7 @@ view ctx =
                     , Html.Attributes.value (Maybe.withDefault "" ctx.props.value)
                     , case ctx.bindings.value of
                         Just setValue ->
-                            Events.onInput (\s -> setValue (Encode.string s))
+                            Events.onInput (\s -> setValue s)
 
                         Nothing ->
                             class ""
