@@ -69,7 +69,7 @@ view ctx =
                     , Html.Attributes.value (Maybe.withDefault "" ctx.props.value)
                     , case ctx.bindings.value of
                         Just setValue ->
-                            Events.onInput (\s -> setValue s)
+                            Events.onInput setValue
 
                         Nothing ->
                             class ""

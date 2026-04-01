@@ -11,7 +11,7 @@
 -}
 
 
-module Catalog.Components.Button exposing (ButtonProps, component, propsDecoder)
+module Catalog.Components.Button exposing (component)
 
 import Dict exposing (Dict)
 import Html exposing (Html, button, text)
@@ -83,6 +83,19 @@ bindingsDecoder =
         |> Bind.bindableTyped "variant" (Json.Encode.string << primaryOrSecondaryOrDangerToString)
 
 
+variantToClass : Maybe PrimaryOrSecondaryOrDanger -> String
+variantToClass variant =
+    case variant of
+        Just Secondary ->
+            "jr-button-secondary"
+
+        Just Danger ->
+            "jr-button-danger"
+
+        _ ->
+            "jr-button-primary"
+
+
 component : Component msg
 component =
     register propsDecoder bindingsDecoder view
@@ -90,20 +103,8 @@ component =
 
 view : ComponentContext ButtonProps (ButtonBindings msg) msg -> Html msg
 view ctx =
-    let
-        variantClass =
-            case ctx.props.variant of
-                Just Secondary ->
-                    "jr-button-secondary"
-
-                Just Danger ->
-                    "jr-button-danger"
-
-                _ ->
-                    "jr-button-primary"
-    in
     button
-        [ class ("jr-button " ++ variantClass)
+        [ class ("jr-button " ++ variantToClass ctx.props.variant)
         , Events.onClick (ctx.emit "press")
         ]
         [ text ctx.props.label ]
