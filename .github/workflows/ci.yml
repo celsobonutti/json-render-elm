@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ELM_BIN: ${{ github.workspace }}/demo/node_modules/.bin
+
+jobs:
+  elm-review:
+    name: elm-review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache Elm artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elm
+            demo/elm-stuff
+            demo/review/elm-stuff
+            packages/elm-core/elm-stuff
+            packages/elm-core/review/elm-stuff
+            packages/elm-review/elm-stuff
+            packages/elm-review/review/elm-stuff
+          key: elm-${{ hashFiles('**/elm.json') }}
+          restore-keys: elm-
+
+      - name: Install Elm tooling
+        run: |
+          cd demo && npm ci
+          echo "$ELM_BIN" >> $GITHUB_PATH
+
+      - name: elm-review demo
+        run: cd demo && npx elm-review
+
+      - name: elm-review elm-core
+        run: cd packages/elm-core && npx elm-review
+
+      - name: elm-review elm-review
+        run: cd packages/elm-review && npx elm-review
+
+  elm-test:
+    name: elm-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache Elm artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elm
+            packages/elm-core/elm-stuff
+            packages/elm-review/elm-stuff
+          key: elm-${{ hashFiles('**/elm.json') }}
+          restore-keys: elm-
+
+      - name: Install Elm tooling
+        run: |
+          cd demo && npm ci
+          echo "$ELM_BIN" >> $GITHUB_PATH
+
+      - name: elm-test elm-core
+        run: cd packages/elm-core && npx elm-test-rs
+
+      - name: elm-test elm-review
+        run: cd packages/elm-review && npx elm-test-rs
+
+  playwright:
+    name: Playwright
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache Elm artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elm
+            demo/elm-stuff
+            packages/elm-core/elm-stuff
+          key: elm-${{ hashFiles('**/elm.json') }}
+          restore-keys: elm-
+
+      - name: Install demo dependencies
+        run: |
+          cd demo && npm ci
+          cd ../packages/js-bridge && npm ci
+          echo "$ELM_BIN" >> $GITHUB_PATH
+
+      - name: Install Playwright browsers
+        run: cd demo && npx playwright install --with-deps chromium
+
+      - name: Run e2e tests
+        run: cd demo && npx playwright test --project=e2e --config test/playwright.config.ts
+
+      - name: Run parity tests
+        run: cd demo && npx playwright test --project=parity --config test/playwright.config.ts
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: demo/test-results/
+          retention-days: 7

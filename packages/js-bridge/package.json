@@ -13,11 +13,10 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "peerDependencies": {
-    "@json-render/core": ">=0.5.0"
+  "dependencies": {
+    "@json-render/core": "^0.16.0"
   },
   "devDependencies": {
-    "@json-render/core": "^0.15.0",
     "@testing-library/dom": "^10.0.0",
     "@testing-library/jest-dom": "^6.0.0",
     "typescript": "^5.4.0",

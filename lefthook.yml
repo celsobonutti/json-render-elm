@@ -1,0 +1,9 @@
+pre-commit:
+  parallel: true
+  commands:
+    elm-review-demo:
+      run: cd demo && npx elm-review
+    elm-review-elm-core:
+      run: cd packages/elm-core && npx elm-review
+    elm-review-elm-review:
+      run: cd packages/elm-review && npx elm-review
