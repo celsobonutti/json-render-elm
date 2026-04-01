@@ -3,11 +3,11 @@ module Catalog.Registry exposing (registry)
 import Catalog.Components.Badge
 import Catalog.Components.Button
 import Catalog.Components.Card
-import Catalog.Functions
 import Catalog.Components.Image
 import Catalog.Components.Input
 import Catalog.Components.Stack
 import Catalog.Components.Text
+import Catalog.Functions
 import Dict
 import JsonRender.Render exposing (Registry)
 
