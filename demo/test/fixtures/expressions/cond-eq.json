@@ -1,0 +1,67 @@
+{
+  "root": "main",
+  "elements": {
+    "main": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4
+      },
+      "children": [
+        "option-a",
+        "option-b"
+      ]
+    },
+    "option-a": {
+      "type": "Button",
+      "props": {
+        "label": "A",
+        "variant": {
+          "$cond": {
+            "$state": "/selected",
+            "eq": "a"
+          },
+          "$then": "primary",
+          "$else": "secondary"
+        }
+      },
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": {
+            "statePath": "/selected",
+            "value": "a"
+          }
+        }
+      },
+      "children": []
+    },
+    "option-b": {
+      "type": "Button",
+      "props": {
+        "label": "B",
+        "variant": {
+          "$cond": {
+            "$state": "/selected",
+            "eq": "b"
+          },
+          "$then": "primary",
+          "$else": "secondary"
+        }
+      },
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": {
+            "statePath": "/selected",
+            "value": "b"
+          }
+        }
+      },
+      "children": []
+    }
+  },
+  "state": {
+    "selected": ""
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "root": "main",
+  "elements": {
+    "main": {
+      "type": "Card",
+      "props": {
+        "title": "Multiple Choice Question"
+      },
+      "children": [
+        "question-text",
+        "options-stack"
+      ]
+    },
+    "question-text": {
+      "type": "Text",
+      "props": {
+        "content": "Which planet is known as the Red Planet?",
+        "size": "lg"
+      },
+      "children": []
+    },
+    "options-stack": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 3
+      },
+      "children": [
+        "option-a",
+        "option-b",
+        "option-c",
+        "option-d"
+      ]
+    },
+    "option-a": {
+      "type": "Button",
+      "props": {
+        "label": "A) Venus",
+        "variant": {
+          "$cond": {
+            "$state": "/selected",
+            "eq": "a"
+          },
+          "$then": "primary",
+          "$else": "secondary"
+        }
+      },
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": {
+            "statePath": "/selected",
+            "value": "a"
+          }
+        }
+      },
+      "children": []
+    },
+    "option-b": {
+      "type": "Button",
+      "props": {
+        "label": "B) Mars",
+        "variant": {
+          "$cond": {
+            "$state": "/selected",
+            "eq": "b"
+          },
+          "$then": "primary",
+          "$else": "secondary"
+        }
+      },
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": {
+            "statePath": "/selected",
+            "value": "b"
+          }
+        }
+      },
+      "children": []
+    },
+    "option-c": {
+      "type": "Button",
+      "props": {
+        "label": "C) Jupiter",
+        "variant": {
+          "$cond": {
+            "$state": "/selected",
+            "eq": "c"
+          },
+          "$then": "primary",
+          "$else": "secondary"
+        }
+      },
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": {
+            "statePath": "/selected",
+            "value": "c"
+          }
+        }
+      },
+      "children": []
+    },
+    "option-d": {
+      "type": "Button",
+      "props": {
+        "label": "D) Saturn",
+        "variant": {
+          "$cond": {
+            "$state": "/selected",
+            "eq": "d"
+          },
+          "$then": "primary",
+          "$else": "secondary"
+        }
+      },
+      "on": {
+        "press": {
+          "action": "setState",
+          "params": {
+            "statePath": "/selected",
+            "value": "d"
+          }
+        }
+      },
+      "children": []
+    }
+  },
+  "state": {
+    "selected": ""
+  }
+}

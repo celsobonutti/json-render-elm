@@ -1,0 +1,25 @@
+{
+  "root": "main",
+  "elements": {
+    "main": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 4 },
+      "children": ["status"]
+    },
+    "status": {
+      "type": "Text",
+      "props": {
+        "content": {
+          "$cond": {
+            "$state": "/role",
+            "neq": "admin"
+          },
+          "$then": "restricted",
+          "$else": "full-access"
+        }
+      },
+      "children": []
+    }
+  },
+  "state": { "role": "admin" }
+}

@@ -1,0 +1,25 @@
+{
+  "root": "main",
+  "elements": {
+    "main": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 4 },
+      "children": ["label"]
+    },
+    "label": {
+      "type": "Text",
+      "props": {
+        "content": {
+          "$cond": {
+            "$state": "/count",
+            "gt": 5
+          },
+          "$then": "many",
+          "$else": "few"
+        }
+      },
+      "children": []
+    }
+  },
+  "state": { "count": 3 }
+}

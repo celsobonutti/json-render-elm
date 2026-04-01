@@ -72,6 +72,46 @@ test.describe("Parity: Expressions", () => {
     }
   })
 
+  test("$cond with eq selects only the matching branch", async ({ page }) => {
+    await sendParitySpec(page, "expressions/cond-eq.json")
+
+    for (const [name, root] of renderers(page)) {
+      const buttons = root.locator(".jr-button")
+
+      // Initially no selection — both buttons should be secondary
+      await expect(buttons.nth(0), `${name}: A initial`).toHaveClass(/jr-button-secondary/)
+      await expect(buttons.nth(1), `${name}: B initial`).toHaveClass(/jr-button-secondary/)
+
+      // Click button A — only A should become primary
+      await buttons.nth(0).click()
+      await expect(buttons.nth(0), `${name}: A after click A`).toHaveClass(/jr-button-primary/)
+      await expect(buttons.nth(1), `${name}: B after click A`).toHaveClass(/jr-button-secondary/)
+
+      // Click button B — only B should become primary
+      await buttons.nth(1).click()
+      await expect(buttons.nth(0), `${name}: A after click B`).toHaveClass(/jr-button-secondary/)
+      await expect(buttons.nth(1), `${name}: B after click B`).toHaveClass(/jr-button-primary/)
+    }
+  })
+
+  test("$cond with neq compares correctly", async ({ page }) => {
+    await sendParitySpec(page, "expressions/cond-neq.json")
+
+    for (const [name, root] of renderers(page)) {
+      // role is "admin", neq "admin" is false → should show "full-access"
+      await expect(root.locator(".jr-text"), `${name}`).toHaveText("full-access")
+    }
+  })
+
+  test("$cond with gt compares correctly", async ({ page }) => {
+    await sendParitySpec(page, "expressions/cond-gt.json")
+
+    for (const [name, root] of renderers(page)) {
+      // count is 3, gt 5 is false → should show "few"
+      await expect(root.locator(".jr-text"), `${name}`).toHaveText("few")
+    }
+  })
+
   // $computed error test lives in error-rendering.parity.ts
 
   test("$computed updates when bound state changes", async ({ page }) => {
