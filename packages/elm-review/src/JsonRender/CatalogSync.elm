@@ -384,17 +384,18 @@ declarationListVisitor declarations context =
                                 case ( context.moduleRange, Dict.get componentName catalog.components ) of
                                     ( Just range, Just schema ) ->
                                         let
-                                            fullRange =
-                                                { start = range.start
-                                                , end = lastDeclarationEnd declarations range
-                                                }
-
                                             viewRange =
                                                 findFunctionRange "view" declarations
                                         in
                                         case viewRange of
                                             Nothing ->
                                                 -- No view function: generate full module (new stub)
+                                                let
+                                                    fullRange =
+                                                        { start = range.start
+                                                        , end = lastDeclarationEnd declarations range
+                                                        }
+                                                in
                                                 [ Rule.errorWithFix
                                                     { message = componentName ++ " component is missing view function"
                                                     , details =
@@ -414,75 +415,83 @@ declarationListVisitor declarations context =
 
                                             Just vRange ->
                                                 let
-                                                    expectedBody =
-                                                        ElmCodeGen.componentBody
-                                                            componentName
-                                                            schema
+                                                    expected =
+                                                        ElmCodeGen.expectedDeclarations componentName schema
 
-                                                    firstDeclStart =
-                                                        firstDeclarationStart declarations
+                                                    expectedComment =
+                                                        ElmCodeGen.generatedComment componentName schema
 
-                                                    bodyRange =
-                                                        case firstDeclStart of
-                                                            Just declStart ->
-                                                                Just
-                                                                    { start = declStart
-                                                                    , end = vRange.start
-                                                                    }
+                                                    -- Check each declaration
+                                                    declFixes =
+                                                        List.concatMap
+                                                            (\decl ->
+                                                                case findDeclarationRange decl.name decl.kind declarations of
+                                                                    Just declRange ->
+                                                                        let
+                                                                            currentCode =
+                                                                                context.extractSourceCode declRange
+                                                                        in
+                                                                        if String.trim currentCode == String.trim decl.code then
+                                                                            []
 
-                                                            Nothing ->
-                                                                Nothing
-                                                in
-                                                case bodyRange of
-                                                    Just bRange ->
-                                                        let
-                                                            currentBody =
-                                                                context.extractSourceCode bRange
+                                                                        else
+                                                                            [ Fix.replaceRangeBy declRange (decl.code ++ "\n") ]
 
-                                                            expectedWithTrailing =
-                                                                expectedBody ++ "\n\n\n"
+                                                                    Nothing ->
+                                                                        [ Fix.insertAt vRange.start (decl.code ++ "\n\n\n") ]
+                                                            )
+                                                            expected
 
-                                                            bodyOutdated =
-                                                                String.trim currentBody /= String.trim expectedWithTrailing
-
-                                                            missingImportLines =
-                                                                requiredComponentImportLines
-                                                                    |> List.filter (\( modName, _ ) -> not (Set.member modName context.importedModules))
-
-                                                            importFixes =
-                                                                case ( missingImportLines, context.lastImportEnd ) of
-                                                                    ( _ :: _, Just insertPos ) ->
-                                                                        List.map
-                                                                            (\( _, line ) -> Fix.insertAt insertPos ("\n" ++ line))
-                                                                            missingImportLines
-
-                                                                    _ ->
-                                                                        []
-
-                                                            bodyFixes =
-                                                                if bodyOutdated then
-                                                                    [ Fix.replaceRangeBy bRange expectedWithTrailing ]
+                                                    -- Check managed comment
+                                                    commentFixes =
+                                                        case findManagedCommentRange context.extractSourceCode of
+                                                            Just commentRange ->
+                                                                let
+                                                                    currentComment =
+                                                                        context.extractSourceCode commentRange
+                                                                in
+                                                                if String.trim currentComment == String.trim expectedComment then
+                                                                    []
 
                                                                 else
-                                                                    []
-                                                        in
-                                                        if not bodyOutdated && List.isEmpty importFixes then
-                                                            []
+                                                                    [ Fix.replaceRangeBy commentRange (expectedComment ++ "\n") ]
 
-                                                        else
-                                                            [ Rule.errorWithFix
-                                                                { message = componentName ++ " component types are out of sync with the catalog"
-                                                                , details =
-                                                                    [ "The generated types and decoders in this module don't match the catalog schema."
-                                                                    , "Accept the fix to regenerate them. Your view function will be preserved."
-                                                                    ]
-                                                                }
-                                                                range
-                                                                (importFixes ++ bodyFixes)
+                                                            Nothing ->
+                                                                -- No comment found, insert at very top
+                                                                [ Fix.insertAt { row = 1, column = 1 } (expectedComment ++ "\n") ]
+
+                                                    -- Check imports
+                                                    missingImportLines =
+                                                        requiredComponentImportLines
+                                                            |> List.filter (\( modName, _ ) -> not (Set.member modName context.importedModules))
+
+                                                    importFixes =
+                                                        case ( missingImportLines, context.lastImportEnd ) of
+                                                            ( _ :: _, Just insertPos ) ->
+                                                                List.map
+                                                                    (\( _, line ) -> Fix.insertAt insertPos ("\n" ++ line))
+                                                                    missingImportLines
+
+                                                            _ ->
+                                                                []
+
+                                                    allFixes =
+                                                        commentFixes ++ importFixes ++ declFixes
+                                                in
+                                                if List.isEmpty allFixes then
+                                                    []
+
+                                                else
+                                                    [ Rule.errorWithFix
+                                                        { message = componentName ++ " component types are out of sync with the catalog"
+                                                        , details =
+                                                            [ "The generated types and decoders in this module don't match the catalog schema."
+                                                            , "Accept the fix to regenerate them. Your view function will be preserved."
                                                             ]
-
-                                                    Nothing ->
-                                                        []
+                                                        }
+                                                        range
+                                                        allFixes
+                                                    ]
 
                                     _ ->
                                         []
@@ -502,16 +511,6 @@ requiredComponentImportLines =
     , ( "JsonRender.Render", "import JsonRender.Render exposing (Component, ComponentContext, register)" )
     , ( "JsonRender.Resolve", "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)" )
     ]
-
-
-firstDeclarationStart : List (Node Declaration) -> Maybe { row : Int, column : Int }
-firstDeclarationStart declarations =
-    case declarations of
-        (Node range _) :: _ ->
-            Just range.start
-
-        [] ->
-            Nothing
 
 
 findFunctionRange : String -> List (Node Declaration) -> Maybe Range
