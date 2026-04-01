@@ -42,6 +42,7 @@ export const catalog = defineCatalog(schema, {
       props: z.object({
         placeholder: z.string().optional(),
         label: z.string().optional(),
+        value: z.string().optional(),
       }),
       slots: [],
       description: "A text input field with an optional label",
