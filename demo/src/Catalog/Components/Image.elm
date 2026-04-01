@@ -44,10 +44,10 @@ bindingsDecoder =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder bindingsDecoder (\_ -> ()) view
 
 
-view : ComponentContext ImageProps (ImageBindings msg) msg -> Html msg
+view : ComponentContext ImageProps (ImageBindings msg) () msg -> Html msg
 view ctx =
     img
         [ src ctx.props.src

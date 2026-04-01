@@ -44,10 +44,10 @@ bindingsDecoder =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder bindingsDecoder (\_ -> ()) view
 
 
-view : ComponentContext CardProps (CardBindings msg) msg -> Html msg
+view : ComponentContext CardProps (CardBindings msg) () msg -> Html msg
 view ctx =
     div [ class "jr-card" ]
         (h3 [ class "jr-card-title" ] [ text ctx.props.title ]

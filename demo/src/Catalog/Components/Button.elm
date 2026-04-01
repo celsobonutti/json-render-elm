@@ -98,10 +98,10 @@ variantToClass variant =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder bindingsDecoder (\_ -> ()) view
 
 
-view : ComponentContext ButtonProps (ButtonBindings msg) msg -> Html msg
+view : ComponentContext ButtonProps (ButtonBindings msg) () msg -> Html msg
 view ctx =
     button
         [ class ("jr-button " ++ variantToClass ctx.props.variant)

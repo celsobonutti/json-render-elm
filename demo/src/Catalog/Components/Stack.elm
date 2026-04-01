@@ -78,10 +78,10 @@ bindingsDecoder =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder bindingsDecoder (\_ -> ()) view
 
 
-view : ComponentContext StackProps (StackBindings msg) msg -> Html msg
+view : ComponentContext StackProps (StackBindings msg) () msg -> Html msg
 view ctx =
     let
         dirClass =

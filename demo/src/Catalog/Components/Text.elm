@@ -92,10 +92,10 @@ bindingsDecoder =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder bindingsDecoder (\_ -> ()) view
 
 
-view : ComponentContext TextProps (TextBindings msg) msg -> Html msg
+view : ComponentContext TextProps (TextBindings msg) () msg -> Html msg
 view ctx =
     let
         sizeClass =

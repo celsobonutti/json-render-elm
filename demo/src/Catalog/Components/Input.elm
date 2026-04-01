@@ -49,10 +49,10 @@ bindingsDecoder =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder bindingsDecoder (\_ -> ()) view
 
 
-view : ComponentContext InputProps (InputBindings msg) msg -> Html msg
+view : ComponentContext InputProps (InputBindings msg) () msg -> Html msg
 view ctx =
     div [ class "jr-input-wrapper" ]
         ((case ctx.props.label of

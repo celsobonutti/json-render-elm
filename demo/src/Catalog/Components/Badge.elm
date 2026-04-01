@@ -99,10 +99,10 @@ bindingsDecoder =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder bindingsDecoder (\_ -> ()) view
 
 
-view : ComponentContext BadgeProps (BadgeBindings msg) msg -> Html msg
+view : ComponentContext BadgeProps (BadgeBindings msg) () msg -> Html msg
 view ctx =
     let
         colorClass =
