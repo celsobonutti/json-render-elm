@@ -18,8 +18,78 @@ module JsonRender.Internal.ElmCodeGen exposing
     )
 
 import Dict exposing (Dict)
+import Elm.CodeGen as CG
+import Elm.Pretty
 import JsonRender.Internal.SchemaParser as SchemaParser exposing (ActionSchema, ComponentSchema, FieldType(..))
 import JsonRender.Internal.TypeMapping as TypeMapping
+import Pretty
+
+
+renderDecl : CG.Declaration -> String
+renderDecl decl =
+    Elm.Pretty.prettyDeclaration 120 decl
+        |> Pretty.pretty 120
+
+
+fieldToTypeAnnotation : String -> SchemaParser.FieldType -> CG.TypeAnnotation
+fieldToTypeAnnotation fieldName fieldType =
+    case fieldType of
+        SchemaParser.FString ->
+            CG.stringAnn
+
+        SchemaParser.FInt ->
+            CG.intAnn
+
+        SchemaParser.FFloat ->
+            CG.floatAnn
+
+        SchemaParser.FBool ->
+            CG.boolAnn
+
+        SchemaParser.FNullable inner ->
+            CG.maybeAnn (fieldToTypeAnnotation fieldName inner)
+
+        SchemaParser.FList inner ->
+            CG.listAnn (fieldToTypeAnnotation fieldName inner)
+
+        SchemaParser.FEnum variants ->
+            CG.typed (TypeMapping.toElmType (SchemaParser.FEnum variants)) []
+
+        SchemaParser.FObject _ ->
+            CG.typed (objectTypeName fieldName) []
+
+
+schemaFieldToTypeAnnotation : SchemaParser.FieldType -> CG.TypeAnnotation
+schemaFieldToTypeAnnotation fieldType =
+    case fieldType of
+        SchemaParser.FString ->
+            CG.stringAnn
+
+        SchemaParser.FInt ->
+            CG.intAnn
+
+        SchemaParser.FFloat ->
+            CG.floatAnn
+
+        SchemaParser.FBool ->
+            CG.boolAnn
+
+        SchemaParser.FNullable inner ->
+            CG.maybeAnn (schemaFieldToTypeAnnotation inner)
+
+        SchemaParser.FList inner ->
+            CG.listAnn (schemaFieldToTypeAnnotation inner)
+
+        SchemaParser.FEnum variants ->
+            CG.typed (TypeMapping.toElmType (SchemaParser.FEnum variants)) []
+
+        SchemaParser.FObject _ ->
+            CG.typed "Value" []
+
+
+recordTypeAlias : String -> List ( String, CG.TypeAnnotation ) -> CG.Declaration
+recordTypeAlias name fields =
+    CG.aliasDecl Nothing name [] (CG.recordAnn fields)
 
 
 propsTypeAlias : String -> ComponentSchema -> String
