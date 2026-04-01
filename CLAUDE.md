@@ -197,7 +197,7 @@ Compared against the [json-render](https://github.com/nichochar/json-render) cor
 | Feature | Details |
 |---|---|
 | **Expressions** | All 8 types: `$state`, `$bindState`, `$item`, `$bindItem`, `$index`, `$template`, `$cond`, `$computed` |
-| **Actions** | `setState`, `pushState` (with `clearStatePath` + `$id` auto-generation), `removeState` + custom actions via `ActionConfig` |
+| **Actions** | `setState`, `pushState` (with `clearStatePath` + `$id` auto-generation), `removeState` + custom actions via `ActionConfig`, `preventDefault` flag |
 | **Chained actions** | Array of action bindings executed sequentially |
 | **Event bindings** | `on` field mapping event names to action bindings |
 | **Watchers** | `watch` field with state path triggers, repeat-aware |
@@ -214,8 +214,6 @@ Gaps versus json-render core, grouped by area and roughly prioritized:
 #### Action gaps
 - **`confirm` dialogs** — `{ "confirm": { "title": "...", "message": "...", "variant": "danger" } }` on action bindings to show a confirmation dialog before executing
 - **`onSuccess` / `onError` handlers** — post-action callbacks: navigate, set state, or chain another action
-- **`preventDefault` flag** — prevents default browser behavior on action trigger
-
 #### Larger features
 - **Named slots** — `ComponentContext props slots` with typed slot records decoded same way as props. The spec's `children` becomes `Dict String (List String)` keyed by slot name
 - **Form validation** — `validateForm` action + validation checks (`required`, `email`, `minLength`, `pattern`, etc.), `validateOn` timing, cross-field validation, conditional validation, custom validators
