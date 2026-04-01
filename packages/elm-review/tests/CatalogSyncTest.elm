@@ -43,14 +43,12 @@ type alias CardBindings msg =
 
 propsDecoder : Dict String ResolvedValue -> Result String CardProps
 propsDecoder =
-    ResolvedValue.succeed CardProps
-        |> ResolvedValue.required "title" ResolvedValue.string
+    ResolvedValue.succeed CardProps |> ResolvedValue.required "title" ResolvedValue.string
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> CardBindings msg
 bindingsDecoder =
-    Bind.succeed CardBindings
-        |> Bind.bindableTyped "title" Json.Encode.string
+    Bind.succeed CardBindings |> Bind.bindableTyped "title" Json.Encode.string
 
 
 component : Component msg
@@ -87,14 +85,12 @@ type alias ButtonBindings msg =
 
 propsDecoder : Dict String ResolvedValue -> Result String ButtonProps
 propsDecoder =
-    ResolvedValue.succeed ButtonProps
-        |> ResolvedValue.required "label" ResolvedValue.string
+    ResolvedValue.succeed ButtonProps |> ResolvedValue.required "label" ResolvedValue.string
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> ButtonBindings msg
 bindingsDecoder =
-    Bind.succeed ButtonBindings
-        |> Bind.bindableTyped "label" Json.Encode.string
+    Bind.succeed ButtonBindings |> Bind.bindableTyped "label" Json.Encode.string
 
 
 component : Component msg
@@ -424,14 +420,12 @@ type alias CardBindings msg =
 
 propsDecoder : Dict String ResolvedValue -> Result String CardProps
 propsDecoder =
-    ResolvedValue.succeed CardProps
-        |> ResolvedValue.required "title" ResolvedValue.string
+    ResolvedValue.succeed CardProps |> ResolvedValue.required "title" ResolvedValue.string
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> CardBindings msg
 bindingsDecoder =
-    Bind.succeed CardBindings
-        |> Bind.bindableTyped "title" Json.Encode.string
+    Bind.succeed CardBindings |> Bind.bindableTyped "title" Json.Encode.string
 
 
 component : Component msg
@@ -493,14 +487,12 @@ type alias CardBindings msg =
 
 propsDecoder : Dict String ResolvedValue -> Result String CardProps
 propsDecoder =
-    ResolvedValue.succeed CardProps
-        |> ResolvedValue.required "title" ResolvedValue.string
+    ResolvedValue.succeed CardProps |> ResolvedValue.required "title" ResolvedValue.string
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> CardBindings msg
 bindingsDecoder =
-    Bind.succeed CardBindings
-        |> Bind.bindableTyped "title" Json.Encode.string
+    Bind.succeed CardBindings |> Bind.bindableTyped "title" Json.Encode.string
 
 
 component : Component msg
