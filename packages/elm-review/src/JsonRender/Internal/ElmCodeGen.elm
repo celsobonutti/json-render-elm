@@ -113,6 +113,54 @@ propsTypeAlias componentName schema =
         |> renderDecl
 
 
+fieldToExtractorExpr : String -> SchemaParser.FieldType -> CG.Expression
+fieldToExtractorExpr fieldName fieldType =
+    case fieldType of
+        SchemaParser.FObject _ ->
+            CG.parens
+                (CG.lambda [ CG.varPattern "rv" ]
+                    (CG.pipe
+                        (CG.apply [ CG.fqVal [ "ResolvedValue" ] "object", CG.val "rv" ])
+                        [ CG.apply [ CG.fqVal [ "Result" ] "andThen", CG.val (objectFnBaseName fieldName ++ "Decoder") ] ]
+                    )
+                )
+
+        SchemaParser.FEnum variants ->
+            let
+                baseName =
+                    TypeMapping.enumFnBaseName variants
+            in
+            CG.parens
+                (CG.lambda [ CG.varPattern "rv" ]
+                    (CG.pipe
+                        (CG.apply [ CG.fqVal [ "ResolvedValue" ] "string", CG.val "rv" ])
+                        [ CG.apply [ CG.fqVal [ "Result" ] "andThen", CG.val (baseName ++ "FromString") ] ]
+                    )
+                )
+
+        _ ->
+            CG.fqVal [ "ResolvedValue" ] (schemaFieldExtractorName fieldType)
+
+
+schemaFieldExtractorName : SchemaParser.FieldType -> String
+schemaFieldExtractorName fieldType =
+    case fieldType of
+        SchemaParser.FString ->
+            "string"
+
+        SchemaParser.FInt ->
+            "int"
+
+        SchemaParser.FFloat ->
+            "float"
+
+        SchemaParser.FBool ->
+            "bool"
+
+        _ ->
+            "string"
+
+
 propsDecoder : String -> ComponentSchema -> String
 propsDecoder componentName schema =
     let
@@ -125,23 +173,31 @@ propsDecoder componentName schema =
                 (\( name, field ) ->
                     let
                         extractor =
-                            fieldToExtractor name field.fieldType
-                    in
-                    if field.required then
-                        "        |> ResolvedValue.required \"" ++ name ++ "\" " ++ extractor
+                            fieldToExtractorExpr name field.fieldType
 
-                    else
-                        "        |> ResolvedValue.optional \"" ++ name ++ "\" " ++ extractor ++ " Nothing"
+                        args =
+                            if field.required then
+                                [ CG.fqVal [ "ResolvedValue" ] "required", CG.string name, extractor ]
+
+                            else
+                                [ CG.fqVal [ "ResolvedValue" ] "optional", CG.string name, extractor, CG.val "Nothing" ]
+                    in
+                    CG.apply args
                 )
                 fields
+
+        body =
+            CG.pipe
+                (CG.apply [ CG.fqVal [ "ResolvedValue" ] "succeed", CG.val (componentName ++ "Props") ])
+                pipelineSteps
+
+        typeAnn =
+            CG.funAnn
+                (CG.typed "Dict" [ CG.stringAnn, CG.typed "ResolvedValue" [] ])
+                (CG.typed "Result" [ CG.stringAnn, CG.typed (componentName ++ "Props") [] ])
     in
-    "propsDecoder : Dict String ResolvedValue -> Result String "
-        ++ componentName
-        ++ "Props\npropsDecoder =\n"
-        ++ "    ResolvedValue.succeed "
-        ++ componentName
-        ++ "Props\n"
-        ++ String.join "\n" pipelineSteps
+    CG.funDecl Nothing (Just typeAnn) "propsDecoder" [] body
+        |> renderDecl
 
 
 bindingsTypeAlias : String -> ComponentSchema -> String
@@ -168,6 +224,45 @@ bindingsTypeAlias componentName schema =
         |> renderDecl
 
 
+fieldToEncoderExpr : String -> SchemaParser.FieldType -> CG.Expression
+fieldToEncoderExpr fieldName fieldType =
+    case fieldType of
+        SchemaParser.FObject _ ->
+            CG.val (objectFnBaseName fieldName ++ "Encoder")
+
+        SchemaParser.FEnum variants ->
+            CG.parens
+                (CG.applyBinOp
+                    (CG.fqVal [ "Json", "Encode" ] "string")
+                    CG.composel
+                    (CG.val (TypeMapping.enumFnBaseName variants ++ "ToString"))
+                )
+
+        SchemaParser.FString ->
+            CG.fqVal [ "Json", "Encode" ] "string"
+
+        SchemaParser.FInt ->
+            CG.fqVal [ "Json", "Encode" ] "int"
+
+        SchemaParser.FFloat ->
+            CG.fqVal [ "Json", "Encode" ] "float"
+
+        SchemaParser.FBool ->
+            CG.fqVal [ "Json", "Encode" ] "bool"
+
+        SchemaParser.FNullable inner ->
+            CG.parens
+                (CG.applyBinOp
+                    (CG.apply [ CG.fqVal [ "Maybe" ] "map", fieldToEncoderExpr fieldName inner ])
+                    CG.composer
+                    (CG.apply [ CG.fqVal [ "Maybe" ] "withDefault", CG.fqVal [ "Json", "Encode" ] "null" ])
+                )
+
+        SchemaParser.FList inner ->
+            CG.parens
+                (CG.apply [ CG.fqVal [ "Json", "Encode" ] "list", fieldToEncoderExpr fieldName inner ])
+
+
 bindingsDecoder : String -> ComponentSchema -> String
 bindingsDecoder componentName schema =
     let
@@ -178,17 +273,26 @@ bindingsDecoder componentName schema =
         pipelineSteps =
             List.map
                 (\( name, field ) ->
-                    "        |> Bind.bindableTyped \"" ++ name ++ "\" " ++ fieldToEncoder name field.fieldType
+                    CG.apply
+                        [ CG.fqVal [ "Bind" ] "bindableTyped"
+                        , CG.string name
+                        , fieldToEncoderExpr name field.fieldType
+                        ]
                 )
                 fields
+
+        body =
+            CG.pipe
+                (CG.apply [ CG.fqVal [ "Bind" ] "succeed", CG.val (componentName ++ "Bindings") ])
+                pipelineSteps
+
+        typeAnn =
+            CG.funAnn
+                (CG.typed "Dict" [ CG.stringAnn, CG.funAnn (CG.typed "Value" []) (CG.typed "EventHandle" [ CG.typeVar "msg" ]) ])
+                (CG.typed (componentName ++ "Bindings") [ CG.typeVar "msg" ])
     in
-    "bindingsDecoder : Dict String (Value -> EventHandle msg) -> "
-        ++ componentName
-        ++ "Bindings msg\nbindingsDecoder =\n"
-        ++ "    Bind.succeed "
-        ++ componentName
-        ++ "Bindings\n"
-        ++ String.join "\n" pipelineSteps
+    CG.funDecl Nothing (Just typeAnn) "bindingsDecoder" [] body
+        |> renderDecl
 
 
 componentBody : String -> ComponentSchema -> String
