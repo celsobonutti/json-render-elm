@@ -10,6 +10,7 @@ module JsonRender.Validation exposing
     , ValidationResult
     , checkDecoder
     , checkTypeDecoder
+    , emptyFieldValidation
     , extractValidation
     , field
     , runCheck
@@ -81,6 +82,11 @@ type alias FieldValidation =
     , touched : Bool
     , validated : Bool
     }
+
+
+emptyFieldValidation : FieldValidation
+emptyFieldValidation =
+    { errors = [], touched = False, validated = False }
 
 
 type alias ValidationResult =
@@ -287,7 +293,7 @@ checkEmail value =
 
 checkMinLength : Value -> Dict String Value -> Bool
 checkMinLength value args =
-    case ( Decode.decodeValue Decode.string value, getIntArg "value" args ) of
+    case ( Decode.decodeValue Decode.string value, getIntArg "min" args ) of
         ( Ok s, Just minLen ) ->
             String.length s >= minLen
 
@@ -297,7 +303,7 @@ checkMinLength value args =
 
 checkMaxLength : Value -> Dict String Value -> Bool
 checkMaxLength value args =
-    case ( Decode.decodeValue Decode.string value, getIntArg "value" args ) of
+    case ( Decode.decodeValue Decode.string value, getIntArg "max" args ) of
         ( Ok s, Just maxLen ) ->
             String.length s <= maxLen
 
@@ -307,7 +313,7 @@ checkMaxLength value args =
 
 checkPattern : Value -> Dict String Value -> Bool
 checkPattern value args =
-    case ( Decode.decodeValue Decode.string value, getStringArg "value" args ) of
+    case ( Decode.decodeValue Decode.string value, getStringArg "pattern" args ) of
         ( Ok s, Just pat ) ->
             case Regex.fromString pat of
                 Just regex ->
@@ -322,7 +328,7 @@ checkPattern value args =
 
 checkMin : Value -> Dict String Value -> Bool
 checkMin value args =
-    case ( toNumber value, getNumberArg "value" args ) of
+    case ( toNumber value, getNumberArg "min" args ) of
         ( Just n, Just minVal ) ->
             n >= minVal
 
@@ -332,7 +338,7 @@ checkMin value args =
 
 checkMax : Value -> Dict String Value -> Bool
 checkMax value args =
-    case ( toNumber value, getNumberArg "value" args ) of
+    case ( toNumber value, getNumberArg "max" args ) of
         ( Just n, Just maxVal ) ->
             n <= maxVal
 
@@ -390,7 +396,7 @@ checkUrl value =
 
 checkMatches : Value -> Dict String Value -> Bool
 checkMatches value args =
-    case Dict.get "field" args of
+    case Dict.get "other" args of
         Just fieldVal ->
             Encode.encode 0 value == Encode.encode 0 fieldVal
 
@@ -400,7 +406,7 @@ checkMatches value args =
 
 checkEqualTo : Value -> Dict String Value -> Bool
 checkEqualTo value args =
-    case Dict.get "field" args of
+    case Dict.get "other" args of
         Just fieldVal ->
             Encode.encode 0 value == Encode.encode 0 fieldVal
 
@@ -410,13 +416,13 @@ checkEqualTo value args =
 
 checkLessThan : Value -> Dict String Value -> Bool
 checkLessThan value args =
-    case ( toNumber value, getNumberArg "value" args ) of
+    case ( toNumber value, getNumberArg "other" args ) of
         ( Just n, Just threshold ) ->
             n < threshold
 
         _ ->
             -- String fallback
-            case ( Decode.decodeValue Decode.string value, getStringArg "value" args ) of
+            case ( Decode.decodeValue Decode.string value, getStringArg "other" args ) of
                 ( Ok s1, Just s2 ) ->
                     s1 < s2
 
@@ -426,13 +432,13 @@ checkLessThan value args =
 
 checkGreaterThan : Value -> Dict String Value -> Bool
 checkGreaterThan value args =
-    case ( toNumber value, getNumberArg "value" args ) of
+    case ( toNumber value, getNumberArg "other" args ) of
         ( Just n, Just threshold ) ->
             n > threshold
 
         _ ->
             -- String fallback
-            case ( Decode.decodeValue Decode.string value, getStringArg "value" args ) of
+            case ( Decode.decodeValue Decode.string value, getStringArg "other" args ) of
                 ( Ok s1, Just s2 ) ->
                     s1 > s2
 

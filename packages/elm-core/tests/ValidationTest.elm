@@ -155,14 +155,14 @@ checkDecoderSuite =
             \_ ->
                 let
                     json =
-                        """{"type": "minLength", "message": "Too short", "args": {"value": 3}}"""
+                        """{"type": "minLength", "message": "Too short", "args": {"min": 3}}"""
                 in
                 case Decode.decodeString Validation.checkDecoder json of
                     Ok check ->
                         Expect.all
                             [ \c -> Expect.equal (BuiltIn MinLength) c.type_
                             , \c -> Expect.equal "Too short" c.message
-                            , \c -> Expect.equal (Just (IntValue 3)) (Dict.get "value" c.args)
+                            , \c -> Expect.equal (Just (IntValue 3)) (Dict.get "min" c.args)
                             ]
                             check
 
@@ -172,13 +172,13 @@ checkDecoderSuite =
             \_ ->
                 let
                     json =
-                        """{"type": "matches", "message": "Must match", "args": {"field": {"$state": "/password"}}}"""
+                        """{"type": "matches", "message": "Must match", "args": {"other": {"$state": "/password"}}}"""
                 in
                 case Decode.decodeString Validation.checkDecoder json of
                     Ok check ->
                         Expect.all
                             [ \c -> Expect.equal (BuiltIn Matches) c.type_
-                            , \c -> Expect.equal (Just (StateExpr "/password")) (Dict.get "field" c.args)
+                            , \c -> Expect.equal (Just (StateExpr "/password")) (Dict.get "other" c.args)
                             ]
                             check
 
@@ -239,13 +239,13 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn MinLength)
                         (Encode.string "hello")
-                        (Dict.fromList [ ( "value", Encode.int 3 ) ])
+                        (Dict.fromList [ ( "min", Encode.int 3 ) ])
                         |> Expect.equal True
             , test "fails when string is too short" <|
                 \_ ->
                     Validation.runCheck (BuiltIn MinLength)
                         (Encode.string "hi")
-                        (Dict.fromList [ ( "value", Encode.int 3 ) ])
+                        (Dict.fromList [ ( "min", Encode.int 3 ) ])
                         |> Expect.equal False
             ]
         , describe "maxLength"
@@ -253,13 +253,13 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn MaxLength)
                         (Encode.string "hi")
-                        (Dict.fromList [ ( "value", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "max", Encode.int 5 ) ])
                         |> Expect.equal True
             , test "fails when string is too long" <|
                 \_ ->
                     Validation.runCheck (BuiltIn MaxLength)
                         (Encode.string "hello world")
-                        (Dict.fromList [ ( "value", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "max", Encode.int 5 ) ])
                         |> Expect.equal False
             ]
         , describe "pattern"
@@ -267,13 +267,13 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn Pattern)
                         (Encode.string "abc123")
-                        (Dict.fromList [ ( "value", Encode.string "^[a-z]+[0-9]+$" ) ])
+                        (Dict.fromList [ ( "pattern", Encode.string "^[a-z]+[0-9]+$" ) ])
                         |> Expect.equal True
             , test "fails when string does not match regex" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Pattern)
                         (Encode.string "123abc")
-                        (Dict.fromList [ ( "value", Encode.string "^[a-z]+[0-9]+$" ) ])
+                        (Dict.fromList [ ( "pattern", Encode.string "^[a-z]+[0-9]+$" ) ])
                         |> Expect.equal False
             ]
         , describe "min"
@@ -281,19 +281,19 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn Min)
                         (Encode.int 10)
-                        (Dict.fromList [ ( "value", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "min", Encode.int 5 ) ])
                         |> Expect.equal True
             , test "fails when number < min" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Min)
                         (Encode.int 3)
-                        (Dict.fromList [ ( "value", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "min", Encode.int 5 ) ])
                         |> Expect.equal False
             , test "passes for float >= min" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Min)
                         (Encode.float 5.5)
-                        (Dict.fromList [ ( "value", Encode.float 5.0 ) ])
+                        (Dict.fromList [ ( "min", Encode.float 5.0 ) ])
                         |> Expect.equal True
             ]
         , describe "max"
@@ -301,13 +301,13 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn Max)
                         (Encode.int 3)
-                        (Dict.fromList [ ( "value", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "max", Encode.int 5 ) ])
                         |> Expect.equal True
             , test "fails when number > max" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Max)
                         (Encode.int 10)
-                        (Dict.fromList [ ( "value", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "max", Encode.int 5 ) ])
                         |> Expect.equal False
             ]
         , describe "numeric"
@@ -355,13 +355,13 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn Matches)
                         (Encode.string "hello")
-                        (Dict.fromList [ ( "field", Encode.string "hello" ) ])
+                        (Dict.fromList [ ( "other", Encode.string "hello" ) ])
                         |> Expect.equal True
             , test "fails when values differ" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Matches)
                         (Encode.string "hello")
-                        (Dict.fromList [ ( "field", Encode.string "world" ) ])
+                        (Dict.fromList [ ( "other", Encode.string "world" ) ])
                         |> Expect.equal False
             ]
         , describe "equalTo"
@@ -369,13 +369,13 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn EqualTo)
                         (Encode.int 5)
-                        (Dict.fromList [ ( "field", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
                         |> Expect.equal True
             , test "fails when values differ" <|
                 \_ ->
                     Validation.runCheck (BuiltIn EqualTo)
                         (Encode.int 5)
-                        (Dict.fromList [ ( "field", Encode.int 10 ) ])
+                        (Dict.fromList [ ( "other", Encode.int 10 ) ])
                         |> Expect.equal False
             ]
         , describe "lessThan"
@@ -383,13 +383,13 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn LessThan)
                         (Encode.int 3)
-                        (Dict.fromList [ ( "value", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
                         |> Expect.equal True
             , test "fails when value >= arg" <|
                 \_ ->
                     Validation.runCheck (BuiltIn LessThan)
                         (Encode.int 5)
-                        (Dict.fromList [ ( "value", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
                         |> Expect.equal False
             ]
         , describe "greaterThan"
@@ -397,13 +397,13 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn GreaterThan)
                         (Encode.int 10)
-                        (Dict.fromList [ ( "value", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
                         |> Expect.equal True
             , test "fails when value <= arg" <|
                 \_ ->
                     Validation.runCheck (BuiltIn GreaterThan)
                         (Encode.int 5)
-                        (Dict.fromList [ ( "value", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
                         |> Expect.equal False
             ]
         , describe "requiredIf"
@@ -527,14 +527,14 @@ runValidationSuite =
                     , \r -> Expect.equal [ "Always fails" ] r.errors
                     ]
                     result
-        , test "empty value fails only required" <|
+        , test "empty value fails both required and minLength" <|
             \_ ->
                 let
                     config =
                         { checks =
                             [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" }
                             , { type_ = BuiltIn MinLength
-                              , args = Dict.fromList [ ( "value", IntValue 3 ) ]
+                              , args = Dict.fromList [ ( "min", IntValue 3 ) ]
                               , message = "Too short"
                               }
                             ]
