@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "dpeendencies": {
+  "dependencies": {
     "@json-render/core": "^0.16.0"
   },
   "devDependencies": {
