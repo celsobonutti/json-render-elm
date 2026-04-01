@@ -21,7 +21,8 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (optional, required)
 import Json.Encode exposing (Value)
 import JsonRender.Internal.PropValue as PropValue exposing (PropValue)
-import JsonRender.Visibility exposing (VisibilityCondition)
+import JsonRender.Internal.Condition exposing (Condition)
+import JsonRender.Visibility
 
 
 type alias Spec =
@@ -35,7 +36,7 @@ type alias Element =
     { type_ : String
     , props : Dict String PropValue
     , children : List String
-    , visible : Maybe VisibilityCondition
+    , visible : Maybe Condition
     , repeat : Maybe Repeat
     , on : Dict String EventHandler
     , watch : Dict String EventHandler

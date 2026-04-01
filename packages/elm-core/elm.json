@@ -6,6 +6,7 @@
     "version": "1.0.0",
     "exposed-modules": [
         "JsonRender",
+        "JsonRender.Internal.Condition",
         "JsonRender.Internal.PropValue",
         "JsonRender.Spec",
         "JsonRender.State",
