@@ -34,8 +34,7 @@ import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias CardProps =
-    { title : String
-    }
+    { title : String }
 
 
 type alias CardBindings msg =
@@ -80,8 +79,7 @@ import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias ButtonProps =
-    { label : String
-    }
+    { label : String }
 
 
 type alias ButtonBindings msg =
@@ -419,8 +417,7 @@ handleAction action model = ()
                                 |> Review.Test.whenFixed
                                     ("""module Catalog.Components.Card exposing (..)
 type alias CardProps =
-    { title : String
-    }
+    { title : String }
 
 
 type alias CardBindings msg =
@@ -490,8 +487,7 @@ import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias CardProps =
-    { title : String
-    }
+    { title : String }
 
 
 type alias CardBindings msg =

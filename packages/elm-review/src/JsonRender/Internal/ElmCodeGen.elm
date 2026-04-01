@@ -100,29 +100,17 @@ propsTypeAlias componentName schema =
                 |> List.sortBy Tuple.first
                 |> List.map
                     (\( name, field ) ->
-                        let
-                            elmType =
-                                if field.required then
-                                    fieldToElmType name field.fieldType
+                        ( name
+                        , if field.required then
+                            fieldToTypeAnnotation name field.fieldType
 
-                                else
-                                    "Maybe " ++ fieldToElmType name field.fieldType
-                        in
-                        name ++ " : " ++ elmType
+                          else
+                            CG.maybeAnn (fieldToTypeAnnotation name field.fieldType)
+                        )
                     )
-
-        body =
-            case fields of
-                [] ->
-                    "    {}"
-
-                first :: rest ->
-                    "    { "
-                        ++ first
-                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
-                        ++ "\n    }"
     in
-    "type alias " ++ componentName ++ "Props =\n" ++ body
+    recordTypeAlias (componentName ++ "Props") fields
+        |> renderDecl
 
 
 propsDecoder : String -> ComponentSchema -> String
