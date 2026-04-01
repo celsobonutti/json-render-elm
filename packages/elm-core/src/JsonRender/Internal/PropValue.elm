@@ -1,5 +1,6 @@
 module JsonRender.Internal.PropValue exposing
-    ( PropValue(..)
+    ( ConditionExpr(..)
+    , PropValue(..)
     , decoder
     )
 
@@ -9,6 +10,7 @@ module JsonRender.Internal.PropValue exposing
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (optional, required)
+import JsonRender.Internal.Condition as Condition
 
 
 type PropValue
@@ -25,8 +27,13 @@ type PropValue
     | TemplateExpr String
     | BindStateExpr String
     | BindItemExpr String
-    | ConditionalExpr PropValue PropValue PropValue
+    | ConditionalExpr ConditionExpr PropValue PropValue
     | ComputedExpr String (Dict String PropValue)
+
+
+type ConditionExpr
+    = VisibilityCondition Condition.Condition
+    | TruthyExpr PropValue
 
 
 decoder : Decoder PropValue
@@ -40,7 +47,7 @@ decoder =
         , Decode.field "$bindState" Decode.string |> Decode.map BindStateExpr
         , Decode.field "$bindItem" Decode.string |> Decode.map BindItemExpr
         , Decode.succeed ConditionalExpr
-            |> required "$cond" (Decode.lazy (\_ -> decoder))
+            |> required "$cond" conditionExprDecoder
             |> required "$then" (Decode.lazy (\_ -> decoder))
             |> required "$else" (Decode.lazy (\_ -> decoder))
         , Decode.succeed (\name args -> ComputedExpr name args)
@@ -55,4 +62,12 @@ decoder =
         , Decode.string |> Decode.map StringValue
         , Decode.lazy (\_ -> Decode.list decoder) |> Decode.map ListValue
         , Decode.lazy (\_ -> Decode.dict decoder) |> Decode.map ObjectValue
+        ]
+
+
+conditionExprDecoder : Decoder ConditionExpr
+conditionExprDecoder =
+    Decode.oneOf
+        [ Condition.decoder |> Decode.map VisibilityCondition
+        , Decode.lazy (\_ -> decoder) |> Decode.map TruthyExpr
         ]
