@@ -195,9 +195,7 @@ registry : Registry msg
 registry =
     { components =
         Dict.fromList
-        [ ( "Button", Catalog.Components.Button.component )
-        , ( "Card", Catalog.Components.Card.component )
-        ]
+            [ ( "Button", Catalog.Components.Button.component ), ( "Card", Catalog.Components.Card.component ) ]
     , functions = Dict.empty
     }
 """

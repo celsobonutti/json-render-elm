@@ -346,7 +346,14 @@ componentBody componentName schema =
         ++ "\n\n\n"
         ++ bindingsDecoderCode
         ++ "\n\n\n"
-        ++ "component : Component msg\ncomponent =\n    register propsDecoder bindingsDecoder view"
+        ++ (CG.funDecl
+                Nothing
+                (Just (CG.typed "Component" [ CG.typeVar "msg" ]))
+                "component"
+                []
+                (CG.apply [ CG.val "register", CG.val "propsDecoder", CG.val "bindingsDecoder", CG.val "view" ])
+                |> renderDecl
+           )
 
 
 componentScaffold : String -> String -> ComponentSchema -> String
@@ -1147,36 +1154,41 @@ registryModule namespace componentNames hasFunctions =
             else
                 ""
 
-        entries =
+        entryExprs =
             List.map
                 (\name ->
-                    "        ( \""
-                        ++ name
-                        ++ "\", "
-                        ++ namespace
-                        ++ ".Components."
-                        ++ name
-                        ++ ".component )"
+                    CG.tuple
+                        [ CG.string name
+                        , CG.fqVal [ namespace, "Components", name ] "component"
+                        ]
                 )
                 componentNames
 
-        entriesStr =
-            case entries of
-                [] ->
-                    "        []"
+        componentsField =
+            ( "components"
+            , CG.apply [ CG.fqVal [ "Dict" ] "fromList", CG.list entryExprs ]
+            )
 
-                first :: rest ->
-                    "        [ "
-                        ++ String.trimLeft first
-                        ++ String.concat (List.map (\e -> "\n        , " ++ String.trimLeft e) rest)
-                        ++ "\n        ]"
-
-        functionsField =
+        functionsFieldExpr =
             if hasFunctions then
-                "    , functions = " ++ namespace ++ ".Functions.toFunctionDict " ++ namespace ++ ".Functions.functions\n"
+                ( "functions"
+                , CG.apply
+                    [ CG.fqVal [ namespace, "Functions" ] "toFunctionDict"
+                    , CG.fqVal [ namespace, "Functions" ] "functions"
+                    ]
+                )
 
             else
-                "    , functions = Dict.empty\n"
+                ( "functions", CG.fqVal [ "Dict" ] "empty" )
+
+        registryDecl =
+            CG.funDecl
+                Nothing
+                (Just (CG.typed "Registry" [ CG.typeVar "msg" ]))
+                "registry"
+                []
+                (CG.record [ componentsField, functionsFieldExpr ])
+                |> renderDecl
     in
     "module "
         ++ namespace
@@ -1186,8 +1198,5 @@ registryModule namespace componentNames hasFunctions =
         ++ functionsImport
         ++ String.join "\n" imports
         ++ "\n\n\n"
-        ++ "registry : Registry msg\nregistry =\n    { components =\n        Dict.fromList\n"
-        ++ entriesStr
+        ++ registryDecl
         ++ "\n"
-        ++ functionsField
-        ++ "    }\n"
