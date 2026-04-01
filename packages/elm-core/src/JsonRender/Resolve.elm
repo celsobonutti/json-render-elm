@@ -24,7 +24,8 @@ module JsonRender.Resolve exposing
 import Dict exposing (Dict)
 import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
-import JsonRender.Internal.PropValue exposing (PropValue(..))
+import JsonRender.Internal.Condition as Condition
+import JsonRender.Internal.PropValue exposing (ConditionExpr(..), PropValue(..))
 import JsonRender.State as State
 import Recursion
 import Recursion.Traverse
@@ -117,7 +118,8 @@ resolveActionParams =
 
 
 {-| Like resolvePropValueWith but $item resolves to the absolute state path.
-$cond conditions still use value-based resolution for truthiness checks.
+$cond conditions use Condition.evaluate for visibility-style conditions,
+or value-based truthiness for $computed and other expressions.
 -}
 resolveActionParamValueWith : FunctionDict -> Value -> Maybe RepeatContext -> PropValue -> ResolvedValue
 resolveActionParamValueWith functions state repeatCtx prop =
@@ -134,20 +136,33 @@ resolveActionParamValueWith functions state repeatCtx prop =
                 Nothing ->
                     RNull
 
-        ConditionalExpr cond thenVal elseVal ->
-            let
-                condResolved =
-                    resolvePropValueWith functions state repeatCtx cond
-            in
-            case isResolvedTruthy condResolved of
-                Ok True ->
-                    resolveActionParamValueWith functions state repeatCtx thenVal
+        ConditionalExpr condExpr thenVal elseVal ->
+            case condExpr of
+                VisibilityCondition cond ->
+                    case Condition.evaluate state repeatCtx cond of
+                        Ok True ->
+                            resolveActionParamValueWith functions state repeatCtx thenVal
 
-                Ok False ->
-                    resolveActionParamValueWith functions state repeatCtx elseVal
+                        Ok False ->
+                            resolveActionParamValueWith functions state repeatCtx elseVal
 
-                Err err ->
-                    RError err
+                        Err err ->
+                            RError err
+
+                TruthyExpr pv ->
+                    let
+                        condResolved =
+                            resolvePropValueWith functions state repeatCtx pv
+                    in
+                    case isResolvedTruthy condResolved of
+                        Ok True ->
+                            resolveActionParamValueWith functions state repeatCtx thenVal
+
+                        Ok False ->
+                            resolveActionParamValueWith functions state repeatCtx elseVal
+
+                        Err err ->
+                            RError err
 
         _ ->
             resolvePropValueWith functions state repeatCtx prop
@@ -237,10 +252,10 @@ resolvePropValueWith functions state repeatCtx =
                         Nothing ->
                             Recursion.base RNull
 
-                ConditionalExpr cond thenVal elseVal ->
-                    Recursion.recurseThen cond <|
-                        \condResolved ->
-                            case isResolvedTruthy condResolved of
+                ConditionalExpr condExpr thenVal elseVal ->
+                    case condExpr of
+                        VisibilityCondition cond ->
+                            case Condition.evaluate state repeatCtx cond of
                                 Ok True ->
                                     Recursion.recurse thenVal
 
@@ -249,6 +264,19 @@ resolvePropValueWith functions state repeatCtx =
 
                                 Err err ->
                                     Recursion.base (RError err)
+
+                        TruthyExpr pv ->
+                            Recursion.recurseThen pv <|
+                                \condResolved ->
+                                    case isResolvedTruthy condResolved of
+                                        Ok True ->
+                                            Recursion.recurse thenVal
+
+                                        Ok False ->
+                                            Recursion.recurse elseVal
+
+                                        Err err ->
+                                            Recursion.base (RError err)
 
                 ComputedExpr name args ->
                     Recursion.Traverse.sequenceDictThen args <|
