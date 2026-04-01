@@ -152,21 +152,20 @@ bindingsTypeAlias componentName schema =
                 |> List.sortBy Tuple.first
                 |> List.map
                     (\( name, field ) ->
-                        name ++ " : Maybe (" ++ fieldToElmType name field.fieldType ++ " -> EventHandle msg)"
+                        ( name
+                        , CG.maybeAnn
+                            (CG.funAnn
+                                (fieldToTypeAnnotation name field.fieldType)
+                                (CG.typed "EventHandle" [ CG.typeVar "msg" ])
+                            )
+                        )
                     )
-
-        body =
-            case fields of
-                [] ->
-                    "    {}"
-
-                first :: rest ->
-                    "    { "
-                        ++ first
-                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
-                        ++ "\n    }"
     in
-    "type alias " ++ componentName ++ "Bindings msg =\n" ++ body
+    CG.aliasDecl Nothing
+        (componentName ++ "Bindings")
+        [ "msg" ]
+        (CG.recordAnn fields)
+        |> renderDecl
 
 
 bindingsDecoder : String -> ComponentSchema -> String

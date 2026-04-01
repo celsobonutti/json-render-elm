@@ -38,8 +38,7 @@ type alias CardProps =
 
 
 type alias CardBindings msg =
-    { title : Maybe (String -> EventHandle msg)
-    }
+    { title : Maybe (String -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String CardProps
@@ -83,8 +82,7 @@ type alias ButtonProps =
 
 
 type alias ButtonBindings msg =
-    { label : Maybe (String -> EventHandle msg)
-    }
+    { label : Maybe (String -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String ButtonProps
@@ -421,8 +419,7 @@ type alias CardProps =
 
 
 type alias CardBindings msg =
-    { title : Maybe (String -> EventHandle msg)
-    }
+    { title : Maybe (String -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String CardProps
@@ -491,8 +488,7 @@ type alias CardProps =
 
 
 type alias CardBindings msg =
-    { title : Maybe (String -> EventHandle msg)
-    }
+    { title : Maybe (String -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String CardProps
