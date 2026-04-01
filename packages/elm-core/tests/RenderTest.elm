@@ -105,6 +105,7 @@ suite =
                                     , repeat = Nothing
                                     , on = Dict.empty
                                     , watch = Dict.empty
+                                    , enabled = Nothing
                                     }
                                   )
                                 ]
@@ -129,6 +130,7 @@ suite =
                                     , repeat = Nothing
                                     , on = Dict.empty
                                     , watch = Dict.empty
+                                    , enabled = Nothing
                                     }
                                   )
                                 , ( "inner"
@@ -139,6 +141,7 @@ suite =
                                     , repeat = Nothing
                                     , on = Dict.empty
                                     , watch = Dict.empty
+                                    , enabled = Nothing
                                     }
                                   )
                                 ]
@@ -163,6 +166,7 @@ suite =
                                     , repeat = Nothing
                                     , on = Dict.empty
                                     , watch = Dict.empty
+                                    , enabled = Nothing
                                     }
                                   )
                                 ]
@@ -190,6 +194,7 @@ suite =
                                     , repeat = Nothing
                                     , on = Dict.empty
                                     , watch = Dict.empty
+                                    , enabled = Nothing
                                     }
                                   )
                                 ]
@@ -251,6 +256,7 @@ suite =
                                     , repeat = Nothing
                                     , on = Dict.empty
                                     , watch = Dict.empty
+                                    , enabled = Nothing
                                     }
                                   )
                                 ]

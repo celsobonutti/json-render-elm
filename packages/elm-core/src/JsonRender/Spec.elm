@@ -40,6 +40,7 @@ type alias Element =
     , repeat : Maybe Repeat
     , on : Dict String EventHandler
     , watch : Dict String EventHandler
+    , enabled : Maybe Condition
     }
 
 
@@ -79,6 +80,7 @@ elementDecoder =
         |> optional "repeat" (Decode.map Just repeatDecoder) Nothing
         |> optional "on" (Decode.dict eventHandlerDecoder) Dict.empty
         |> optional "watch" (Decode.dict eventHandlerDecoder) Dict.empty
+        |> optional "enabled" (Decode.map Just JsonRender.Visibility.decoder) Nothing
 
 
 repeatDecoder : Decoder Repeat
