@@ -39,21 +39,20 @@ verticalOrHorizontalToString value =
 
 
 type alias StackProps =
-    { direction : Maybe VerticalOrHorizontal
-    , gap : Maybe Int
-    }
+    { direction : Maybe VerticalOrHorizontal, gap : Maybe Int }
 
 
 type alias StackBindings msg =
-    { direction : Maybe (VerticalOrHorizontal -> EventHandle msg)
-    , gap : Maybe (Int -> EventHandle msg)
-    }
+    { direction : Maybe (VerticalOrHorizontal -> EventHandle msg), gap : Maybe (Int -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String StackProps
 propsDecoder =
     ResolvedValue.succeed StackProps
-        |> ResolvedValue.optional "direction" (\rv -> ResolvedValue.string rv |> Result.andThen verticalOrHorizontalFromString) Nothing
+        |> ResolvedValue.optional
+            "direction"
+            (\rv -> ResolvedValue.string rv |> Result.andThen verticalOrHorizontalFromString)
+            Nothing
         |> ResolvedValue.optional "gap" ResolvedValue.int Nothing
 
 

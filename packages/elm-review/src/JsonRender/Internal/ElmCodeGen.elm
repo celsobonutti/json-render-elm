@@ -18,8 +18,78 @@ module JsonRender.Internal.ElmCodeGen exposing
     )
 
 import Dict exposing (Dict)
+import Elm.CodeGen as CG
+import Elm.Pretty
 import JsonRender.Internal.SchemaParser as SchemaParser exposing (ActionSchema, ComponentSchema, FieldType(..))
 import JsonRender.Internal.TypeMapping as TypeMapping
+import Pretty
+
+
+renderDecl : CG.Declaration -> String
+renderDecl decl =
+    Elm.Pretty.prettyDeclaration 120 decl
+        |> Pretty.pretty 120
+
+
+fieldToTypeAnnotation : String -> SchemaParser.FieldType -> CG.TypeAnnotation
+fieldToTypeAnnotation fieldName fieldType =
+    case fieldType of
+        SchemaParser.FString ->
+            CG.stringAnn
+
+        SchemaParser.FInt ->
+            CG.intAnn
+
+        SchemaParser.FFloat ->
+            CG.floatAnn
+
+        SchemaParser.FBool ->
+            CG.boolAnn
+
+        SchemaParser.FNullable inner ->
+            CG.maybeAnn (fieldToTypeAnnotation fieldName inner)
+
+        SchemaParser.FList inner ->
+            CG.listAnn (fieldToTypeAnnotation fieldName inner)
+
+        SchemaParser.FEnum variants ->
+            CG.typed (TypeMapping.toElmType (SchemaParser.FEnum variants)) []
+
+        SchemaParser.FObject _ ->
+            CG.typed (objectTypeName fieldName) []
+
+
+schemaFieldToTypeAnnotation : SchemaParser.FieldType -> CG.TypeAnnotation
+schemaFieldToTypeAnnotation fieldType =
+    case fieldType of
+        SchemaParser.FString ->
+            CG.stringAnn
+
+        SchemaParser.FInt ->
+            CG.intAnn
+
+        SchemaParser.FFloat ->
+            CG.floatAnn
+
+        SchemaParser.FBool ->
+            CG.boolAnn
+
+        SchemaParser.FNullable inner ->
+            CG.maybeAnn (schemaFieldToTypeAnnotation inner)
+
+        SchemaParser.FList inner ->
+            CG.listAnn (schemaFieldToTypeAnnotation inner)
+
+        SchemaParser.FEnum variants ->
+            CG.typed (TypeMapping.toElmType (SchemaParser.FEnum variants)) []
+
+        SchemaParser.FObject _ ->
+            CG.typed "Value" []
+
+
+recordTypeAlias : String -> List ( String, CG.TypeAnnotation ) -> CG.Declaration
+recordTypeAlias name fields =
+    CG.aliasDecl Nothing name [] (CG.recordAnn fields)
 
 
 propsTypeAlias : String -> ComponentSchema -> String
@@ -30,29 +100,65 @@ propsTypeAlias componentName schema =
                 |> List.sortBy Tuple.first
                 |> List.map
                     (\( name, field ) ->
-                        let
-                            elmType =
-                                if field.required then
-                                    fieldToElmType name field.fieldType
+                        ( name
+                        , if field.required then
+                            fieldToTypeAnnotation name field.fieldType
 
-                                else
-                                    "Maybe " ++ fieldToElmType name field.fieldType
-                        in
-                        name ++ " : " ++ elmType
+                          else
+                            CG.maybeAnn (fieldToTypeAnnotation name field.fieldType)
+                        )
                     )
-
-        body =
-            case fields of
-                [] ->
-                    "    {}"
-
-                first :: rest ->
-                    "    { "
-                        ++ first
-                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
-                        ++ "\n    }"
     in
-    "type alias " ++ componentName ++ "Props =\n" ++ body
+    recordTypeAlias (componentName ++ "Props") fields
+        |> renderDecl
+
+
+fieldToExtractorExpr : String -> SchemaParser.FieldType -> CG.Expression
+fieldToExtractorExpr fieldName fieldType =
+    case fieldType of
+        SchemaParser.FObject _ ->
+            CG.parens
+                (CG.lambda [ CG.varPattern "rv" ]
+                    (CG.pipe
+                        (CG.apply [ CG.fqVal [ "ResolvedValue" ] "object", CG.val "rv" ])
+                        [ CG.apply [ CG.fqVal [ "Result" ] "andThen", CG.val (objectFnBaseName fieldName ++ "Decoder") ] ]
+                    )
+                )
+
+        SchemaParser.FEnum variants ->
+            let
+                baseName =
+                    TypeMapping.enumFnBaseName variants
+            in
+            CG.parens
+                (CG.lambda [ CG.varPattern "rv" ]
+                    (CG.pipe
+                        (CG.apply [ CG.fqVal [ "ResolvedValue" ] "string", CG.val "rv" ])
+                        [ CG.apply [ CG.fqVal [ "Result" ] "andThen", CG.val (baseName ++ "FromString") ] ]
+                    )
+                )
+
+        _ ->
+            CG.fqVal [ "ResolvedValue" ] (schemaFieldExtractorName fieldType)
+
+
+schemaFieldExtractorName : SchemaParser.FieldType -> String
+schemaFieldExtractorName fieldType =
+    case fieldType of
+        SchemaParser.FString ->
+            "string"
+
+        SchemaParser.FInt ->
+            "int"
+
+        SchemaParser.FFloat ->
+            "float"
+
+        SchemaParser.FBool ->
+            "bool"
+
+        _ ->
+            "string"
 
 
 propsDecoder : String -> ComponentSchema -> String
@@ -67,23 +173,31 @@ propsDecoder componentName schema =
                 (\( name, field ) ->
                     let
                         extractor =
-                            fieldToExtractor name field.fieldType
-                    in
-                    if field.required then
-                        "        |> ResolvedValue.required \"" ++ name ++ "\" " ++ extractor
+                            fieldToExtractorExpr name field.fieldType
 
-                    else
-                        "        |> ResolvedValue.optional \"" ++ name ++ "\" " ++ extractor ++ " Nothing"
+                        args =
+                            if field.required then
+                                [ CG.fqVal [ "ResolvedValue" ] "required", CG.string name, extractor ]
+
+                            else
+                                [ CG.fqVal [ "ResolvedValue" ] "optional", CG.string name, extractor, CG.val "Nothing" ]
+                    in
+                    CG.apply args
                 )
                 fields
+
+        body =
+            CG.pipe
+                (CG.apply [ CG.fqVal [ "ResolvedValue" ] "succeed", CG.val (componentName ++ "Props") ])
+                pipelineSteps
+
+        typeAnn =
+            CG.funAnn
+                (CG.typed "Dict" [ CG.stringAnn, CG.typed "ResolvedValue" [] ])
+                (CG.typed "Result" [ CG.stringAnn, CG.typed (componentName ++ "Props") [] ])
     in
-    "propsDecoder : Dict String ResolvedValue -> Result String "
-        ++ componentName
-        ++ "Props\npropsDecoder =\n"
-        ++ "    ResolvedValue.succeed "
-        ++ componentName
-        ++ "Props\n"
-        ++ String.join "\n" pipelineSteps
+    CG.funDecl Nothing (Just typeAnn) "propsDecoder" [] body
+        |> renderDecl
 
 
 bindingsTypeAlias : String -> ComponentSchema -> String
@@ -94,21 +208,59 @@ bindingsTypeAlias componentName schema =
                 |> List.sortBy Tuple.first
                 |> List.map
                     (\( name, field ) ->
-                        name ++ " : Maybe (" ++ fieldToElmType name field.fieldType ++ " -> EventHandle msg)"
+                        ( name
+                        , CG.maybeAnn
+                            (CG.funAnn
+                                (fieldToTypeAnnotation name field.fieldType)
+                                (CG.typed "EventHandle" [ CG.typeVar "msg" ])
+                            )
+                        )
                     )
-
-        body =
-            case fields of
-                [] ->
-                    "    {}"
-
-                first :: rest ->
-                    "    { "
-                        ++ first
-                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
-                        ++ "\n    }"
     in
-    "type alias " ++ componentName ++ "Bindings msg =\n" ++ body
+    CG.aliasDecl Nothing
+        (componentName ++ "Bindings")
+        [ "msg" ]
+        (CG.recordAnn fields)
+        |> renderDecl
+
+
+fieldToEncoderExpr : String -> SchemaParser.FieldType -> CG.Expression
+fieldToEncoderExpr fieldName fieldType =
+    case fieldType of
+        SchemaParser.FObject _ ->
+            CG.val (objectFnBaseName fieldName ++ "Encoder")
+
+        SchemaParser.FEnum variants ->
+            CG.parens
+                (CG.applyBinOp
+                    (CG.fqVal [ "Json", "Encode" ] "string")
+                    CG.composel
+                    (CG.val (TypeMapping.enumFnBaseName variants ++ "ToString"))
+                )
+
+        SchemaParser.FString ->
+            CG.fqVal [ "Json", "Encode" ] "string"
+
+        SchemaParser.FInt ->
+            CG.fqVal [ "Json", "Encode" ] "int"
+
+        SchemaParser.FFloat ->
+            CG.fqVal [ "Json", "Encode" ] "float"
+
+        SchemaParser.FBool ->
+            CG.fqVal [ "Json", "Encode" ] "bool"
+
+        SchemaParser.FNullable inner ->
+            CG.parens
+                (CG.applyBinOp
+                    (CG.apply [ CG.fqVal [ "Maybe" ] "map", fieldToEncoderExpr fieldName inner ])
+                    CG.composer
+                    (CG.apply [ CG.fqVal [ "Maybe" ] "withDefault", CG.fqVal [ "Json", "Encode" ] "null" ])
+                )
+
+        SchemaParser.FList inner ->
+            CG.parens
+                (CG.apply [ CG.fqVal [ "Json", "Encode" ] "list", fieldToEncoderExpr fieldName inner ])
 
 
 bindingsDecoder : String -> ComponentSchema -> String
@@ -121,17 +273,26 @@ bindingsDecoder componentName schema =
         pipelineSteps =
             List.map
                 (\( name, field ) ->
-                    "        |> Bind.bindableTyped \"" ++ name ++ "\" " ++ fieldToEncoder name field.fieldType
+                    CG.apply
+                        [ CG.fqVal [ "Bind" ] "bindableTyped"
+                        , CG.string name
+                        , fieldToEncoderExpr name field.fieldType
+                        ]
                 )
                 fields
+
+        body =
+            CG.pipe
+                (CG.apply [ CG.fqVal [ "Bind" ] "succeed", CG.val (componentName ++ "Bindings") ])
+                pipelineSteps
+
+        typeAnn =
+            CG.funAnn
+                (CG.typed "Dict" [ CG.stringAnn, CG.funAnn (CG.typed "Value" []) (CG.typed "EventHandle" [ CG.typeVar "msg" ]) ])
+                (CG.typed (componentName ++ "Bindings") [ CG.typeVar "msg" ])
     in
-    "bindingsDecoder : Dict String (Value -> EventHandle msg) -> "
-        ++ componentName
-        ++ "Bindings msg\nbindingsDecoder =\n"
-        ++ "    Bind.succeed "
-        ++ componentName
-        ++ "Bindings\n"
-        ++ String.join "\n" pipelineSteps
+    CG.funDecl Nothing (Just typeAnn) "bindingsDecoder" [] body
+        |> renderDecl
 
 
 componentBody : String -> ComponentSchema -> String
@@ -185,7 +346,14 @@ componentBody componentName schema =
         ++ "\n\n\n"
         ++ bindingsDecoderCode
         ++ "\n\n\n"
-        ++ "component : Component msg\ncomponent =\n    register propsDecoder bindingsDecoder view"
+        ++ (CG.funDecl
+                Nothing
+                (Just (CG.typed "Component" [ CG.typeVar "msg" ]))
+                "component"
+                []
+                (CG.apply [ CG.val "register", CG.val "propsDecoder", CG.val "bindingsDecoder", CG.val "view" ])
+                |> renderDecl
+           )
 
 
 componentScaffold : String -> String -> ComponentSchema -> String
@@ -235,11 +403,19 @@ componentScaffold namespace componentName schema =
 
 defaultViewFunction : String -> String
 defaultViewFunction componentName =
-    "view : ComponentContext "
-        ++ componentName
-        ++ "Props ("
-        ++ componentName
-        ++ "Bindings msg) msg -> Html msg\nview ctx =\n    ()\n"
+    let
+        typeAnn =
+            CG.funAnn
+                (CG.typed "ComponentContext"
+                    [ CG.typed (componentName ++ "Props") []
+                    , CG.typed (componentName ++ "Bindings") [ CG.typeVar "msg" ]
+                    , CG.typeVar "msg"
+                    ]
+                )
+                (CG.typed "Html" [ CG.typeVar "msg" ])
+    in
+    CG.funDecl Nothing (Just typeAnn) "view" [ CG.varPattern "ctx" ] CG.unit
+        |> renderDecl
 
 
 componentModule : String -> String -> ComponentSchema -> String
@@ -257,85 +433,145 @@ actionParamsType actionName schema =
                 |> List.sortBy Tuple.first
                 |> List.map
                     (\( name, field ) ->
-                        let
-                            elmType =
-                                if field.required then
-                                    TypeMapping.toElmType field.fieldType
+                        ( name
+                        , if field.required then
+                            schemaFieldToTypeAnnotation field.fieldType
 
-                                else
-                                    "Maybe " ++ TypeMapping.toElmType field.fieldType
-                        in
-                        name ++ " : " ++ elmType
+                          else
+                            CG.maybeAnn (schemaFieldToTypeAnnotation field.fieldType)
+                        )
                     )
-
-        body =
-            case fields of
-                [] ->
-                    "    {}"
-
-                first :: rest ->
-                    "    { "
-                        ++ first
-                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
-                        ++ "\n    }"
     in
-    "type alias " ++ actionName ++ "Params =\n" ++ body
+    recordTypeAlias (actionName ++ "Params") fields
+        |> renderDecl
 
 
 actionType : Dict String ActionSchema -> String
 actionType actions =
     let
-        variants =
-            Dict.toList actions
-                |> List.sortBy Tuple.first
-                |> List.map
-                    (\( name, schema ) ->
-                        let
-                            capitalName =
-                                TypeMapping.capitalizeFirst name
-                        in
-                        if Dict.isEmpty schema.params then
-                            capitalName
-
-                        else
-                            capitalName ++ " " ++ capitalName ++ "Params"
-                    )
-    in
-    case variants of
-        [] ->
-            "type Action\n    = NoAction"
-
-        first :: rest ->
-            "type Action\n    = "
-                ++ first
-                ++ String.concat (List.map (\v -> "\n    | " ++ v) rest)
-                ++ "\n"
-
-
-decodeActionFunction : Dict String ActionSchema -> String
-decodeActionFunction actions =
-    let
         sortedActions =
             Dict.toList actions
                 |> List.sortBy Tuple.first
 
-        branches =
-            List.map actionBranch sortedActions
+        variants =
+            case sortedActions of
+                [] ->
+                    [ ( "NoAction", [] ) ]
 
-        catchAll =
-            "        _ ->\n            Err (\"Unknown action: \" ++ name)"
+                _ ->
+                    List.map
+                        (\( name, schema ) ->
+                            let
+                                capitalName =
+                                    TypeMapping.capitalizeFirst name
+                            in
+                            if Dict.isEmpty schema.params then
+                                ( capitalName, [] )
 
-        allBranches =
-            branches ++ [ catchAll ]
+                            else
+                                ( capitalName, [ CG.typed (capitalName ++ "Params") [] ] )
+                        )
+                        sortedActions
     in
-    "decodeAction : String -> Dict String Value -> Result String Action\n"
-        ++ "decodeAction name params =\n"
-        ++ "    case name of\n"
-        ++ String.join "\n\n" allBranches
+    CG.customTypeDecl Nothing "Action" [] variants
+        |> renderDecl
 
 
-actionBranch : ( String, ActionSchema ) -> String
-actionBranch ( name, schema ) =
+fieldToJsonDecoderExpr : SchemaParser.FieldType -> CG.Expression
+fieldToJsonDecoderExpr fieldType =
+    case fieldType of
+        SchemaParser.FString ->
+            CG.fqVal [ "Decode" ] "string"
+
+        SchemaParser.FInt ->
+            CG.fqVal [ "Decode" ] "int"
+
+        SchemaParser.FFloat ->
+            CG.fqVal [ "Decode" ] "float"
+
+        SchemaParser.FBool ->
+            CG.fqVal [ "Decode" ] "bool"
+
+        SchemaParser.FNullable inner ->
+            CG.parens (CG.apply [ CG.fqVal [ "Decode" ] "nullable", fieldToJsonDecoderExpr inner ])
+
+        SchemaParser.FList inner ->
+            CG.parens (CG.apply [ CG.fqVal [ "Decode" ] "list", fieldToJsonDecoderExpr inner ])
+
+        SchemaParser.FEnum variants ->
+            CG.val (TypeMapping.enumFnBaseName variants ++ "Decoder")
+
+        SchemaParser.FObject _ ->
+            CG.fqVal [ "Decode" ] "value"
+
+
+nestedParamDecodingExpr : List ( String, { a | fieldType : SchemaParser.FieldType, required : Bool } ) -> CG.Expression -> CG.Expression
+nestedParamDecodingExpr params successExpr =
+    case params of
+        [] ->
+            successExpr
+
+        ( pName, field ) :: rest ->
+            let
+                decoderExpr =
+                    fieldToJsonDecoderExpr field.fieldType
+
+                innerExpr =
+                    nestedParamDecodingExpr rest successExpr
+            in
+            if field.required then
+                -- case Dict.get "paramName" params of
+                --     Just paramName_raw ->
+                --         case Decode.decodeValue decoder paramName_raw of
+                --             Ok paramName -> <recurse>
+                --             Err _ -> Err "paramName must be a Type"
+                --     Nothing ->
+                --         Err "missing required param paramName"
+                CG.caseExpr
+                    (CG.apply [ CG.fqVal [ "Dict" ] "get", CG.string pName, CG.val "params" ])
+                    [ ( CG.namedPattern "Just" [ CG.varPattern (pName ++ "_raw") ]
+                      , CG.caseExpr
+                            (CG.apply [ CG.fqVal [ "Decode" ] "decodeValue", decoderExpr, CG.val (pName ++ "_raw") ])
+                            [ ( CG.namedPattern "Ok" [ CG.varPattern pName ]
+                              , innerExpr
+                              )
+                            , ( CG.namedPattern "Err" [ CG.allPattern ]
+                              , CG.apply [ CG.val "Err", CG.string (pName ++ " must be a " ++ TypeMapping.toElmType field.fieldType) ]
+                              )
+                            ]
+                      )
+                    , ( CG.namedPattern "Nothing" []
+                      , CG.apply [ CG.val "Err", CG.string ("missing required param " ++ pName) ]
+                      )
+                    ]
+
+            else
+                -- let
+                --     paramName =
+                --         Dict.get "paramName" params
+                --             |> Maybe.andThen (\raw -> Decode.decodeValue decoder raw |> Result.toMaybe)
+                -- in
+                -- <recurse>
+                CG.letExpr
+                    [ CG.letVal pName
+                        (CG.pipe
+                            (CG.apply [ CG.fqVal [ "Dict" ] "get", CG.string pName, CG.val "params" ])
+                            [ CG.apply
+                                [ CG.fqVal [ "Maybe" ] "andThen"
+                                , CG.lambda [ CG.varPattern "raw" ]
+                                    (CG.pipe
+                                        (CG.apply [ CG.fqVal [ "Decode" ] "decodeValue", decoderExpr, CG.val "raw" ])
+                                        [ CG.fqVal [ "Result" ] "toMaybe" ]
+                                    )
+                                ]
+                            ]
+                        )
+                    ]
+                    innerExpr
+
+
+actionBranchExpr : ( String, ActionSchema ) -> ( CG.Pattern, CG.Expression )
+actionBranchExpr ( name, schema ) =
     let
         capitalName =
             TypeMapping.capitalizeFirst name
@@ -351,7 +587,9 @@ actionBranch ( name, schema ) =
                 |> List.filter (\( _, field ) -> not field.required)
     in
     if Dict.isEmpty schema.params then
-        "        \"" ++ name ++ "\" ->\n            Ok " ++ capitalName
+        ( CG.stringPattern name
+        , CG.apply [ CG.val "Ok", CG.val capitalName ]
+        )
 
     else
         let
@@ -359,98 +597,46 @@ actionBranch ( name, schema ) =
                 sortedParams ++ optionalParams
 
             recordFields =
-                List.map
-                    (\( pName, _ ) -> pName ++ " = " ++ pName)
-                    allParams
-                    |> String.join ", "
+                List.map (\( pName, _ ) -> ( pName, CG.val pName )) allParams
 
             successExpr =
-                "Ok (" ++ capitalName ++ " { " ++ recordFields ++ " })"
+                CG.apply [ CG.val "Ok", CG.parens (CG.apply [ CG.val capitalName, CG.record recordFields ]) ]
         in
-        "        \""
-            ++ name
-            ++ "\" ->\n"
-            ++ nestedParamDecoding allParams successExpr 12
+        ( CG.stringPattern name
+        , nestedParamDecodingExpr allParams successExpr
+        )
 
 
-nestedParamDecoding : List ( String, { a | fieldType : SchemaParser.FieldType, required : Bool } ) -> String -> Int -> String
-nestedParamDecoding params successExpr baseIndent =
-    case params of
-        [] ->
-            indent baseIndent ++ successExpr
+decodeActionFunction : Dict String ActionSchema -> String
+decodeActionFunction actions =
+    let
+        sortedActions =
+            Dict.toList actions
+                |> List.sortBy Tuple.first
 
-        ( pName, field ) :: rest ->
-            let
-                decoderExpr =
-                    TypeMapping.toJsonDecoder field.fieldType
+        actionBranches =
+            List.map actionBranchExpr sortedActions
 
-                currentIndent =
-                    indent baseIndent
+        catchAll =
+            ( CG.allPattern
+            , CG.apply [ CG.val "Err", CG.parens (CG.applyBinOp (CG.string "Unknown action: ") CG.append (CG.val "name")) ]
+            )
 
-                innerIndent =
-                    indent (baseIndent + 4)
+        allBranches =
+            actionBranches ++ [ catchAll ]
 
-                innerInnerIndent =
-                    indent (baseIndent + 8)
-            in
-            if field.required then
-                currentIndent
-                    ++ "case Dict.get \""
-                    ++ pName
-                    ++ "\" params of\n"
-                    ++ innerIndent
-                    ++ "Just "
-                    ++ pName
-                    ++ "_raw ->\n"
-                    ++ innerInnerIndent
-                    ++ "case Decode.decodeValue "
-                    ++ decoderExpr
-                    ++ " "
-                    ++ pName
-                    ++ "_raw of\n"
-                    ++ indent (baseIndent + 12)
-                    ++ "Ok "
-                    ++ pName
-                    ++ " ->\n"
-                    ++ nestedParamDecoding rest successExpr (baseIndent + 16)
-                    ++ "\n\n"
-                    ++ indent (baseIndent + 12)
-                    ++ "Err _ ->\n"
-                    ++ indent (baseIndent + 16)
-                    ++ "Err \""
-                    ++ pName
-                    ++ " must be a "
-                    ++ TypeMapping.toElmType field.fieldType
-                    ++ "\"\n\n"
-                    ++ innerIndent
-                    ++ "Nothing ->\n"
-                    ++ innerInnerIndent
-                    ++ "Err \"missing required param "
-                    ++ pName
-                    ++ "\""
+        body =
+            CG.caseExpr (CG.val "name") allBranches
 
-            else
-                currentIndent
-                    ++ "let\n"
-                    ++ innerIndent
-                    ++ pName
-                    ++ " =\n"
-                    ++ innerInnerIndent
-                    ++ "Dict.get \""
-                    ++ pName
-                    ++ "\" params\n"
-                    ++ innerInnerIndent
-                    ++ "|> Maybe.andThen (\\raw -> Decode.decodeValue "
-                    ++ decoderExpr
-                    ++ " raw |> Result.toMaybe)\n"
-                    ++ currentIndent
-                    ++ "in\n"
-                    ++ nestedParamDecoding rest successExpr baseIndent
-
-
-indent : Int -> String
-indent n =
-    String.repeat n " "
+        typeAnn =
+            CG.funAnn CG.stringAnn
+                (CG.funAnn
+                    (CG.typed "Dict" [ CG.stringAnn, CG.typed "Value" [] ])
+                    (CG.typed "Result" [ CG.stringAnn, CG.typed "Action" [] ])
+                )
+    in
+    CG.funDecl Nothing (Just typeAnn) "decodeAction" [ CG.varPattern "name", CG.varPattern "params" ] body
+        |> renderDecl
 
 
 collectEnumsFromFields : Dict String SchemaParser.FieldSchema -> List (List String)
@@ -545,152 +731,123 @@ objectHelpers ( fieldName, subFields ) =
             Dict.toList subFields |> List.sortBy Tuple.first
 
         -- type alias
-        typeFields =
-            List.map
-                (\( name, field ) ->
-                    let
-                        elmType =
-                            if field.required then
-                                fieldToElmType name field.fieldType
-
-                            else
-                                "Maybe " ++ fieldToElmType name field.fieldType
-                    in
-                    name ++ " : " ++ elmType
-                )
-                sortedFields
-
-        typeBody =
-            case typeFields of
-                [] ->
-                    "    {}"
-
-                first :: rest ->
-                    "    { "
-                        ++ first
-                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
-                        ++ "\n    }"
-
         typeAliasCode =
-            "type alias " ++ typeName ++ " =\n" ++ typeBody
+            recordTypeAlias typeName
+                (List.map
+                    (\( name, field ) ->
+                        ( name
+                        , if field.required then
+                            fieldToTypeAnnotation name field.fieldType
+
+                          else
+                            CG.maybeAnn (fieldToTypeAnnotation name field.fieldType)
+                        )
+                    )
+                    sortedFields
+                )
+                |> renderDecl
 
         -- decoder (ResolvedValue pipeline)
-        decoderSteps =
+        decoderPipelineSteps =
             List.map
                 (\( name, field ) ->
                     let
                         extractor =
-                            fieldToExtractor name field.fieldType
-                    in
-                    if field.required then
-                        "        |> ResolvedValue.required \"" ++ name ++ "\" " ++ extractor
+                            fieldToExtractorExpr name field.fieldType
 
-                    else
-                        "        |> ResolvedValue.optional \"" ++ name ++ "\" " ++ extractor ++ " Nothing"
+                        args =
+                            if field.required then
+                                [ CG.fqVal [ "ResolvedValue" ] "required", CG.string name, extractor ]
+
+                            else
+                                [ CG.fqVal [ "ResolvedValue" ] "optional", CG.string name, extractor, CG.val "Nothing" ]
+                    in
+                    CG.apply args
                 )
                 sortedFields
 
+        decoderBody =
+            CG.pipe
+                (CG.apply [ CG.fqVal [ "ResolvedValue" ] "succeed", CG.val typeName ])
+                decoderPipelineSteps
+
+        decoderTypeAnn =
+            CG.funAnn
+                (CG.typed "Dict" [ CG.stringAnn, CG.typed "ResolvedValue" [] ])
+                (CG.typed "Result" [ CG.stringAnn, CG.typed typeName [] ])
+
         decoderCode =
-            baseName
-                ++ "Decoder : Dict String ResolvedValue -> Result String "
-                ++ typeName
-                ++ "\n"
-                ++ baseName
-                ++ "Decoder =\n"
-                ++ "    ResolvedValue.succeed "
-                ++ typeName
-                ++ "\n"
-                ++ String.join "\n" decoderSteps
+            CG.funDecl Nothing (Just decoderTypeAnn) (baseName ++ "Decoder") [] decoderBody
+                |> renderDecl
 
         -- encoder
-        encoderFields =
+        encoderFieldExprs =
             List.map
                 (\( name, field ) ->
                     let
                         encoder =
-                            fieldToEncoder name field.fieldType
-                    in
-                    if field.required then
-                        "        ( \"" ++ name ++ "\", " ++ encoder ++ " record." ++ name ++ " )"
+                            fieldToEncoderExpr name field.fieldType
 
-                    else
-                        "        ( \""
-                            ++ name
-                            ++ "\", record."
-                            ++ name
-                            ++ " |> Maybe.map "
-                            ++ encoder
-                            ++ " |> Maybe.withDefault Json.Encode.null )"
+                        valueExpr =
+                            if field.required then
+                                CG.apply [ encoder, CG.access (CG.val "record") name ]
+
+                            else
+                                CG.pipe
+                                    (CG.access (CG.val "record") name)
+                                    [ CG.apply [ CG.fqVal [ "Maybe" ] "map", encoder ]
+                                    , CG.apply [ CG.fqVal [ "Maybe" ] "withDefault", CG.fqVal [ "Json", "Encode" ] "null" ]
+                                    ]
+                    in
+                    CG.tuple [ CG.string name, valueExpr ]
                 )
                 sortedFields
 
         encoderBody =
-            case encoderFields of
-                [] ->
-                    "    Json.Encode.object []"
+            CG.apply [ CG.fqVal [ "Json", "Encode" ] "object", CG.list encoderFieldExprs ]
 
-                _ ->
-                    "    Json.Encode.object\n"
-                        ++ "        [ "
-                        ++ String.join "\n        , " (List.map String.trimLeft encoderFields)
-                        ++ "\n        ]"
+        encoderTypeAnn =
+            CG.funAnn (CG.typed typeName []) (CG.typed "Value" [])
 
         encoderCode =
-            baseName
-                ++ "Encoder : "
-                ++ typeName
-                ++ " -> Value\n"
-                ++ baseName
-                ++ "Encoder record =\n"
-                ++ encoderBody
+            CG.funDecl Nothing (Just encoderTypeAnn) (baseName ++ "Encoder") [ CG.varPattern "record" ] encoderBody
+                |> renderDecl
     in
     typeAliasCode ++ "\n\n\n" ++ decoderCode ++ "\n\n\n" ++ encoderCode
 
 
-fieldToElmType : String -> SchemaParser.FieldType -> String
-fieldToElmType fieldName fieldType =
-    case fieldType of
-        FObject _ ->
-            objectTypeName fieldName
-
-        _ ->
-            TypeMapping.toElmType fieldType
-
-
-fieldToExtractor : String -> SchemaParser.FieldType -> String
-fieldToExtractor fieldName fieldType =
-    case fieldType of
-        FObject _ ->
-            "(\\rv -> ResolvedValue.object rv |> Result.andThen " ++ objectFnBaseName fieldName ++ "Decoder)"
-
-        _ ->
-            TypeMapping.toResolvedValueExtractor fieldType
-
-
-fieldToEncoder : String -> SchemaParser.FieldType -> String
-fieldToEncoder fieldName fieldType =
-    case fieldType of
-        FObject _ ->
-            objectFnBaseName fieldName ++ "Encoder"
-
-        _ ->
-            TypeMapping.toValueEncoder fieldType
-
-
 handleActionFunction : String
 handleActionFunction =
-    "handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\n"
-        ++ "handleAction action model =\n"
-        ++ "    ()\n"
+    let
+        typeAnn =
+            CG.funAnn (CG.typed "Action" [])
+                (CG.funAnn
+                    (CG.fqTyped [ "Actions" ] "Model" [])
+                    (CG.tupleAnn
+                        [ CG.fqTyped [ "Actions" ] "Model" []
+                        , CG.typed "Cmd" [ CG.fqTyped [ "Actions" ] "Msg" [ CG.typed "Action" [] ] ]
+                        ]
+                    )
+                )
+    in
+    CG.funDecl Nothing (Just typeAnn) "handleAction" [ CG.varPattern "action", CG.varPattern "model" ] CG.unit
+        |> renderDecl
 
 
 actionConfigFunction : String
 actionConfigFunction =
-    "actionConfig : Actions.ActionConfig Action\n"
-        ++ "actionConfig =\n"
-        ++ "    { handleAction = handleAction\n"
-        ++ "    , decodeAction = decodeAction\n"
-        ++ "    }\n"
+    let
+        typeAnn =
+            CG.fqTyped [ "Actions" ] "ActionConfig" [ CG.typed "Action" [] ]
+
+        body =
+            CG.record
+                [ ( "handleAction", CG.val "handleAction" )
+                , ( "decodeAction", CG.val "decodeAction" )
+                ]
+    in
+    CG.funDecl Nothing (Just typeAnn) "actionConfig" [] body
+        |> renderDecl
 
 
 actionsModule : String -> Dict String ActionSchema -> String
@@ -838,29 +995,17 @@ functionParamsType capitalName schema =
                 |> List.sortBy Tuple.first
                 |> List.map
                     (\( name, field ) ->
-                        let
-                            elmType =
-                                if field.required then
-                                    TypeMapping.toElmType field.fieldType
+                        ( name
+                        , if field.required then
+                            schemaFieldToTypeAnnotation field.fieldType
 
-                                else
-                                    "Maybe " ++ TypeMapping.toElmType field.fieldType
-                        in
-                        name ++ " : " ++ elmType
+                          else
+                            CG.maybeAnn (schemaFieldToTypeAnnotation field.fieldType)
+                        )
                     )
-
-        body =
-            case fields of
-                [] ->
-                    "    {}"
-
-                first :: rest ->
-                    "    { "
-                        ++ first
-                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
-                        ++ "\n    }"
     in
-    "type alias " ++ capitalName ++ "Params =\n" ++ body
+    recordTypeAlias (capitalName ++ "Params") fields
+        |> renderDecl
 
 
 functionRecordType : List ( String, SchemaParser.FunctionSchema ) -> String
@@ -869,49 +1014,52 @@ functionRecordType functions =
         fields =
             List.map
                 (\( name, schema ) ->
-                    let
-                        capitalName =
-                            TypeMapping.capitalizeFirst name
-
-                        returnType =
-                            TypeMapping.toElmType schema.returnType
-                    in
-                    name ++ " : " ++ capitalName ++ "Params -> " ++ returnType
+                    ( name
+                    , CG.funAnn
+                        (CG.typed (TypeMapping.capitalizeFirst name ++ "Params") [])
+                        (schemaFieldToTypeAnnotation schema.returnType)
+                    )
                 )
                 functions
-
-        body =
-            case fields of
-                [] ->
-                    "    {}"
-
-                first :: rest ->
-                    "    { "
-                        ++ first
-                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
-                        ++ "\n    }"
     in
-    "type alias Functions =\n" ++ body
+    recordTypeAlias "Functions" fields
+        |> renderDecl
 
 
 functionRecordValue : List ( String, SchemaParser.FunctionSchema ) -> String
 functionRecordValue functions =
     let
         fields =
-            List.map (\( name, _ ) -> name ++ " = ()") functions
+            List.map (\( name, _ ) -> ( name, CG.unit )) functions
 
         body =
-            case fields of
-                [] ->
-                    "    {}"
+            CG.record fields
 
-                first :: rest ->
-                    "    { "
-                        ++ first
-                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
-                        ++ "\n    }"
+        typeAnn =
+            CG.typed "Functions" []
     in
-    "functions : Functions\nfunctions =\n" ++ body
+    CG.funDecl Nothing (Just typeAnn) "functions" [] body
+        |> renderDecl
+
+
+schemaFieldExtractorExpr : SchemaParser.FieldType -> CG.Expression
+schemaFieldExtractorExpr fieldType =
+    case fieldType of
+        SchemaParser.FEnum variants ->
+            let
+                baseName =
+                    TypeMapping.enumFnBaseName variants
+            in
+            CG.parens
+                (CG.lambda [ CG.varPattern "rv" ]
+                    (CG.pipe
+                        (CG.apply [ CG.fqVal [ "ResolvedValue" ] "string", CG.val "rv" ])
+                        [ CG.apply [ CG.fqVal [ "Result" ] "andThen", CG.val (baseName ++ "FromString") ] ]
+                    )
+                )
+
+        _ ->
+            CG.fqVal [ "ResolvedValue" ] (schemaFieldExtractorName fieldType)
 
 
 toFunctionDict : List ( String, SchemaParser.FunctionSchema ) -> String
@@ -920,24 +1068,25 @@ toFunctionDict functions =
         entries =
             List.map toFunctionDictEntry functions
 
-        entriesStr =
-            case entries of
-                [] ->
-                    "        []"
+        body =
+            CG.apply [ CG.fqVal [ "Dict" ] "fromList", CG.list entries ]
 
-                first :: rest ->
-                    "        [ "
-                        ++ String.trimLeft first
-                        ++ String.concat (List.map (\e -> "\n        , " ++ String.trimLeft e) rest)
-                        ++ "\n        ]"
+        typeAnn =
+            CG.funAnn
+                (CG.typed "Functions" [])
+                (CG.typed "Dict"
+                    [ CG.stringAnn
+                    , CG.funAnn
+                        (CG.typed "Dict" [ CG.stringAnn, CG.typed "ResolvedValue" [] ])
+                        (CG.typed "ResolvedValue" [])
+                    ]
+                )
     in
-    "toFunctionDict : Functions -> Dict String (Dict String ResolvedValue -> ResolvedValue)\n"
-        ++ "toFunctionDict fns =\n"
-        ++ "    Dict.fromList\n"
-        ++ entriesStr
+    CG.funDecl Nothing (Just typeAnn) "toFunctionDict" [ CG.varPattern "fns" ] body
+        |> renderDecl
 
 
-toFunctionDictEntry : ( String, SchemaParser.FunctionSchema ) -> String
+toFunctionDictEntry : ( String, SchemaParser.FunctionSchema ) -> CG.Expression
 toFunctionDictEntry ( name, schema ) =
     let
         capitalName =
@@ -952,43 +1101,42 @@ toFunctionDictEntry ( name, schema ) =
                 (\( pName, field ) ->
                     let
                         extractor =
-                            TypeMapping.toResolvedValueExtractor field.fieldType
-                    in
-                    if field.required then
-                        "                        |> ResolvedValue.required \"" ++ pName ++ "\" " ++ extractor
+                            schemaFieldExtractorExpr field.fieldType
 
-                    else
-                        "                        |> ResolvedValue.optional \"" ++ pName ++ "\" " ++ extractor ++ " Nothing"
+                        args =
+                            if field.required then
+                                [ CG.fqVal [ "ResolvedValue" ] "required", CG.string pName, extractor ]
+
+                            else
+                                [ CG.fqVal [ "ResolvedValue" ] "optional", CG.string pName, extractor, CG.val "Nothing" ]
+                    in
+                    CG.apply args
                 )
                 sortedParams
 
+        resultExpr =
+            CG.pipe
+                (CG.apply [ CG.fqVal [ "ResolvedValue" ] "succeed", CG.val (capitalName ++ "Params") ])
+                pipelineSteps
+
         wrapper =
             TypeMapping.toResolvedValueWrapper schema.returnType
+
+        lambdaBody =
+            CG.letExpr
+                [ CG.letVal "result" resultExpr ]
+                (CG.caseExpr
+                    (CG.apply [ CG.val "result", CG.val "args" ])
+                    [ ( CG.namedPattern "Ok" [ CG.varPattern "params" ]
+                      , CG.apply [ CG.val wrapper, CG.parens (CG.apply [ CG.access (CG.val "fns") name, CG.val "params" ]) ]
+                      )
+                    , ( CG.namedPattern "Err" [ CG.varPattern "err" ]
+                      , CG.apply [ CG.val "RError", CG.parens (CG.applyBinOp (CG.string (name ++ ": ")) CG.append (CG.val "err")) ]
+                      )
+                    ]
+                )
     in
-    "( \""
-        ++ name
-        ++ "\"\n"
-        ++ "          , \\args ->\n"
-        ++ "                let\n"
-        ++ "                    result =\n"
-        ++ "                        ResolvedValue.succeed "
-        ++ capitalName
-        ++ "Params\n"
-        ++ String.join "\n" pipelineSteps
-        ++ "\n"
-        ++ "                in\n"
-        ++ "                case result args of\n"
-        ++ "                    Ok params ->\n"
-        ++ "                        "
-        ++ wrapper
-        ++ " (fns."
-        ++ name
-        ++ " params)\n\n"
-        ++ "                    Err err ->\n"
-        ++ "                        RError (\""
-        ++ name
-        ++ ": \" ++ err)\n"
-        ++ "          )"
+    CG.tuple [ CG.string name, CG.lambda [ CG.varPattern "args" ] lambdaBody ]
 
 
 registryModule : String -> List String -> Bool -> String
@@ -1006,36 +1154,41 @@ registryModule namespace componentNames hasFunctions =
             else
                 ""
 
-        entries =
+        entryExprs =
             List.map
                 (\name ->
-                    "        ( \""
-                        ++ name
-                        ++ "\", "
-                        ++ namespace
-                        ++ ".Components."
-                        ++ name
-                        ++ ".component )"
+                    CG.tuple
+                        [ CG.string name
+                        , CG.fqVal [ namespace, "Components", name ] "component"
+                        ]
                 )
                 componentNames
 
-        entriesStr =
-            case entries of
-                [] ->
-                    "        []"
+        componentsField =
+            ( "components"
+            , CG.apply [ CG.fqVal [ "Dict" ] "fromList", CG.list entryExprs ]
+            )
 
-                first :: rest ->
-                    "        [ "
-                        ++ String.trimLeft first
-                        ++ String.concat (List.map (\e -> "\n        , " ++ String.trimLeft e) rest)
-                        ++ "\n        ]"
-
-        functionsField =
+        functionsFieldExpr =
             if hasFunctions then
-                "    , functions = " ++ namespace ++ ".Functions.toFunctionDict " ++ namespace ++ ".Functions.functions\n"
+                ( "functions"
+                , CG.apply
+                    [ CG.fqVal [ namespace, "Functions" ] "toFunctionDict"
+                    , CG.fqVal [ namespace, "Functions" ] "functions"
+                    ]
+                )
 
             else
-                "    , functions = Dict.empty\n"
+                ( "functions", CG.fqVal [ "Dict" ] "empty" )
+
+        registryDecl =
+            CG.funDecl
+                Nothing
+                (Just (CG.typed "Registry" [ CG.typeVar "msg" ]))
+                "registry"
+                []
+                (CG.record [ componentsField, functionsFieldExpr ])
+                |> renderDecl
     in
     "module "
         ++ namespace
@@ -1045,8 +1198,5 @@ registryModule namespace componentNames hasFunctions =
         ++ functionsImport
         ++ String.join "\n" imports
         ++ "\n\n\n"
-        ++ "registry : Registry msg\nregistry =\n    { components =\n        Dict.fromList\n"
-        ++ entriesStr
+        ++ registryDecl
         ++ "\n"
-        ++ functionsField
-        ++ "    }\n"

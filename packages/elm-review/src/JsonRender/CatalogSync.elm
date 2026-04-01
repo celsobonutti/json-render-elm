@@ -389,12 +389,6 @@ declarationListVisitor declarations context =
                                                 , end = lastDeclarationEnd declarations range
                                                 }
 
-                                            expectedScaffold =
-                                                ElmCodeGen.componentScaffold
-                                                    context.config.catalogNamespace
-                                                    componentName
-                                                    schema
-
                                             viewRange =
                                                 findFunctionRange "view" declarations
                                         in

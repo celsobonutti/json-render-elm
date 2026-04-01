@@ -13,7 +13,9 @@
         "elm/json": "1.1.0 <= v < 2.0.0",
         "jfmengels/elm-review": "2.0.0 <= v < 3.0.0",
         "NoRedInk/elm-json-decode-pipeline": "1.0.0 <= v < 2.0.0",
-        "stil4m/elm-syntax": "7.0.0 <= v < 8.0.0"
+        "stil4m/elm-syntax": "7.0.0 <= v < 8.0.0",
+        "the-sett/elm-syntax-dsl": "6.0.0 <= v < 7.0.0",
+        "the-sett/elm-pretty-printer": "3.0.0 <= v < 4.0.0"
     },
     "test-dependencies": {
         "elm-explorations/test": "2.0.0 <= v < 3.0.0"

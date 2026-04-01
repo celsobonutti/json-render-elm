@@ -46,22 +46,21 @@ primaryOrSecondaryOrDangerToString value =
 
 
 type alias ButtonProps =
-    { label : String
-    , variant : Maybe PrimaryOrSecondaryOrDanger
-    }
+    { label : String, variant : Maybe PrimaryOrSecondaryOrDanger }
 
 
 type alias ButtonBindings msg =
-    { label : Maybe (String -> EventHandle msg)
-    , variant : Maybe (PrimaryOrSecondaryOrDanger -> EventHandle msg)
-    }
+    { label : Maybe (String -> EventHandle msg), variant : Maybe (PrimaryOrSecondaryOrDanger -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String ButtonProps
 propsDecoder =
     ResolvedValue.succeed ButtonProps
         |> ResolvedValue.required "label" ResolvedValue.string
-        |> ResolvedValue.optional "variant" (\rv -> ResolvedValue.string rv |> Result.andThen primaryOrSecondaryOrDangerFromString) Nothing
+        |> ResolvedValue.optional
+            "variant"
+            (\rv -> ResolvedValue.string rv |> Result.andThen primaryOrSecondaryOrDangerFromString)
+            Nothing
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> ButtonBindings msg

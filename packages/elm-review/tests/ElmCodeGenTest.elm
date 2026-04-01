@@ -189,8 +189,10 @@ suite =
         , test "action with empty params has no payload" <|
             \_ ->
                 ElmCodeGen.actionType testActions
-                    |> String.contains "| Press\n"
-                    |> Expect.equal True
+                    |> Expect.all
+                        [ \c -> String.contains "| Press" c |> Expect.equal True
+                        , \c -> String.contains "PressParams" c |> Expect.equal False
+                        ]
         , test "generates actions module" <|
             \_ ->
                 ElmCodeGen.actionsModule "Catalog" testActions

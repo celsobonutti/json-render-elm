@@ -11,15 +11,11 @@ import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias ImageProps =
-    { alt : String
-    , src : String
-    }
+    { alt : String, src : String }
 
 
 type alias ImageBindings msg =
-    { alt : Maybe (String -> EventHandle msg)
-    , src : Maybe (String -> EventHandle msg)
-    }
+    { alt : Maybe (String -> EventHandle msg), src : Maybe (String -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String ImageProps

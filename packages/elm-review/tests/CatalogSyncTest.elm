@@ -34,25 +34,21 @@ import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias CardProps =
-    { title : String
-    }
+    { title : String }
 
 
 type alias CardBindings msg =
-    { title : Maybe (String -> EventHandle msg)
-    }
+    { title : Maybe (String -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String CardProps
 propsDecoder =
-    ResolvedValue.succeed CardProps
-        |> ResolvedValue.required "title" ResolvedValue.string
+    ResolvedValue.succeed CardProps |> ResolvedValue.required "title" ResolvedValue.string
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> CardBindings msg
 bindingsDecoder =
-    Bind.succeed CardBindings
-        |> Bind.bindableTyped "title" Json.Encode.string
+    Bind.succeed CardBindings |> Bind.bindableTyped "title" Json.Encode.string
 
 
 component : Component msg
@@ -80,25 +76,21 @@ import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias ButtonProps =
-    { label : String
-    }
+    { label : String }
 
 
 type alias ButtonBindings msg =
-    { label : Maybe (String -> EventHandle msg)
-    }
+    { label : Maybe (String -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String ButtonProps
 propsDecoder =
-    ResolvedValue.succeed ButtonProps
-        |> ResolvedValue.required "label" ResolvedValue.string
+    ResolvedValue.succeed ButtonProps |> ResolvedValue.required "label" ResolvedValue.string
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> ButtonBindings msg
 bindingsDecoder =
-    Bind.succeed ButtonBindings
-        |> Bind.bindableTyped "label" Json.Encode.string
+    Bind.succeed ButtonBindings |> Bind.bindableTyped "label" Json.Encode.string
 
 
 component : Component msg
@@ -203,9 +195,7 @@ registry : Registry msg
 registry =
     { components =
         Dict.fromList
-        [ ( "Button", Catalog.Components.Button.component )
-        , ( "Card", Catalog.Components.Card.component )
-        ]
+            [ ( "Button", Catalog.Components.Button.component ), ( "Card", Catalog.Components.Card.component ) ]
     , functions = Dict.empty
     }
 """
@@ -280,7 +270,7 @@ type Action = Press
                                     ]
                                 , under = "module Catalog.Actions exposing (Action(..))"
                                 }
-                                |> Review.Test.whenFixed ("module Catalog.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\nimport JsonRender.Actions as Actions\n\n\ntype alias ExportParams =\n    { format : String\n    }\n\n\ntype Action\n    = Export ExportParams\n    | Press\n\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"export\" ->\n            case Dict.get \"format\" params of\n                Just format_raw ->\n                    case Decode.decodeValue Decode.string format_raw of\n                        Ok format ->\n                            Ok (Export { format = format })\n\n                        Err _ ->\n                            Err \"format must be a String\"\n\n                Nothing ->\n                    Err \"missing required param format\"\n\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n\n\nhandleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\nhandleAction action model =\n    ()\n\n\nactionConfig : Actions.ActionConfig Action\nactionConfig =\n    { handleAction = handleAction\n    , decodeAction = decodeAction\n    }\n")
+                                |> Review.Test.whenFixed ("module Catalog.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\nimport JsonRender.Actions as Actions\n\n\ntype alias ExportParams =\n    { format : String }\n\n\ntype Action\n    = Export ExportParams\n    | Press\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"export\" ->\n            case Dict.get \"format\" params of\n                Just format_raw ->\n                    case Decode.decodeValue Decode.string format_raw of\n                        Ok format ->\n                            Ok (Export { format = format })\n\n                        Err _ ->\n                            Err \"format must be a String\"\n\n                Nothing ->\n                    Err \"missing required param format\"\n\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n\n\nhandleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\nhandleAction action model =\n    ()\n\nactionConfig : Actions.ActionConfig Action\nactionConfig =\n    { handleAction = handleAction, decodeAction = decodeAction }")
                             ]
                           )
                         ]
@@ -334,7 +324,7 @@ decodeAction name params = Ok Press
                                     ]
                                 , under = "module Catalog.Actions exposing (Action(..), decodeAction)"
                                 }
-                                |> Review.Test.whenFixed ("module Catalog.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\nimport JsonRender.Actions as Actions\n\n\ntype Action\n    = Press\n\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n\n\nhandleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\nhandleAction action model =\n    ()\n\n\nactionConfig : Actions.ActionConfig Action\nactionConfig =\n    { handleAction = handleAction\n    , decodeAction = decodeAction\n    }\n")
+                                |> Review.Test.whenFixed ("module Catalog.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\nimport JsonRender.Actions as Actions\n\n\ntype Action\n    = Press\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n\n\nhandleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\nhandleAction action model =\n    ()\n\nactionConfig : Actions.ActionConfig Action\nactionConfig =\n    { handleAction = handleAction, decodeAction = decodeAction }")
                             ]
                           )
                         ]
@@ -381,7 +371,7 @@ placeholder = ()
                                     ]
                                 , under = "module Catalog.Actions exposing (..)"
                                 }
-                                |> Review.Test.whenFixed ("module Catalog.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\nimport JsonRender.Actions as Actions\n\n\ntype Action\n    = Press\n\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n\n\nhandleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\nhandleAction action model =\n    ()\n\n\nactionConfig : Actions.ActionConfig Action\nactionConfig =\n    { handleAction = handleAction\n    , decodeAction = decodeAction\n    }\n")
+                                |> Review.Test.whenFixed ("module Catalog.Actions exposing (Action(..), actionConfig, decodeAction, handleAction)\n\nimport Dict exposing (Dict)\nimport Json.Decode as Decode\nimport Json.Encode exposing (Value)\nimport JsonRender.Actions as Actions\n\n\ntype Action\n    = Press\n\ndecodeAction : String -> Dict String Value -> Result String Action\ndecodeAction name params =\n    case name of\n        \"press\" ->\n            Ok Press\n\n        _ ->\n            Err (\"Unknown action: \" ++ name)\n\n\nhandleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\nhandleAction action model =\n    ()\n\nactionConfig : Actions.ActionConfig Action\nactionConfig =\n    { handleAction = handleAction, decodeAction = decodeAction }")
                             ]
                           )
                         ]
@@ -419,25 +409,21 @@ handleAction action model = ()
                                 |> Review.Test.whenFixed
                                     ("""module Catalog.Components.Card exposing (..)
 type alias CardProps =
-    { title : String
-    }
+    { title : String }
 
 
 type alias CardBindings msg =
-    { title : Maybe (String -> EventHandle msg)
-    }
+    { title : Maybe (String -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String CardProps
 propsDecoder =
-    ResolvedValue.succeed CardProps
-        |> ResolvedValue.required "title" ResolvedValue.string
+    ResolvedValue.succeed CardProps |> ResolvedValue.required "title" ResolvedValue.string
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> CardBindings msg
 bindingsDecoder =
-    Bind.succeed CardBindings
-        |> Bind.bindableTyped "title" Json.Encode.string
+    Bind.succeed CardBindings |> Bind.bindableTyped "title" Json.Encode.string
 
 
 component : Component msg
@@ -490,25 +476,21 @@ import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
 
 type alias CardProps =
-    { title : String
-    }
+    { title : String }
 
 
 type alias CardBindings msg =
-    { title : Maybe (String -> EventHandle msg)
-    }
+    { title : Maybe (String -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String CardProps
 propsDecoder =
-    ResolvedValue.succeed CardProps
-        |> ResolvedValue.required "title" ResolvedValue.string
+    ResolvedValue.succeed CardProps |> ResolvedValue.required "title" ResolvedValue.string
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> CardBindings msg
 bindingsDecoder =
-    Bind.succeed CardBindings
-        |> Bind.bindableTyped "title" Json.Encode.string
+    Bind.succeed CardBindings |> Bind.bindableTyped "title" Json.Encode.string
 
 
 component : Component msg
