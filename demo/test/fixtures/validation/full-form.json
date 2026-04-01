@@ -1,0 +1,57 @@
+{
+  "state": { "form": { "name": "", "email": "" }, "result": null },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["name-input", "email-input", "btn", "status"]
+    },
+    "name-input": {
+      "type": "Input",
+      "props": {
+        "label": "Name",
+        "value": { "$bindState": "/form/name" },
+        "checks": [
+          { "type": "required", "message": "Name is required" }
+        ]
+      },
+      "children": []
+    },
+    "email-input": {
+      "type": "Input",
+      "props": {
+        "label": "Email",
+        "value": { "$bindState": "/form/email" },
+        "checks": [
+          { "type": "required", "message": "Email is required" },
+          { "type": "email", "message": "Invalid email" }
+        ]
+      },
+      "children": []
+    },
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Submit" },
+      "on": {
+        "press": {
+          "action": "validateForm",
+          "params": { "statePath": "/result" }
+        }
+      },
+      "children": []
+    },
+    "status": {
+      "type": "Text",
+      "props": {
+        "content": {
+          "$cond": { "$state": "/result/valid", "eq": true },
+          "$then": "All valid!",
+          "$else": "Fix errors above"
+        }
+      },
+      "visible": { "$state": "/result" },
+      "children": []
+    }
+  }
+}
