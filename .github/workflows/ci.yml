@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  ELM_BIN: ${{ github.workspace }}/demo/node_modules/.bin
+
 jobs:
   elm-review:
     name: elm-review
@@ -34,7 +37,9 @@ jobs:
           restore-keys: elm-
 
       - name: Install Elm tooling
-        run: cd demo && npm ci
+        run: |
+          cd demo && npm ci
+          echo "$ELM_BIN" >> $GITHUB_PATH
 
       - name: elm-review demo
         run: cd demo && npx elm-review
@@ -66,7 +71,9 @@ jobs:
           restore-keys: elm-
 
       - name: Install Elm tooling
-        run: cd demo && npm ci
+        run: |
+          cd demo && npm ci
+          echo "$ELM_BIN" >> $GITHUB_PATH
 
       - name: elm-test elm-core
         run: cd packages/elm-core && npx elm-test-rs
@@ -95,7 +102,9 @@ jobs:
           restore-keys: elm-
 
       - name: Install demo dependencies
-        run: cd demo && npm ci
+        run: |
+          cd demo && npm ci
+          echo "$ELM_BIN" >> $GITHUB_PATH
 
       - name: Install Playwright browsers
         run: cd demo && npx playwright install --with-deps chromium
