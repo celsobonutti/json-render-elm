@@ -396,11 +396,19 @@ componentScaffold namespace componentName schema =
 
 defaultViewFunction : String -> String
 defaultViewFunction componentName =
-    "view : ComponentContext "
-        ++ componentName
-        ++ "Props ("
-        ++ componentName
-        ++ "Bindings msg) msg -> Html msg\nview ctx =\n    ()\n"
+    let
+        typeAnn =
+            CG.funAnn
+                (CG.typed "ComponentContext"
+                    [ CG.typed (componentName ++ "Props") []
+                    , CG.typed (componentName ++ "Bindings") [ CG.typeVar "msg" ]
+                    , CG.typeVar "msg"
+                    ]
+                )
+                (CG.typed "Html" [ CG.typeVar "msg" ])
+    in
+    CG.funDecl Nothing (Just typeAnn) "view" [ CG.varPattern "ctx" ] CG.unit
+        |> renderDecl
 
 
 componentModule : String -> String -> ComponentSchema -> String
@@ -418,59 +426,48 @@ actionParamsType actionName schema =
                 |> List.sortBy Tuple.first
                 |> List.map
                     (\( name, field ) ->
-                        let
-                            elmType =
-                                if field.required then
-                                    TypeMapping.toElmType field.fieldType
+                        ( name
+                        , if field.required then
+                            schemaFieldToTypeAnnotation field.fieldType
 
-                                else
-                                    "Maybe " ++ TypeMapping.toElmType field.fieldType
-                        in
-                        name ++ " : " ++ elmType
+                          else
+                            CG.maybeAnn (schemaFieldToTypeAnnotation field.fieldType)
+                        )
                     )
-
-        body =
-            case fields of
-                [] ->
-                    "    {}"
-
-                first :: rest ->
-                    "    { "
-                        ++ first
-                        ++ String.concat (List.map (\f -> "\n    , " ++ f) rest)
-                        ++ "\n    }"
     in
-    "type alias " ++ actionName ++ "Params =\n" ++ body
+    recordTypeAlias (actionName ++ "Params") fields
+        |> renderDecl
 
 
 actionType : Dict String ActionSchema -> String
 actionType actions =
     let
-        variants =
+        sortedActions =
             Dict.toList actions
                 |> List.sortBy Tuple.first
-                |> List.map
-                    (\( name, schema ) ->
-                        let
-                            capitalName =
-                                TypeMapping.capitalizeFirst name
-                        in
-                        if Dict.isEmpty schema.params then
-                            capitalName
 
-                        else
-                            capitalName ++ " " ++ capitalName ++ "Params"
-                    )
+        variants =
+            case sortedActions of
+                [] ->
+                    [ ( "NoAction", [] ) ]
+
+                _ ->
+                    List.map
+                        (\( name, schema ) ->
+                            let
+                                capitalName =
+                                    TypeMapping.capitalizeFirst name
+                            in
+                            if Dict.isEmpty schema.params then
+                                ( capitalName, [] )
+
+                            else
+                                ( capitalName, [ CG.typed (capitalName ++ "Params") [] ] )
+                        )
+                        sortedActions
     in
-    case variants of
-        [] ->
-            "type Action\n    = NoAction"
-
-        first :: rest ->
-            "type Action\n    = "
-                ++ first
-                ++ String.concat (List.map (\v -> "\n    | " ++ v) rest)
-                ++ "\n"
+    CG.customTypeDecl Nothing "Action" [] variants
+        |> renderDecl
 
 
 decodeActionFunction : Dict String ActionSchema -> String
@@ -840,18 +837,36 @@ fieldToEncoder fieldName fieldType =
 
 handleActionFunction : String
 handleActionFunction =
-    "handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )\n"
-        ++ "handleAction action model =\n"
-        ++ "    ()\n"
+    let
+        typeAnn =
+            CG.funAnn (CG.typed "Action" [])
+                (CG.funAnn
+                    (CG.fqTyped [ "Actions" ] "Model" [])
+                    (CG.tupleAnn
+                        [ CG.fqTyped [ "Actions" ] "Model" []
+                        , CG.typed "Cmd" [ CG.fqTyped [ "Actions" ] "Msg" [ CG.typed "Action" [] ] ]
+                        ]
+                    )
+                )
+    in
+    CG.funDecl Nothing (Just typeAnn) "handleAction" [ CG.varPattern "action", CG.varPattern "model" ] CG.unit
+        |> renderDecl
 
 
 actionConfigFunction : String
 actionConfigFunction =
-    "actionConfig : Actions.ActionConfig Action\n"
-        ++ "actionConfig =\n"
-        ++ "    { handleAction = handleAction\n"
-        ++ "    , decodeAction = decodeAction\n"
-        ++ "    }\n"
+    let
+        typeAnn =
+            CG.fqTyped [ "Actions" ] "ActionConfig" [ CG.typed "Action" [] ]
+
+        body =
+            CG.record
+                [ ( "handleAction", CG.val "handleAction" )
+                , ( "decodeAction", CG.val "decodeAction" )
+                ]
+    in
+    CG.funDecl Nothing (Just typeAnn) "actionConfig" [] body
+        |> renderDecl
 
 
 actionsModule : String -> Dict String ActionSchema -> String
