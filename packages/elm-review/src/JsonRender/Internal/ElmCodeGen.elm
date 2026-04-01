@@ -612,35 +612,14 @@ componentScaffold namespace componentName schema =
         moduleName =
             namespace ++ ".Components." ++ componentName
 
-        enums =
-            collectEnumsFromFields schema.fields
-
-        objects =
-            collectObjectFields schema.fields
-
-        enumExposing =
-            List.map (\variants -> TypeMapping.toElmType (FEnum variants) ++ "(..)") enums
-
-        objectExposing =
-            List.map (\( name, _ ) -> objectTypeName name) objects
-
-        exposingItems =
-            List.sort
-                (enumExposing
-                    ++ objectExposing
-                    ++ [ componentName ++ "Props"
-                       , componentName ++ "Bindings"
-                       , "propsDecoder"
-                       , "bindingsDecoder"
-                       , "component"
-                       ]
-                )
+        comment =
+            generatedComment componentName schema
     in
-    "module "
+    comment
+        ++ "\n"
+        ++ "module "
         ++ moduleName
-        ++ " exposing ("
-        ++ String.join ", " exposingItems
-        ++ ")\n\n"
+        ++ " exposing (component)\n\n"
         ++ "import Dict exposing (Dict)\n"
         ++ "import Html exposing (Html)\n"
         ++ "import Json.Encode exposing (Value)\n"
