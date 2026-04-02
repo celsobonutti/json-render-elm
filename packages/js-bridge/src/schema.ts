@@ -83,17 +83,17 @@ export const schema = defineSchema(
       {
         name: "setState",
         description:
-          "Update a value in state at the given path. Params: { path: string, value: any }",
+          "Update a value in state at the given path. Params: { statePath: string, value: any }",
       },
       {
         name: "pushState",
         description:
-          'Append an item to an array in state. Params: { path: string, value: any, clearStatePath?: string }. Use "$id" as a string value inside value to auto-generate a unique ID. Use clearStatePath to reset a state path (e.g., an input field) to "" after appending.',
+          'Append an item to an array in state. Params: { statePath: string, value: any, clearStatePath?: string }. Use "$id" as a string value inside value to auto-generate a unique ID. Use clearStatePath to reset a state path (e.g., an input field) to "" after appending.',
       },
       {
         name: "removeState",
         description:
-          "Remove a value from state at the given path. Params: { path: string }",
+          "Remove a value from state at the given path. Params: { statePath: string }",
       },
       {
         name: "validateForm",
@@ -109,9 +109,9 @@ export const schema = defineSchema(
       // Field placement
       'The "visible" field goes on the ELEMENT object, NOT inside "props". Correct: {"type":"Card","props":{},"visible":{"$state":"/show"},"children":[...]}.',
       'Visibility conditions: sources are { "$state": "/path" }, { "$item": "field" } (in repeat), or { "$index": true } (in repeat). Operators: "eq", "neq" (any value), "gt", "gte", "lt", "lte" (numeric). Right-hand side can be a literal or { "$state": "/otherPath" }. Invert with "not": true. Combine with { "$and": [...] }, { "$or": [...] }, or an array (implicit AND). Boolean true/false for always/never.',
-      'The "on" field goes on the ELEMENT object, NOT inside "props". Use it to bind events to actions: {"on":{"press":{"action":"setState","params":{"path":"/clicked","value":true}}}}. Chain multiple actions with an array: {"on":{"press":[{"action":"setState",...},{"action":"myAction",...}]}}.',
+      'The "on" field goes on the ELEMENT object, NOT inside "props". Use it to bind events to actions: {"on":{"press":{"action":"setState","params":{"statePath":"/clicked","value":true}}}}. Chain multiple actions with an array: {"on":{"press":[{"action":"setState",...},{"action":"myAction",...}]}}.',
       'Add "preventDefault": true to an action binding to prevent default browser behavior (e.g., form submission page reload). Example: {"on":{"press":{"action":"setState","params":{...},"preventDefault":true}}}.',
-      'The "watch" field goes on the ELEMENT object. It maps state paths to actions that fire when the value at that path changes (not on initial render). Same format as "on" actions: {"watch":{"/form/country":{"action":"setState","params":{"path":"/form/city","value":""}}}}. Use for cascading updates and derived state.',
+      'The "watch" field goes on the ELEMENT object. It maps state paths to actions that fire when the value at that path changes (not on initial render). Same format as "on" actions: {"watch":{"/form/country":{"action":"setState","params":{"statePath":"/form/city","value":""}}}}. Use for cascading updates and derived state.',
 
       // Expression support
       'Dynamic props: use { "$state": "/path" } to read from state, { "$bindState": "/path" } for two-way binding (read and write), { "$item": "field" } in repeat contexts, { "$index": true } for loop index, { "$template": "Hello ${/name}" } for string interpolation, { "$computed": "funcName", "args": { "argName": <expression> } } for computed values from registered functions.',

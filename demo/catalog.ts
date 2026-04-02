@@ -48,7 +48,7 @@ export const catalog = defineCatalog(schema, {
       props: z.object({
         placeholder: z.string().optional(),
         label: z.string().optional(),
-        value: z.string().optional(),
+        value: z.string(),
       }),
       slots: [],
       bindable: ["value"],
@@ -103,6 +103,11 @@ export const catalog = defineCatalog(schema, {
       params: z.object({ text: z.string() }),
       returnType: z.string(),
       description: "Convert text to uppercase",
+    },
+    add: {
+      params: z.object({ a: z.number(), b: z.number() }),
+      returnType: z.number(),
+      description: "Add two numbers together",
     },
   },
 });

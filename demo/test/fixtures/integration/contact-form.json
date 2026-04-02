@@ -23,7 +23,7 @@
       "on": {
         "press": {
           "action": "setState",
-          "params": { "path": "/submitted", "value": true }
+          "params": { "statePath": "/submitted", "value": true }
         }
       }
     },

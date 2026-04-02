@@ -24,7 +24,7 @@ import JsonRender.Validation as Validation exposing (FieldValidation, ValidateOn
 
 
 type alias InputProps =
-    { label : Maybe String, placeholder : Maybe String, value : Maybe String }
+    { label : Maybe String, placeholder : Maybe String, value : String }
 
 
 type alias InputBindings msg =
@@ -40,7 +40,7 @@ propsDecoder =
     ResolvedValue.succeed InputProps
         |> ResolvedValue.optional "label" ResolvedValue.string Nothing
         |> ResolvedValue.optional "placeholder" ResolvedValue.string Nothing
-        |> ResolvedValue.optional "value" ResolvedValue.string Nothing
+        |> ResolvedValue.required "value" ResolvedValue.string
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> InputBindings msg
@@ -72,10 +72,10 @@ view ctx =
                     [ type_ "text"
                     , class "jr-input"
                     , placeholder (Maybe.withDefault "" ctx.props.placeholder)
-                    , Html.Attributes.value (Maybe.withDefault "" ctx.props.value)
+                    , Html.Attributes.value ctx.props.value
                     , case ctx.bindings.value of
                         Just setValue ->
-                            Events.onInput (\s -> setValue s)
+                            Events.onInput setValue
 
                         Nothing ->
                             class ""
