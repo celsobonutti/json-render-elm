@@ -38,6 +38,8 @@ type alias ComponentSchema =
     { fields : Dict String FieldSchema
     , description : String
     , slots : List String
+    , bindable : List String
+    , validatable : List String
     }
 
 
@@ -83,10 +85,12 @@ functionDecoder =
 
 componentDecoder : Decoder ComponentSchema
 componentDecoder =
-    Decode.succeed (\fields description slots -> ComponentSchema fields description slots)
+    Decode.succeed (\fields description slots bindable validatable -> ComponentSchema fields description slots bindable validatable)
         |> required "props" propsObjectDecoder
         |> required "description" Decode.string
         |> optional "slots" (Decode.list Decode.string) []
+        |> optional "bindable" (Decode.list Decode.string) []
+        |> optional "validatable" (Decode.list Decode.string) []
 
 
 propsObjectDecoder : Decoder (Dict String FieldSchema)

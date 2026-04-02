@@ -2,11 +2,8 @@
    These values were created by the rule, and will be overwritten by it if changed:
    - type PrimaryOrSecondaryOrDanger
    - primaryOrSecondaryOrDangerFromString
-   - primaryOrSecondaryOrDangerToString
    - type alias ButtonProps
-   - type alias ButtonBindings
    - propsDecoder
-   - bindingsDecoder
    - component
 -}
 
@@ -16,9 +13,7 @@ module Catalog.Components.Button exposing (component)
 import Dict exposing (Dict)
 import Html exposing (Html, button, text)
 import Html.Attributes exposing (class)
-import Json.Encode exposing (Value)
-import JsonRender.Bind as Bind
-import JsonRender.Events as Events exposing (EventHandle)
+import JsonRender.Events as Events
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -45,25 +40,8 @@ primaryOrSecondaryOrDangerFromString str =
             Err ("Unknown value: " ++ str ++ ". Expected one of: primary, secondary, danger")
 
 
-primaryOrSecondaryOrDangerToString : PrimaryOrSecondaryOrDanger -> String
-primaryOrSecondaryOrDangerToString value =
-    case value of
-        Primary ->
-            "primary"
-
-        Secondary ->
-            "secondary"
-
-        Danger ->
-            "danger"
-
-
 type alias ButtonProps =
     { label : String, variant : Maybe PrimaryOrSecondaryOrDanger }
-
-
-type alias ButtonBindings msg =
-    { label : Maybe (String -> EventHandle msg), variant : Maybe (PrimaryOrSecondaryOrDanger -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String ButtonProps
@@ -74,13 +52,6 @@ propsDecoder =
             "variant"
             (\rv -> ResolvedValue.string rv |> Result.andThen primaryOrSecondaryOrDangerFromString)
             Nothing
-
-
-bindingsDecoder : Dict String (Value -> EventHandle msg) -> ButtonBindings msg
-bindingsDecoder =
-    Bind.succeed ButtonBindings
-        |> Bind.bindableTyped "label" Json.Encode.string
-        |> Bind.bindableTyped "variant" (Json.Encode.string << primaryOrSecondaryOrDangerToString)
 
 
 variantToClass : Maybe PrimaryOrSecondaryOrDanger -> String
@@ -98,10 +69,10 @@ variantToClass variant =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder (\_ -> ()) (\_ -> ()) view
 
 
-view : ComponentContext ButtonProps (ButtonBindings msg) () msg -> Html msg
+view : ComponentContext ButtonProps () () msg -> Html msg
 view ctx =
     button
         [ class ("jr-button " ++ variantToClass ctx.props.variant)

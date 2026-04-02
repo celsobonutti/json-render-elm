@@ -51,6 +51,10 @@ export const schema = defineSchema(
         props: s.zod(),
         /** Slots for this component. Use ['default'] for children, or named slots like ['header', 'footer'] */
         slots: s.array(s.string()),
+        /** Props that support two-way binding ($bindState) */
+        bindable: s.array(s.string()),
+        /** Props that support validation (checks) — must be subset of bindable */
+        validatable: s.array(s.string()),
         /** Description for AI generation hints */
         description: s.string(),
         /** Example prop values used in prompt examples (auto-generated from Zod schema if omitted) */
@@ -115,8 +119,9 @@ export const schema = defineSchema(
       // Props integrity
       "Every prop listed WITHOUT a `?` suffix is REQUIRED and must always be provided — even inside repeat contexts. Omitting a required prop causes a visible error.",
 
-      // Validation
-      'Form validation: add "checks" prop to Input/Select components for validation. Each check: { "type": "required"|"email"|"minLength"|"maxLength"|"pattern"|"min"|"max"|"numeric"|"url"|"matches"|"equalTo"|"lessThan"|"greaterThan"|"requiredIf", "message": "error text", "args"?: { ... } }. Add "validateOn": "change"|"blur"|"submit" to control timing (default: submit). Use the "validateForm" action on submit buttons to validate all fields.',
+      // Binding and validation
+      'Two-way binding: use { "$bindState": "/path" } ONLY on props listed as "bindable" for the component. Non-bindable props must use { "$state": "/path" } (read-only) or literal values.',
+      'Form validation: add "checks" and "validateOn" ONLY to elements whose component has "validatable" props. Each check: { "type": "required"|"email"|"minLength"|"maxLength"|"pattern"|"min"|"max"|"numeric"|"url"|"matches"|"equalTo"|"lessThan"|"greaterThan"|"requiredIf", "message": "error text", "args"?: { ... } }. "validateOn": "change"|"blur"|"submit" (default: submit). Use "validateForm" action on submit buttons.',
 
       // Design quality
       "Design with visual hierarchy: use container components to group content, proper spacing, and status indicators. ONLY use components from the AVAILABLE COMPONENTS list.",

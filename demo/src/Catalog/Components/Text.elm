@@ -2,11 +2,8 @@
    These values were created by the rule, and will be overwritten by it if changed:
    - type SmOrMdOrLgOrXl
    - smOrMdOrLgOrXlFromString
-   - smOrMdOrLgOrXlToString
    - type alias TextProps
-   - type alias TextBindings
    - propsDecoder
-   - bindingsDecoder
    - component
 -}
 
@@ -16,9 +13,6 @@ module Catalog.Components.Text exposing (TextProps, component, propsDecoder)
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)
 import Html.Attributes exposing (class)
-import Json.Encode exposing (Value)
-import JsonRender.Bind as Bind
-import JsonRender.Events exposing (EventHandle)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -69,10 +63,6 @@ type alias TextProps =
     { content : String, size : Maybe SmOrMdOrLgOrXl }
 
 
-type alias TextBindings msg =
-    { content : Maybe (String -> EventHandle msg), size : Maybe (SmOrMdOrLgOrXl -> EventHandle msg) }
-
-
 propsDecoder : Dict String ResolvedValue -> Result String TextProps
 propsDecoder =
     ResolvedValue.succeed TextProps
@@ -83,19 +73,12 @@ propsDecoder =
             Nothing
 
 
-bindingsDecoder : Dict String (Value -> EventHandle msg) -> TextBindings msg
-bindingsDecoder =
-    Bind.succeed TextBindings
-        |> Bind.bindableTyped "content" Json.Encode.string
-        |> Bind.bindableTyped "size" (Json.Encode.string << smOrMdOrLgOrXlToString)
-
-
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder (\_ -> ()) (\_ -> ()) view
 
 
-view : ComponentContext TextProps (TextBindings msg) () msg -> Html msg
+view : ComponentContext TextProps () () msg -> Html msg
 view ctx =
     let
         sizeClass =

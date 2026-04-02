@@ -20,7 +20,9 @@
       "description": "A card container with a title and optional subtitle",
       "slots": [
         "default"
-      ]
+      ],
+      "bindable": [],
+      "validatable": []
     },
     "Button": {
       "props": {
@@ -45,7 +47,9 @@
         "additionalProperties": false
       },
       "description": "A clickable button",
-      "slots": []
+      "slots": [],
+      "bindable": [],
+      "validatable": []
     },
     "Text": {
       "props": {
@@ -71,7 +75,9 @@
         "additionalProperties": false
       },
       "description": "A text block",
-      "slots": []
+      "slots": [],
+      "bindable": [],
+      "validatable": []
     },
     "Input": {
       "props": {
@@ -90,8 +96,14 @@
         },
         "additionalProperties": false
       },
-      "description": "A text input field with an optional label",
-      "slots": []
+      "description": "A text input field with an optional label. Use { $bindState } on value for two-way binding. Use checks for validation.",
+      "slots": [],
+      "bindable": [
+        "value"
+      ],
+      "validatable": [
+        "value"
+      ]
     },
     "Stack": {
       "props": {
@@ -116,7 +128,9 @@
       "description": "A flex container that stacks children vertically or horizontally",
       "slots": [
         "default"
-      ]
+      ],
+      "bindable": [],
+      "validatable": []
     },
     "Image": {
       "props": {
@@ -137,7 +151,9 @@
         "additionalProperties": false
       },
       "description": "An image element",
-      "slots": []
+      "slots": [],
+      "bindable": [],
+      "validatable": []
     },
     "Badge": {
       "props": {
@@ -164,7 +180,9 @@
         "additionalProperties": false
       },
       "description": "A small colored badge/tag",
-      "slots": []
+      "slots": [],
+      "bindable": [],
+      "validatable": []
     }
   },
   "actions": {

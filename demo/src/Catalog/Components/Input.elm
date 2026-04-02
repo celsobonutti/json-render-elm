@@ -2,8 +2,10 @@
    These values were created by the rule, and will be overwritten by it if changed:
    - type alias InputProps
    - type alias InputBindings
+   - type alias InputValidation
    - propsDecoder
    - bindingsDecoder
+   - validationDecoder
    - component
 -}
 
@@ -26,15 +28,11 @@ type alias InputProps =
 
 
 type alias InputBindings msg =
-    { label : Maybe (String -> EventHandle msg)
-    , placeholder : Maybe (String -> EventHandle msg)
-    , value : Maybe (String -> EventHandle msg)
-    }
+    { value : Maybe (String -> EventHandle msg) }
 
 
 type alias InputValidation =
-    { value : Maybe FieldValidation
-    }
+    { value : Maybe FieldValidation }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String InputProps
@@ -47,21 +45,17 @@ propsDecoder =
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> InputBindings msg
 bindingsDecoder =
-    Bind.succeed InputBindings
-        |> Bind.bindableTyped "label" Json.Encode.string
-        |> Bind.bindableTyped "placeholder" Json.Encode.string
-        |> Bind.bindableTyped "value" Json.Encode.string
+    Bind.succeed InputBindings |> Bind.bindableTyped "value" Json.Encode.string
 
 
 validationDecoder : Dict String FieldValidation -> InputValidation
 validationDecoder =
-    Validation.succeed InputValidation
-        |> Validation.field "value"
+    Validation.succeed InputValidation |> Validation.field "value"
 
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder bindingsDecoder validationDecoder view
 
 
 view : ComponentContext InputProps (InputBindings msg) InputValidation msg -> Html msg
