@@ -22,11 +22,7 @@ import JsonRender.Validation as Validation exposing (FieldValidation, ValidateOn
 
 
 type alias InputProps =
-    { label : Maybe String
-    , placeholder : Maybe String
-    , value : Maybe String
-    , validateOn : ValidateOn
-    }
+    { label : Maybe String, placeholder : Maybe String, value : Maybe String }
 
 
 type alias InputBindings msg =
@@ -43,30 +39,10 @@ type alias InputValidation =
 
 propsDecoder : Dict String ResolvedValue -> Result String InputProps
 propsDecoder =
-    ResolvedValue.succeed (\l pl v vo -> InputProps l pl v (Maybe.withDefault OnSubmit vo))
+    ResolvedValue.succeed InputProps
         |> ResolvedValue.optional "label" ResolvedValue.string Nothing
         |> ResolvedValue.optional "placeholder" ResolvedValue.string Nothing
         |> ResolvedValue.optional "value" ResolvedValue.string Nothing
-        |> ResolvedValue.optional "validateOn" decodeValidateOn Nothing
-
-
-decodeValidateOn : ResolvedValue -> Result String ValidateOn
-decodeValidateOn rv =
-    case rv of
-        ResolvedValue.RString "change" ->
-            Ok OnChange
-
-        ResolvedValue.RString "blur" ->
-            Ok OnBlur
-
-        ResolvedValue.RString "submit" ->
-            Ok OnSubmit
-
-        ResolvedValue.RString other ->
-            Err ("Unknown validateOn: " ++ other)
-
-        _ ->
-            Err "validateOn must be a string"
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> InputBindings msg
@@ -85,7 +61,7 @@ validationDecoder =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder validationDecoder view
+    register propsDecoder bindingsDecoder view
 
 
 view : ComponentContext InputProps (InputBindings msg) InputValidation msg -> Html msg
@@ -110,7 +86,7 @@ view ctx =
                         Nothing ->
                             class ""
                     , Events.onBlur
-                        (if ctx.props.validateOn == OnBlur then
+                        (if ctx.validateOn == OnBlur then
                             ctx.validateAndEmit "blur"
 
                          else

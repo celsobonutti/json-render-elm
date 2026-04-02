@@ -12,6 +12,7 @@ import JsonRender.Render as Render
 import JsonRender.Resolve as Resolve
 import JsonRender.Spec as Spec
 import JsonRender.Internal.Condition exposing (Condition(..), Source(..), Operator(..))
+import JsonRender.Validation exposing (ValidateOn(..))
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
@@ -109,6 +110,8 @@ suite =
                                     , on = Dict.empty
                                     , watch = Dict.empty
                                     , enabled = Nothing
+                                    , checks = []
+                                    , validateOn = OnSubmit
                                     }
                                   )
                                 ]
@@ -134,6 +137,8 @@ suite =
                                     , on = Dict.empty
                                     , watch = Dict.empty
                                     , enabled = Nothing
+                                    , checks = []
+                                    , validateOn = OnSubmit
                                     }
                                   )
                                 , ( "inner"
@@ -145,6 +150,8 @@ suite =
                                     , on = Dict.empty
                                     , watch = Dict.empty
                                     , enabled = Nothing
+                                    , checks = []
+                                    , validateOn = OnSubmit
                                     }
                                   )
                                 ]
@@ -170,6 +177,8 @@ suite =
                                     , on = Dict.empty
                                     , watch = Dict.empty
                                     , enabled = Nothing
+                                    , checks = []
+                                    , validateOn = OnSubmit
                                     }
                                   )
                                 ]
@@ -198,6 +207,8 @@ suite =
                                     , on = Dict.empty
                                     , watch = Dict.empty
                                     , enabled = Nothing
+                                    , checks = []
+                                    , validateOn = OnSubmit
                                     }
                                   )
                                 ]
@@ -261,6 +272,8 @@ suite =
                                     , on = Dict.empty
                                     , watch = Dict.empty
                                     , enabled = Nothing
+                                    , checks = []
+                                    , validateOn = OnSubmit
                                     }
                                   )
                                 ]

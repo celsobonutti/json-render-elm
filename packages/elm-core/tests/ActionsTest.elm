@@ -8,6 +8,7 @@ import JsonRender.Actions as Actions exposing (Msg(..), ResolvedAction(..))
 import JsonRender.Spec as Spec exposing (EventHandler(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.State as State
+import JsonRender.Validation as Validation exposing (BuiltInCheck(..), CheckType(..), ValidateOn(..))
 import Random
 import Test exposing (..)
 import UUID
@@ -1149,19 +1150,9 @@ suite =
                         spec =
                             testSpec
                                 [ ( "email-input"
-                                  , testElement "Input"
-                                        [ ( "value", BindStateExpr "/form/email" )
-                                        , ( "checks"
-                                          , ListValue
-                                                [ ObjectValue
-                                                    (Dict.fromList
-                                                        [ ( "type", StringValue "required" )
-                                                        , ( "message", StringValue "Email is required" )
-                                                        ]
-                                                    )
-                                                ]
-                                          )
-                                        ]
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/email" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" } ]
                                   )
                                 ]
 
@@ -1192,19 +1183,9 @@ suite =
                         spec =
                             testSpec
                                 [ ( "email-input"
-                                  , testElement "Input"
-                                        [ ( "value", BindStateExpr "/form/email" )
-                                        , ( "checks"
-                                          , ListValue
-                                                [ ObjectValue
-                                                    (Dict.fromList
-                                                        [ ( "type", StringValue "required" )
-                                                        , ( "message", StringValue "Email is required" )
-                                                        ]
-                                                    )
-                                                ]
-                                          )
-                                        ]
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/email" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" } ]
                                   )
                                 ]
 
@@ -1247,19 +1228,9 @@ suite =
                         spec =
                             testSpec
                                 [ ( "name-input"
-                                  , testElement "Input"
-                                        [ ( "value", BindStateExpr "/form/name" )
-                                        , ( "checks"
-                                          , ListValue
-                                                [ ObjectValue
-                                                    (Dict.fromList
-                                                        [ ( "type", StringValue "required" )
-                                                        , ( "message", StringValue "Name is required" )
-                                                        ]
-                                                    )
-                                                ]
-                                          )
-                                        ]
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/name" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Name is required" } ]
                                   )
                                 ]
 
@@ -1288,34 +1259,14 @@ suite =
                         spec =
                             testSpec
                                 [ ( "email-input"
-                                  , testElement "Input"
-                                        [ ( "value", BindStateExpr "/form/email" )
-                                        , ( "checks"
-                                          , ListValue
-                                                [ ObjectValue
-                                                    (Dict.fromList
-                                                        [ ( "type", StringValue "required" )
-                                                        , ( "message", StringValue "Email is required" )
-                                                        ]
-                                                    )
-                                                ]
-                                          )
-                                        ]
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/email" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" } ]
                                   )
                                 , ( "name-input"
-                                  , testElement "Input"
-                                        [ ( "value", BindStateExpr "/form/name" )
-                                        , ( "checks"
-                                          , ListValue
-                                                [ ObjectValue
-                                                    (Dict.fromList
-                                                        [ ( "type", StringValue "required" )
-                                                        , ( "message", StringValue "Name is required" )
-                                                        ]
-                                                    )
-                                                ]
-                                          )
-                                        ]
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/name" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Name is required" } ]
                                   )
                                 ]
 
@@ -1368,19 +1319,9 @@ suite =
                         spec =
                             testSpec
                                 [ ( "email-input"
-                                  , testElement "Input"
-                                        [ ( "value", BindStateExpr "/form/email" )
-                                        , ( "checks"
-                                          , ListValue
-                                                [ ObjectValue
-                                                    (Dict.fromList
-                                                        [ ( "type", StringValue "required" )
-                                                        , ( "message", StringValue "Email is required" )
-                                                        ]
-                                                    )
-                                                ]
-                                          )
-                                        ]
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/email" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" } ]
                                   )
                                 ]
 
@@ -1411,19 +1352,9 @@ suite =
                         spec =
                             testSpec
                                 [ ( "email-input"
-                                  , testElement "Input"
-                                        [ ( "value", BindStateExpr "/form/email" )
-                                        , ( "checks"
-                                          , ListValue
-                                                [ ObjectValue
-                                                    (Dict.fromList
-                                                        [ ( "type", StringValue "required" )
-                                                        , ( "message", StringValue "Email is required" )
-                                                        ]
-                                                    )
-                                                ]
-                                          )
-                                        ]
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/email" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" } ]
                                   )
                                 ]
 
@@ -1472,4 +1403,21 @@ testElement type_ props =
     , on = Dict.empty
     , watch = Dict.empty
     , enabled = Nothing
+    , checks = []
+    , validateOn = OnSubmit
+    }
+
+
+testElementWithChecks : String -> List ( String, PropValue ) -> List Validation.ValidationCheck -> Spec.Element
+testElementWithChecks type_ props checks =
+    { type_ = type_
+    , props = Dict.fromList props
+    , children = []
+    , visible = Nothing
+    , repeat = Nothing
+    , on = Dict.empty
+    , watch = Dict.empty
+    , enabled = Nothing
+    , checks = checks
+    , validateOn = OnSubmit
     }

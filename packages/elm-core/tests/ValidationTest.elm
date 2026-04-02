@@ -630,31 +630,19 @@ pipelineSuite =
 extractValidationSuite : Test
 extractValidationSuite =
     describe "extractValidation"
-        [ test "extracts validation config from props with bindState and checks" <|
+        [ test "extracts validation config from element fields with bindState" <|
             \_ ->
                 let
+                    checks =
+                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" }
+                        , { type_ = BuiltIn Email, args = Dict.empty, message = "Invalid email" }
+                        ]
+
                     props =
                         Dict.fromList
-                            [ ( "value", BindStateExpr "/email" )
-                            , ( "checks"
-                              , ListValue
-                                    [ ObjectValue
-                                        (Dict.fromList
-                                            [ ( "type", StringValue "required" )
-                                            , ( "message", StringValue "Email is required" )
-                                            ]
-                                        )
-                                    , ObjectValue
-                                        (Dict.fromList
-                                            [ ( "type", StringValue "email" )
-                                            , ( "message", StringValue "Invalid email" )
-                                            ]
-                                        )
-                                    ]
-                              )
-                            ]
+                            [ ( "value", BindStateExpr "/email" ) ]
                 in
-                case Validation.extractValidation Nothing props of
+                case Validation.extractValidation checks OnSubmit Nothing props of
                     Just ( path, config ) ->
                         Expect.all
                             [ \_ -> Expect.equal "/email" path
@@ -665,55 +653,38 @@ extractValidationSuite =
 
                     Nothing ->
                         Expect.fail "Expected Just, got Nothing"
-        , test "returns Nothing when no checks prop" <|
+        , test "returns Nothing when checks list is empty" <|
             \_ ->
                 let
                     props =
                         Dict.fromList
                             [ ( "value", BindStateExpr "/email" ) ]
                 in
-                Validation.extractValidation Nothing props
+                Validation.extractValidation [] OnSubmit Nothing props
                     |> Expect.equal Nothing
         , test "returns Nothing when no bindState prop" <|
             \_ ->
                 let
+                    checks =
+                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
+
                     props =
                         Dict.fromList
-                            [ ( "value", StringValue "hello" )
-                            , ( "checks"
-                              , ListValue
-                                    [ ObjectValue
-                                        (Dict.fromList
-                                            [ ( "type", StringValue "required" )
-                                            , ( "message", StringValue "Required" )
-                                            ]
-                                        )
-                                    ]
-                              )
-                            ]
+                            [ ( "value", StringValue "hello" ) ]
                 in
-                Validation.extractValidation Nothing props
+                Validation.extractValidation checks OnSubmit Nothing props
                     |> Expect.equal Nothing
-        , test "extracts validateOn from props" <|
+        , test "passes validateOn through" <|
             \_ ->
                 let
+                    checks =
+                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
+
                     props =
                         Dict.fromList
-                            [ ( "value", BindStateExpr "/name" )
-                            , ( "checks"
-                              , ListValue
-                                    [ ObjectValue
-                                        (Dict.fromList
-                                            [ ( "type", StringValue "required" )
-                                            , ( "message", StringValue "Required" )
-                                            ]
-                                        )
-                                    ]
-                              )
-                            , ( "validateOn", StringValue "blur" )
-                            ]
+                            [ ( "value", BindStateExpr "/name" ) ]
                 in
-                case Validation.extractValidation Nothing props of
+                case Validation.extractValidation checks OnBlur Nothing props of
                     Just ( _, config ) ->
                         Expect.equal OnBlur config.validateOn
 
@@ -722,25 +693,17 @@ extractValidationSuite =
         , test "passes enabled condition through" <|
             \_ ->
                 let
+                    checks =
+                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
+
                     props =
                         Dict.fromList
-                            [ ( "value", BindStateExpr "/name" )
-                            , ( "checks"
-                              , ListValue
-                                    [ ObjectValue
-                                        (Dict.fromList
-                                            [ ( "type", StringValue "required" )
-                                            , ( "message", StringValue "Required" )
-                                            ]
-                                        )
-                                    ]
-                              )
-                            ]
+                            [ ( "value", BindStateExpr "/name" ) ]
 
                     enabledCond =
                         Just (Condition.And [])
                 in
-                case Validation.extractValidation enabledCond props of
+                case Validation.extractValidation checks OnSubmit enabledCond props of
                     Just ( _, config ) ->
                         Expect.equal enabledCond config.enabled
 

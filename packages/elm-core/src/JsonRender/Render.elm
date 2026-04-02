@@ -35,6 +35,7 @@ type alias ComponentContext props bindings validation msg =
     , emit : String -> EventHandle msg
     , validate : EventHandle msg
     , validateAndEmit : String -> EventHandle msg
+    , validateOn : Validation.ValidateOn
     }
 
 
@@ -46,6 +47,7 @@ type alias RawComponentContext msg =
     , emit : String -> EventHandle msg
     , validate : EventHandle msg
     , validateAndEmit : String -> EventHandle msg
+    , validateOn : Validation.ValidateOn
     }
 
 
@@ -78,6 +80,7 @@ register propsDecoder bindingsDecoder validationDecoder view =
                         , emit = raw.emit
                         , validate = raw.validate
                         , validateAndEmit = raw.validateAndEmit
+                        , validateOn = raw.validateOn
                         }
 
                 Err err ->
@@ -363,6 +366,7 @@ renderElementInner registry state validationState repeatCtx spec element =
                         , emit = buildEmit element.on repeatCtx
                         , validate = validateHandle
                         , validateAndEmit = validateAndEmitHandle
+                        , validateOn = element.validateOn
                         }
 
                 watcherTriggers =

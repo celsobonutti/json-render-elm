@@ -11,24 +11,24 @@
       "type": "Input",
       "props": {
         "label": "Password",
-        "value": { "$bindState": "/form/password" },
-        "checks": [
-          { "type": "required", "message": "Password is required" },
-          { "type": "minLength", "args": { "min": 8 }, "message": "Must be at least 8 characters" }
-        ]
+        "value": { "$bindState": "/form/password" }
       },
+      "checks": [
+        { "type": "required", "message": "Password is required" },
+        { "type": "minLength", "args": { "min": 8 }, "message": "Must be at least 8 characters" }
+      ],
       "children": []
     },
     "confirm": {
       "type": "Input",
       "props": {
         "label": "Confirm",
-        "value": { "$bindState": "/form/confirm" },
-        "checks": [
-          { "type": "required", "message": "Please confirm" },
-          { "type": "matches", "args": { "other": { "$state": "/form/password" } }, "message": "Passwords must match" }
-        ]
+        "value": { "$bindState": "/form/confirm" }
       },
+      "checks": [
+        { "type": "required", "message": "Please confirm" },
+        { "type": "matches", "args": { "other": { "$state": "/form/password" } }, "message": "Passwords must match" }
+      ],
       "children": []
     },
     "btn": {

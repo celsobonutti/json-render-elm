@@ -391,7 +391,7 @@ collectValidations : Resolve.FunctionDict -> Spec -> Value -> List ( String, Val
 collectValidations functions spec state =
     Dict.foldl
         (\_ element acc ->
-            case Validation.extractValidation element.enabled element.props of
+            case Validation.extractValidation element.checks element.validateOn element.enabled element.props of
                 Just ( path, validationConfig ) ->
                     let
                         fieldValue =
@@ -418,7 +418,7 @@ findValidationConfig spec path =
                     acc
 
                 Nothing ->
-                    case Validation.extractValidation element.enabled element.props of
+                    case Validation.extractValidation element.checks element.validateOn element.enabled element.props of
                         Just ( p, cfg ) ->
                             if p == path then
                                 Just cfg
@@ -442,7 +442,7 @@ findElementByBindPath spec path =
                     acc
 
                 Nothing ->
-                    case Validation.extractValidation element.enabled element.props of
+                    case Validation.extractValidation element.checks element.validateOn element.enabled element.props of
                         Just ( p, _ ) ->
                             if p == path then
                                 Just element

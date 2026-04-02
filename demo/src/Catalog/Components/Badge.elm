@@ -99,7 +99,7 @@ bindingsDecoder =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder (\_ -> ()) view
+    register propsDecoder bindingsDecoder view
 
 
 view : ComponentContext BadgeProps (BadgeBindings msg) () msg -> Html msg

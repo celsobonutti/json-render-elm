@@ -78,7 +78,7 @@ bindingsDecoder =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder (\_ -> ()) view
+    register propsDecoder bindingsDecoder view
 
 
 view : ComponentContext StackProps (StackBindings msg) () msg -> Html msg

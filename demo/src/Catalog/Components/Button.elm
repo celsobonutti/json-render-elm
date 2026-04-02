@@ -98,7 +98,7 @@ variantToClass variant =
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder (\_ -> ()) view
+    register propsDecoder bindingsDecoder view
 
 
 view : ComponentContext ButtonProps (ButtonBindings msg) () msg -> Html msg

@@ -35,6 +35,10 @@ export const schema = defineSchema(
           watch: s.any(),
           /** Condition for when validation is enabled on this element */
           enabled: s.any(),
+          /** Validation checks for this element */
+          checks: s.any(),
+          /** When to run validation: "change" | "blur" | "submit" (default: submit) */
+          validateOn: s.any(),
         }),
       ),
     }),

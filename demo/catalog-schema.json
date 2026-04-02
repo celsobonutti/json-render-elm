@@ -86,45 +86,11 @@
           },
           "value": {
             "type": "string"
-          },
-          "checks": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string"
-                },
-                "message": {
-                  "type": "string"
-                },
-                "args": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
-                }
-              },
-              "required": [
-                "type",
-                "message"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "validateOn": {
-            "type": "string",
-            "enum": [
-              "change",
-              "blur",
-              "submit"
-            ]
           }
         },
         "additionalProperties": false
       },
-      "description": "A text input field with an optional label. Use { $bindState } on value for two-way binding. Use checks for validation (e.g. required, email, minLength). validateOn controls timing (default: submit).",
+      "description": "A text input field with an optional label",
       "slots": []
     },
     "Stack": {

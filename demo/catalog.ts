@@ -43,20 +43,9 @@ export const catalog = defineCatalog(schema, {
         placeholder: z.string().optional(),
         label: z.string().optional(),
         value: z.string().optional(),
-        checks: z
-          .array(
-            z.object({
-              type: z.string(),
-              message: z.string(),
-              args: z.record(z.string(), z.unknown()).optional(),
-            }),
-          )
-          .optional(),
-        validateOn: z.enum(["change", "blur", "submit"]).optional(),
       }),
       slots: [],
-      description:
-        "A text input field with an optional label. Use { $bindState } on value for two-way binding. Use checks for validation (e.g. required, email, minLength). validateOn controls timing (default: submit).",
+      description: "A text input field with an optional label",
     },
     Stack: {
       props: z.object({

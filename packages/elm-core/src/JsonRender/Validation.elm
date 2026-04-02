@@ -541,43 +541,28 @@ runChecks validationFns functions checks fieldValue state repeatCtx =
 -- Extraction
 
 
-{-| Extract validation config from a props dict.
-Looks for a `checks` ListValue prop (list of ObjectValue checks),
-a `validateOn` StringValue prop (default OnSubmit), and finds
-the first `$bindState` path in the props dict.
-Returns `Just (bindStatePath, validationConfig)` if found, Nothing otherwise.
+{-| Extract validation config from element-level fields.
+Takes checks, validateOn, and enabled from the Element, plus props to find the bindState path.
+Returns `Just (bindStatePath, validationConfig)` if checks are present and a bindState path exists.
 -}
-extractValidation : Maybe Condition -> Dict String PropValue -> Maybe ( String, ValidationConfig )
-extractValidation enabledCondition props =
-    case ( findBindStatePath props, Dict.get "checks" props ) of
-        ( Just path, Just (ListValue checksList) ) ->
-            case parseChecks checksList of
-                Just parsedChecks ->
-                    let
-                        validateOn =
-                            case Dict.get "validateOn" props of
-                                Just (StringValue "change") ->
-                                    OnChange
+extractValidation : List ValidationCheck -> ValidateOn -> Maybe Condition -> Dict String PropValue -> Maybe ( String, ValidationConfig )
+extractValidation checks validateOn enabledCondition props =
+    if List.isEmpty checks then
+        Nothing
 
-                                Just (StringValue "blur") ->
-                                    OnBlur
+    else
+        case findBindStatePath props of
+            Just path ->
+                Just
+                    ( path
+                    , { checks = checks
+                      , validateOn = validateOn
+                      , enabled = enabledCondition
+                      }
+                    )
 
-                                _ ->
-                                    OnSubmit
-                    in
-                    Just
-                        ( path
-                        , { checks = parsedChecks
-                          , validateOn = validateOn
-                          , enabled = enabledCondition
-                          }
-                        )
-
-                Nothing ->
-                    Nothing
-
-        _ ->
-            Nothing
+            Nothing ->
+                Nothing
 
 
 findBindStatePath : Dict String PropValue -> Maybe String
@@ -598,108 +583,6 @@ findBindStatePath props =
         )
         Nothing
         props
-
-
-parseChecks : List PropValue -> Maybe (List ValidationCheck)
-parseChecks items =
-    let
-        results =
-            List.filterMap parseCheck items
-    in
-    if List.length results == List.length items then
-        Just results
-
-    else
-        Nothing
-
-
-parseCheck : PropValue -> Maybe ValidationCheck
-parseCheck pv =
-    case pv of
-        ObjectValue obj ->
-            case Dict.get "type" obj of
-                Just (StringValue typeStr) ->
-                    let
-                        checkType =
-                            parseCheckType typeStr
-
-                        message =
-                            case Dict.get "message" obj of
-                                Just (StringValue msg) ->
-                                    msg
-
-                                _ ->
-                                    "Validation failed"
-
-                        args =
-                            case Dict.get "args" obj of
-                                Just (ObjectValue argsDict) ->
-                                    argsDict
-
-                                _ ->
-                                    Dict.empty
-                    in
-                    Just
-                        { type_ = checkType
-                        , args = args
-                        , message = message
-                        }
-
-                _ ->
-                    Nothing
-
-        _ ->
-            Nothing
-
-
-parseCheckType : String -> CheckType
-parseCheckType s =
-    case s of
-        "required" ->
-            BuiltIn Required
-
-        "email" ->
-            BuiltIn Email
-
-        "minLength" ->
-            BuiltIn MinLength
-
-        "maxLength" ->
-            BuiltIn MaxLength
-
-        "pattern" ->
-            BuiltIn Pattern
-
-        "min" ->
-            BuiltIn Min
-
-        "max" ->
-            BuiltIn Max
-
-        "numeric" ->
-            BuiltIn Numeric
-
-        "url" ->
-            BuiltIn Url
-
-        "matches" ->
-            BuiltIn Matches
-
-        "equalTo" ->
-            BuiltIn EqualTo
-
-        "lessThan" ->
-            BuiltIn LessThan
-
-        "greaterThan" ->
-            BuiltIn GreaterThan
-
-        "requiredIf" ->
-            BuiltIn RequiredIf
-
-        other ->
-            Custom other
-
 
 
 -- Pipeline combinators
