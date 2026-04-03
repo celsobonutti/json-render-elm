@@ -272,20 +272,12 @@ checkEmail : Value -> Bool
 checkEmail value =
     case Decode.decodeValue Decode.string value of
         Ok s ->
-            if s == "" then
-                True
+            case Regex.fromString "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" of
+                Just regex ->
+                    Regex.contains regex s
 
-            else
-                let
-                    maybeRegex =
-                        Regex.fromString "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
-                in
-                case maybeRegex of
-                    Just regex ->
-                        Regex.contains regex s
-
-                    Nothing ->
-                        False
+                Nothing ->
+                    False
 
         Err _ ->
             False
@@ -298,7 +290,7 @@ checkMinLength value args =
             String.length s >= minLen
 
         _ ->
-            True
+            False
 
 
 checkMaxLength : Value -> Dict String Value -> Bool
@@ -308,7 +300,7 @@ checkMaxLength value args =
             String.length s <= maxLen
 
         _ ->
-            True
+            False
 
 
 checkPattern : Value -> Dict String Value -> Bool
@@ -320,56 +312,56 @@ checkPattern value args =
                     Regex.contains regex s
 
                 Nothing ->
-                    True
+                    False
 
         _ ->
-            True
+            False
 
 
 checkMin : Value -> Dict String Value -> Bool
 checkMin value args =
-    case ( toNumber value, getNumberArg "min" args ) of
+    case ( toStrictNumber value, getNumberArg "min" args ) of
         ( Just n, Just minVal ) ->
             n >= minVal
 
         _ ->
-            True
+            False
 
 
 checkMax : Value -> Dict String Value -> Bool
 checkMax value args =
-    case ( toNumber value, getNumberArg "max" args ) of
+    case ( toStrictNumber value, getNumberArg "max" args ) of
         ( Just n, Just maxVal ) ->
             n <= maxVal
 
         _ ->
-            True
+            False
 
 
 checkNumeric : Value -> Bool
 checkNumeric value =
-    case Decode.decodeValue Decode.string value of
-        Ok s ->
-            if s == "" then
-                True
-
-            else
-                case String.toFloat s of
-                    Just _ ->
-                        True
-
-                    Nothing ->
-                        False
+    case Decode.decodeValue Decode.int value of
+        Ok _ ->
+            True
 
         Err _ ->
-            case Decode.decodeValue Decode.int value of
+            case Decode.decodeValue Decode.float value of
                 Ok _ ->
                     True
 
                 Err _ ->
-                    case Decode.decodeValue Decode.float value of
-                        Ok _ ->
-                            True
+                    case Decode.decodeValue Decode.string value of
+                        Ok s ->
+                            if s == "" then
+                                False
+
+                            else
+                                case String.toFloat s of
+                                    Just _ ->
+                                        True
+
+                                    Nothing ->
+                                        False
 
                         Err _ ->
                             False
@@ -379,16 +371,12 @@ checkUrl : Value -> Bool
 checkUrl value =
     case Decode.decodeValue Decode.string value of
         Ok s ->
-            if s == "" then
-                True
+            case Regex.fromString "^https?://.+" of
+                Just regex ->
+                    Regex.contains regex s
 
-            else
-                case Regex.fromString "^https?://.+" of
-                    Just regex ->
-                        Regex.contains regex s
-
-                    Nothing ->
-                        False
+                Nothing ->
+                    False
 
         Err _ ->
             False
@@ -416,34 +404,42 @@ checkEqualTo value args =
 
 checkLessThan : Value -> Dict String Value -> Bool
 checkLessThan value args =
-    case ( toNumber value, getNumberArg "other" args ) of
-        ( Just n, Just threshold ) ->
-            n < threshold
+    case Dict.get "other" args of
+        Nothing ->
+            False
 
-        _ ->
-            -- String fallback
-            case ( Decode.decodeValue Decode.string value, getStringArg "other" args ) of
-                ( Ok s1, Just s2 ) ->
-                    s1 < s2
+        Just other ->
+            case ( toNumber value, toNumber other ) of
+                ( Just n1, Just n2 ) ->
+                    n1 < n2
 
                 _ ->
-                    True
+                    case ( toNonEmptyString value, toNonEmptyString other ) of
+                        ( Just s1, Just s2 ) ->
+                            s1 < s2
+
+                        _ ->
+                            False
 
 
 checkGreaterThan : Value -> Dict String Value -> Bool
 checkGreaterThan value args =
-    case ( toNumber value, getNumberArg "other" args ) of
-        ( Just n, Just threshold ) ->
-            n > threshold
+    case Dict.get "other" args of
+        Nothing ->
+            False
 
-        _ ->
-            -- String fallback
-            case ( Decode.decodeValue Decode.string value, getStringArg "other" args ) of
-                ( Ok s1, Just s2 ) ->
-                    s1 > s2
+        Just other ->
+            case ( toNumber value, toNumber other ) of
+                ( Just n1, Just n2 ) ->
+                    n1 > n2
 
                 _ ->
-                    True
+                    case ( toNonEmptyString value, toNonEmptyString other ) of
+                        ( Just s1, Just s2 ) ->
+                            s1 > s2
+
+                        _ ->
+                            False
 
 
 checkRequiredIf : Value -> Dict String Value -> Bool
@@ -611,8 +607,8 @@ field key prev dict =
 -- Helpers
 
 
-toNumber : Value -> Maybe Float
-toNumber value =
+toStrictNumber : Value -> Maybe Float
+toStrictNumber value =
     case Decode.decodeValue Decode.int value of
         Ok n ->
             Just (toFloat n)
@@ -623,12 +619,36 @@ toNumber value =
                     Just f
 
                 Err _ ->
-                    case Decode.decodeValue Decode.string value of
-                        Ok s ->
-                            String.toFloat s
+                    Nothing
 
-                        Err _ ->
-                            Nothing
+
+toNumber : Value -> Maybe Float
+toNumber value =
+    case toStrictNumber value of
+        Just n ->
+            Just n
+
+        Nothing ->
+            case Decode.decodeValue Decode.string value of
+                Ok s ->
+                    String.toFloat s
+
+                Err _ ->
+                    Nothing
+
+
+toNonEmptyString : Value -> Maybe String
+toNonEmptyString value =
+    case Decode.decodeValue Decode.string value of
+        Ok s ->
+            if s == "" then
+                Nothing
+
+            else
+                Just s
+
+        Err _ ->
+            Nothing
 
 
 getIntArg : String -> Dict String Value -> Maybe Int

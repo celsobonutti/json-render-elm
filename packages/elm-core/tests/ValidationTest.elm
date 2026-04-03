@@ -30,6 +30,8 @@ suite =
         , checkDecoderSuite
         , runCheckSuite
         , runValidationSuite
+        , runValidationCheckSuite
+        , deepArgResolutionSuite
         , pipelineSuite
         , extractValidationSuite
         ]
@@ -188,7 +190,7 @@ checkDecoderSuite =
 
 
 
--- runCheck tests
+-- runCheck tests (matches builtInValidationFunctions in core)
 
 
 runCheckSuite : Test
@@ -199,22 +201,34 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn Required) (Encode.string "hello") Dict.empty
                         |> Expect.equal True
+            , test "passes for zero" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Required) (Encode.int 0) Dict.empty
+                        |> Expect.equal True
+            , test "passes for false" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Required) (Encode.bool False) Dict.empty
+                        |> Expect.equal True
+            , test "passes for non-empty list" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Required) (Encode.list Encode.string [ "item" ]) Dict.empty
+                        |> Expect.equal True
+            , test "passes for object" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Required) (Encode.object [ ( "key", Encode.string "value" ) ]) Dict.empty
+                        |> Expect.equal True
             , test "fails for empty string" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Required) (Encode.string "") Dict.empty
                         |> Expect.equal False
             , test "fails for whitespace-only string" <|
                 \_ ->
-                    Validation.runCheck (BuiltIn Required) (Encode.string "  ") Dict.empty
+                    Validation.runCheck (BuiltIn Required) (Encode.string "   ") Dict.empty
                         |> Expect.equal False
             , test "fails for null" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Required) Encode.null Dict.empty
                         |> Expect.equal False
-            , test "passes for non-empty list" <|
-                \_ ->
-                    Validation.runCheck (BuiltIn Required) (Encode.list Encode.int [ 1 ]) Dict.empty
-                        |> Expect.equal True
             , test "fails for empty list" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Required) (Encode.list Encode.int []) Dict.empty
@@ -225,20 +239,56 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn Email) (Encode.string "test@example.com") Dict.empty
                         |> Expect.equal True
-            , test "fails for missing @" <|
+            , test "passes for email with dots in username" <|
                 \_ ->
-                    Validation.runCheck (BuiltIn Email) (Encode.string "notanemail") Dict.empty
+                    Validation.runCheck (BuiltIn Email) (Encode.string "user.name@domain.co") Dict.empty
+                        |> Expect.equal True
+            , test "passes for minimal email" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Email) (Encode.string "a@b.c") Dict.empty
+                        |> Expect.equal True
+            , test "fails for missing domain extension" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Email) (Encode.string "missing@domain") Dict.empty
                         |> Expect.equal False
-            , test "passes for empty string (not required)" <|
+            , test "fails for missing username" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Email) (Encode.string "@domain.com") Dict.empty
+                        |> Expect.equal False
+            , test "fails for missing domain" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Email) (Encode.string "user@") Dict.empty
+                        |> Expect.equal False
+            , test "fails for plain string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Email) (Encode.string "invalid") Dict.empty
+                        |> Expect.equal False
+            , test "fails for non-string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Email) (Encode.int 123) Dict.empty
+                        |> Expect.equal False
+            , test "fails for empty string" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Email) (Encode.string "") Dict.empty
-                        |> Expect.equal True
+                        |> Expect.equal False
             ]
         , describe "minLength"
-            [ test "passes when string is long enough" <|
+            [ test "passes when string meets minimum length" <|
                 \_ ->
                     Validation.runCheck (BuiltIn MinLength)
                         (Encode.string "hello")
+                        (Dict.fromList [ ( "min", Encode.int 3 ) ])
+                        |> Expect.equal True
+            , test "passes when string is exactly minimum length" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn MinLength)
+                        (Encode.string "abc")
+                        (Dict.fromList [ ( "min", Encode.int 3 ) ])
+                        |> Expect.equal True
+            , test "passes when string exceeds minimum length" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn MinLength)
+                        (Encode.string "abcdef")
                         (Dict.fromList [ ( "min", Encode.int 3 ) ])
                         |> Expect.equal True
             , test "fails when string is too short" <|
@@ -247,47 +297,89 @@ runCheckSuite =
                         (Encode.string "hi")
                         (Dict.fromList [ ( "min", Encode.int 3 ) ])
                         |> Expect.equal False
+            , test "fails for empty string with min 1" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn MinLength)
+                        (Encode.string "")
+                        (Dict.fromList [ ( "min", Encode.int 1 ) ])
+                        |> Expect.equal False
+            , test "fails for non-strings" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn MinLength)
+                        (Encode.int 123)
+                        (Dict.fromList [ ( "min", Encode.int 1 ) ])
+                        |> Expect.equal False
+            , test "fails when min is not provided" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn MinLength)
+                        (Encode.string "hello")
+                        Dict.empty
+                        |> Expect.equal False
             ]
         , describe "maxLength"
-            [ test "passes when string is short enough" <|
+            [ test "passes when string is under maximum" <|
                 \_ ->
                     Validation.runCheck (BuiltIn MaxLength)
                         (Encode.string "hi")
                         (Dict.fromList [ ( "max", Encode.int 5 ) ])
                         |> Expect.equal True
-            , test "fails when string is too long" <|
+            , test "passes when string is exactly maximum" <|
                 \_ ->
                     Validation.runCheck (BuiltIn MaxLength)
-                        (Encode.string "hello world")
+                        (Encode.string "hello")
+                        (Dict.fromList [ ( "max", Encode.int 5 ) ])
+                        |> Expect.equal True
+            , test "fails when string exceeds maximum" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn MaxLength)
+                        (Encode.string "hello!")
                         (Dict.fromList [ ( "max", Encode.int 5 ) ])
                         |> Expect.equal False
             ]
         , describe "pattern"
-            [ test "passes when string matches regex" <|
+            [ test "passes when string matches pattern" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Pattern)
                         (Encode.string "abc123")
-                        (Dict.fromList [ ( "pattern", Encode.string "^[a-z]+[0-9]+$" ) ])
+                        (Dict.fromList [ ( "pattern", Encode.string "^[a-z0-9]+$" ) ])
                         |> Expect.equal True
-            , test "fails when string does not match regex" <|
+            , test "fails when string does not match pattern" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Pattern)
-                        (Encode.string "123abc")
-                        (Dict.fromList [ ( "pattern", Encode.string "^[a-z]+[0-9]+$" ) ])
+                        (Encode.string "ABC")
+                        (Dict.fromList [ ( "pattern", Encode.string "^[a-z]+$" ) ])
+                        |> Expect.equal False
+            , test "fails for invalid regex pattern" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Pattern)
+                        (Encode.string "test")
+                        (Dict.fromList [ ( "pattern", Encode.string "[invalid" ) ])
                         |> Expect.equal False
             ]
         , describe "min"
-            [ test "passes when number >= min" <|
+            [ test "passes when number exceeds minimum" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Min)
-                        (Encode.int 10)
-                        (Dict.fromList [ ( "min", Encode.int 5 ) ])
+                        (Encode.int 5)
+                        (Dict.fromList [ ( "min", Encode.int 3 ) ])
                         |> Expect.equal True
-            , test "fails when number < min" <|
+            , test "passes when number equals minimum" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Min)
                         (Encode.int 3)
-                        (Dict.fromList [ ( "min", Encode.int 5 ) ])
+                        (Dict.fromList [ ( "min", Encode.int 3 ) ])
+                        |> Expect.equal True
+            , test "fails when number is below minimum" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Min)
+                        (Encode.int 2)
+                        (Dict.fromList [ ( "min", Encode.int 3 ) ])
+                        |> Expect.equal False
+            , test "fails for non-numbers" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Min)
+                        (Encode.string "5")
+                        (Dict.fromList [ ( "min", Encode.int 3 ) ])
                         |> Expect.equal False
             , test "passes for float >= min" <|
                 \_ ->
@@ -297,16 +389,22 @@ runCheckSuite =
                         |> Expect.equal True
             ]
         , describe "max"
-            [ test "passes when number <= max" <|
+            [ test "passes when number is under maximum" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Max)
                         (Encode.int 3)
                         (Dict.fromList [ ( "max", Encode.int 5 ) ])
                         |> Expect.equal True
-            , test "fails when number > max" <|
+            , test "passes when number equals maximum" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Max)
-                        (Encode.int 10)
+                        (Encode.int 5)
+                        (Dict.fromList [ ( "max", Encode.int 5 ) ])
+                        |> Expect.equal True
+            , test "fails when number exceeds maximum" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Max)
+                        (Encode.int 6)
                         (Dict.fromList [ ( "max", Encode.int 5 ) ])
                         |> Expect.equal False
             ]
@@ -319,110 +417,292 @@ runCheckSuite =
                 \_ ->
                     Validation.runCheck (BuiltIn Numeric) (Encode.float 3.14) Dict.empty
                         |> Expect.equal True
+            , test "passes for zero" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Numeric) (Encode.int 0) Dict.empty
+                        |> Expect.equal True
             , test "passes for numeric string" <|
                 \_ ->
-                    Validation.runCheck (BuiltIn Numeric) (Encode.string "42.5") Dict.empty
+                    Validation.runCheck (BuiltIn Numeric) (Encode.string "42") Dict.empty
+                        |> Expect.equal True
+            , test "passes for float string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Numeric) (Encode.string "3.14") Dict.empty
                         |> Expect.equal True
             , test "fails for non-numeric string" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Numeric) (Encode.string "abc") Dict.empty
                         |> Expect.equal False
-            , test "passes for empty string (not required)" <|
+            , test "fails for null" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Numeric) Encode.null Dict.empty
+                        |> Expect.equal False
+            , test "fails for empty string" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Numeric) (Encode.string "") Dict.empty
-                        |> Expect.equal True
+                        |> Expect.equal False
             ]
         , describe "url"
-            [ test "passes for http url" <|
-                \_ ->
-                    Validation.runCheck (BuiltIn Url) (Encode.string "http://example.com") Dict.empty
-                        |> Expect.equal True
-            , test "passes for https url" <|
+            [ test "passes for https url" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Url) (Encode.string "https://example.com") Dict.empty
                         |> Expect.equal True
+            , test "passes for http localhost with port" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Url) (Encode.string "http://localhost:3000") Dict.empty
+                        |> Expect.equal True
+            , test "passes for url with path and query" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Url) (Encode.string "https://example.com/path?query=1") Dict.empty
+                        |> Expect.equal True
+            , test "fails for string without protocol" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Url) (Encode.string "example.com") Dict.empty
+                        |> Expect.equal False
             , test "fails for non-url string" <|
                 \_ ->
-                    Validation.runCheck (BuiltIn Url) (Encode.string "not a url") Dict.empty
+                    Validation.runCheck (BuiltIn Url) (Encode.string "not-a-url") Dict.empty
                         |> Expect.equal False
-            , test "passes for empty string (not required)" <|
+            , test "fails for empty string" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Url) (Encode.string "") Dict.empty
-                        |> Expect.equal True
+                        |> Expect.equal False
             ]
         , describe "matches"
-            [ test "passes when values are equal" <|
+            [ test "passes when string values match" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Matches)
-                        (Encode.string "hello")
-                        (Dict.fromList [ ( "other", Encode.string "hello" ) ])
+                        (Encode.string "password")
+                        (Dict.fromList [ ( "other", Encode.string "password" ) ])
                         |> Expect.equal True
-            , test "fails when values differ" <|
+            , test "passes when number values match" <|
                 \_ ->
                     Validation.runCheck (BuiltIn Matches)
-                        (Encode.string "hello")
-                        (Dict.fromList [ ( "other", Encode.string "world" ) ])
+                        (Encode.int 123)
+                        (Dict.fromList [ ( "other", Encode.int 123 ) ])
+                        |> Expect.equal True
+            , test "fails when values do not match" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn Matches)
+                        (Encode.string "password")
+                        (Dict.fromList [ ( "other", Encode.string "different" ) ])
                         |> Expect.equal False
             ]
         , describe "equalTo"
             [ test "passes when values are equal" <|
                 \_ ->
                     Validation.runCheck (BuiltIn EqualTo)
-                        (Encode.int 5)
-                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
+                        (Encode.string "abc")
+                        (Dict.fromList [ ( "other", Encode.string "abc" ) ])
                         |> Expect.equal True
             , test "fails when values differ" <|
                 \_ ->
                     Validation.runCheck (BuiltIn EqualTo)
-                        (Encode.int 5)
-                        (Dict.fromList [ ( "other", Encode.int 10 ) ])
+                        (Encode.string "abc")
+                        (Dict.fromList [ ( "other", Encode.string "xyz" ) ])
                         |> Expect.equal False
             ]
         , describe "lessThan"
-            [ test "passes when value < arg" <|
+            [ test "passes when value is less than other" <|
                 \_ ->
                     Validation.runCheck (BuiltIn LessThan)
                         (Encode.int 3)
                         (Dict.fromList [ ( "other", Encode.int 5 ) ])
                         |> Expect.equal True
-            , test "fails when value >= arg" <|
+            , test "fails when value equals other" <|
                 \_ ->
                     Validation.runCheck (BuiltIn LessThan)
                         (Encode.int 5)
                         (Dict.fromList [ ( "other", Encode.int 5 ) ])
                         |> Expect.equal False
-            ]
-        , describe "greaterThan"
-            [ test "passes when value > arg" <|
+            , test "fails when value is greater than other" <|
                 \_ ->
-                    Validation.runCheck (BuiltIn GreaterThan)
-                        (Encode.int 10)
+                    Validation.runCheck (BuiltIn LessThan)
+                        (Encode.int 7)
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
+                        |> Expect.equal False
+            , test "coerces numeric string vs number" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn LessThan)
+                        (Encode.string "3")
                         (Dict.fromList [ ( "other", Encode.int 5 ) ])
                         |> Expect.equal True
-            , test "fails when value <= arg" <|
+            , test "fails coercion when non-numeric string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn LessThan)
+                        (Encode.string "abc")
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
+                        |> Expect.equal False
+            , test "passes for string comparison (ISO dates)" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn LessThan)
+                        (Encode.string "2026-01-01")
+                        (Dict.fromList [ ( "other", Encode.string "2026-06-15" ) ])
+                        |> Expect.equal True
+            , test "fails for equal strings" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn LessThan)
+                        (Encode.string "2026-01-01")
+                        (Dict.fromList [ ( "other", Encode.string "2026-01-01" ) ])
+                        |> Expect.equal False
+            , test "returns false when value is empty string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn LessThan)
+                        (Encode.string "")
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
+                        |> Expect.equal False
+            , test "returns false when other is empty string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn LessThan)
+                        (Encode.int 3)
+                        (Dict.fromList [ ( "other", Encode.string "" ) ])
+                        |> Expect.equal False
+            , test "returns false when value is empty string vs non-empty string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn LessThan)
+                        (Encode.string "")
+                        (Dict.fromList [ ( "other", Encode.string "abc" ) ])
+                        |> Expect.equal False
+            , test "returns false when other is empty string vs non-empty string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn LessThan)
+                        (Encode.string "abc")
+                        (Dict.fromList [ ( "other", Encode.string "" ) ])
+                        |> Expect.equal False
+            , test "returns false when other is null" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn LessThan)
+                        (Encode.int 3)
+                        (Dict.fromList [ ( "other", Encode.null ) ])
+                        |> Expect.equal False
+            , test "returns false when value is null" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn LessThan)
+                        Encode.null
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
+                        |> Expect.equal False
+            ]
+        , describe "greaterThan"
+            [ test "passes when value is greater than other" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        (Encode.int 7)
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
+                        |> Expect.equal True
+            , test "fails when value equals other" <|
                 \_ ->
                     Validation.runCheck (BuiltIn GreaterThan)
                         (Encode.int 5)
                         (Dict.fromList [ ( "other", Encode.int 5 ) ])
                         |> Expect.equal False
+            , test "fails when value is less than other" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        (Encode.int 3)
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
+                        |> Expect.equal False
+            , test "coerces numeric string vs number" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        (Encode.string "7")
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
+                        |> Expect.equal True
+            , test "fails coercion when non-numeric string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        (Encode.string "abc")
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
+                        |> Expect.equal False
+            , test "passes for string comparison (ISO dates)" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        (Encode.string "2026-06-15")
+                        (Dict.fromList [ ( "other", Encode.string "2026-01-01" ) ])
+                        |> Expect.equal True
+            , test "fails for lesser strings" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        (Encode.string "2026-01-01")
+                        (Dict.fromList [ ( "other", Encode.string "2026-06-15" ) ])
+                        |> Expect.equal False
+            , test "returns false when value is empty string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        (Encode.string "")
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
+                        |> Expect.equal False
+            , test "returns false when other is empty string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        (Encode.int 3)
+                        (Dict.fromList [ ( "other", Encode.string "" ) ])
+                        |> Expect.equal False
+            , test "returns false when value is empty string vs non-empty string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        (Encode.string "")
+                        (Dict.fromList [ ( "other", Encode.string "abc" ) ])
+                        |> Expect.equal False
+            , test "returns false when other is empty string vs non-empty string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        (Encode.string "abc")
+                        (Dict.fromList [ ( "other", Encode.string "" ) ])
+                        |> Expect.equal False
+            , test "returns false when other is null" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        (Encode.int 3)
+                        (Dict.fromList [ ( "other", Encode.null ) ])
+                        |> Expect.equal False
+            , test "returns false when value is null" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn GreaterThan)
+                        Encode.null
+                        (Dict.fromList [ ( "other", Encode.int 5 ) ])
+                        |> Expect.equal False
             ]
         , describe "requiredIf"
-            [ test "enforces required when field arg is truthy" <|
-                \_ ->
-                    Validation.runCheck (BuiltIn RequiredIf)
-                        (Encode.string "")
-                        (Dict.fromList [ ( "field", Encode.bool True ) ])
-                        |> Expect.equal False
-            , test "passes when field arg is falsy" <|
+            [ test "passes when condition is falsy (field not required)" <|
                 \_ ->
                     Validation.runCheck (BuiltIn RequiredIf)
                         (Encode.string "")
                         (Dict.fromList [ ( "field", Encode.bool False ) ])
                         |> Expect.equal True
-            , test "passes when field arg is truthy and value non-empty" <|
+            , test "passes when condition field is empty string" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn RequiredIf)
+                        (Encode.string "")
+                        (Dict.fromList [ ( "field", Encode.string "" ) ])
+                        |> Expect.equal True
+            , test "passes when condition field is null" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn RequiredIf)
+                        (Encode.string "")
+                        (Dict.fromList [ ( "field", Encode.null ) ])
+                        |> Expect.equal True
+            , test "fails when condition is truthy and value is empty" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn RequiredIf)
+                        (Encode.string "")
+                        (Dict.fromList [ ( "field", Encode.bool True ) ])
+                        |> Expect.equal False
+            , test "fails when condition is truthy string and value is null" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn RequiredIf)
+                        Encode.null
+                        (Dict.fromList [ ( "field", Encode.string "yes" ) ])
+                        |> Expect.equal False
+            , test "passes when condition is truthy and value is present" <|
                 \_ ->
                     Validation.runCheck (BuiltIn RequiredIf)
                         (Encode.string "hello")
+                        (Dict.fromList [ ( "field", Encode.bool True ) ])
+                        |> Expect.equal True
+            , test "passes when condition is truthy and value is number" <|
+                \_ ->
+                    Validation.runCheck (BuiltIn RequiredIf)
+                        (Encode.int 42)
                         (Dict.fromList [ ( "field", Encode.bool True ) ])
                         |> Expect.equal True
             ]
@@ -436,13 +716,101 @@ runCheckSuite =
 
 
 
--- runValidation tests
+-- runValidationCheck tests (matches runValidationCheck in core)
+
+
+runValidationCheckSuite : Test
+runValidationCheckSuite =
+    describe "runValidationCheck"
+        [ test "runs a validation check and returns result" <|
+            \_ ->
+                let
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config (Encode.string "hello") Encode.null Nothing
+                in
+                Expect.all
+                    [ \r -> Expect.equal True r.valid
+                    , \r -> Expect.equal [] r.errors
+                    ]
+                    result
+        , test "resolves dynamic args from state" <|
+            \_ ->
+                let
+                    state =
+                        Encode.object [ ( "minLen", Encode.int 5 ) ]
+
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn MinLength
+                              , args = Dict.fromList [ ( "min", StateExpr "/minLen" ) ]
+                              , message = "Too short"
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config (Encode.string "hi") state Nothing
+                in
+                Expect.equal False result.valid
+        , test "returns valid for unknown custom functions" <|
+            \_ ->
+                let
+                    config =
+                        { checks =
+                            [ { type_ = Custom "unknownFunction", args = Dict.empty, message = "Unknown" } ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config (Encode.string "test") Encode.null Nothing
+                in
+                Expect.equal True result.valid
+        , test "uses custom validation functions" <|
+            \_ ->
+                let
+                    startsWithA value _ =
+                        case Decode.decodeValue Decode.string value of
+                            Ok s ->
+                                String.startsWith "A" s
+
+                            Err _ ->
+                                False
+
+                    customFns =
+                        Dict.fromList [ ( "startsWithA", startsWithA ) ]
+
+                    config =
+                        { checks =
+                            [ { type_ = Custom "startsWithA", args = Dict.empty, message = "Must start with A" } ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    result =
+                        Validation.runValidation customFns Dict.empty config (Encode.string "Apple") Encode.null Nothing
+                in
+                Expect.equal True result.valid
+        ]
+
+
+
+-- runValidation tests (matches runValidation in core)
 
 
 runValidationSuite : Test
 runValidationSuite =
     describe "runValidation"
-        [ test "all checks pass returns valid" <|
+        [ test "runs all checks and returns valid" <|
             \_ ->
                 let
                     config =
@@ -462,7 +830,7 @@ runValidationSuite =
                     , \r -> Expect.equal [] r.errors
                     ]
                     result
-        , test "failing checks returns errors" <|
+        , test "collects all errors" <|
             \_ ->
                 let
                     config =
@@ -475,22 +843,22 @@ runValidationSuite =
                         }
 
                     result =
-                        Validation.runValidation Dict.empty Dict.empty config (Encode.string "notanemail") Encode.null Nothing
+                        Validation.runValidation Dict.empty Dict.empty config (Encode.string "") Encode.null Nothing
                 in
                 Expect.all
                     [ \r -> Expect.equal False r.valid
-                    , \r -> Expect.equal [ "Invalid email" ] r.errors
+                    , \r -> Expect.equal True (List.member "Required" r.errors)
+                    , \r -> Expect.equal True (List.member "Invalid email" r.errors)
                     ]
                     result
-        , test "disabled config returns valid regardless" <|
+        , test "skips validation when enabled condition is false" <|
             \_ ->
                 let
                     config =
                         { checks =
-                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" }
-                            ]
+                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
                         , validateOn = OnSubmit
-                        , enabled = Just (Condition.Or [])
+                        , enabled = Just (Condition.Compare (Condition.StateSource "/enabled") (Condition.Eq (Condition.Literal (Encode.bool True))))
                         }
 
                     result =
@@ -501,6 +869,23 @@ runValidationSuite =
                     , \r -> Expect.equal [] r.errors
                     ]
                     result
+        , test "runs validation when enabled condition is true" <|
+            \_ ->
+                let
+                    state =
+                        Encode.object [ ( "enabled", Encode.bool True ) ]
+
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
+                        , validateOn = OnSubmit
+                        , enabled = Just (Condition.Compare (Condition.StateSource "/enabled") Condition.IsTruthy)
+                        }
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config (Encode.string "") state Nothing
+                in
+                Expect.equal False result.valid
         , test "custom validation function is invoked" <|
             \_ ->
                 let
@@ -550,6 +935,116 @@ runValidationSuite =
                     , \r -> Expect.equal [ "Required", "Too short" ] r.errors
                     ]
                     result
+        ]
+
+
+
+-- Deep arg resolution tests (matches deep arg resolution in core)
+
+
+deepArgResolutionSuite : Test
+deepArgResolutionSuite =
+    describe "deep arg resolution"
+        [ test "resolves nested $state refs in matches validation args" <|
+            \_ ->
+                let
+                    state =
+                        Encode.object
+                            [ ( "form"
+                              , Encode.object [ ( "password", Encode.string "secret123" ) ]
+                              )
+                            ]
+
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn Matches
+                              , args = Dict.fromList [ ( "other", StateExpr "/form/password" ) ]
+                              , message = "Passwords must match"
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config (Encode.string "secret123") state Nothing
+                in
+                Expect.equal True result.valid
+        , test "resolves $state in cross-field lessThan check" <|
+            \_ ->
+                let
+                    state =
+                        Encode.object
+                            [ ( "form"
+                              , Encode.object [ ( "maxPrice", Encode.int 100 ) ]
+                              )
+                            ]
+
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn LessThan
+                              , args = Dict.fromList [ ( "other", StateExpr "/form/maxPrice" ) ]
+                              , message = "Must be less than max price"
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config (Encode.int 50) state Nothing
+                in
+                Expect.equal True result.valid
+        , test "resolves $state in requiredIf check - condition true" <|
+            \_ ->
+                let
+                    state =
+                        Encode.object
+                            [ ( "form"
+                              , Encode.object [ ( "enableEmail", Encode.bool True ) ]
+                              )
+                            ]
+
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn RequiredIf
+                              , args = Dict.fromList [ ( "field", StateExpr "/form/enableEmail" ) ]
+                              , message = "Email is required"
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config (Encode.string "") state Nothing
+                in
+                Expect.equal False result.valid
+        , test "passes requiredIf when $state condition is false" <|
+            \_ ->
+                let
+                    state =
+                        Encode.object
+                            [ ( "form"
+                              , Encode.object [ ( "enableEmail", Encode.bool False ) ]
+                              )
+                            ]
+
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn RequiredIf
+                              , args = Dict.fromList [ ( "field", StateExpr "/form/enableEmail" ) ]
+                              , message = "Email is required"
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config (Encode.string "") state Nothing
+                in
+                Expect.equal True result.valid
         ]
 
 
