@@ -10,7 +10,9 @@ module JsonRender.Validation exposing
     , ValidationResult
     , checkDecoder
     , checkTypeDecoder
+    , configDecoder
     , emptyFieldValidation
+    , encodeValidationConfig
     , extractValidation
     , field
     , runCheck
@@ -190,6 +192,94 @@ checkDecoder =
             ]
         )
         (Decode.field "message" Decode.string)
+
+
+
+encodeCheckType : CheckType -> Encode.Value
+encodeCheckType ct =
+    case ct of
+        BuiltIn Required ->
+            Encode.string "required"
+
+        BuiltIn Email ->
+            Encode.string "email"
+
+        BuiltIn MinLength ->
+            Encode.string "minLength"
+
+        BuiltIn MaxLength ->
+            Encode.string "maxLength"
+
+        BuiltIn Pattern ->
+            Encode.string "pattern"
+
+        BuiltIn Min ->
+            Encode.string "min"
+
+        BuiltIn Max ->
+            Encode.string "max"
+
+        BuiltIn Numeric ->
+            Encode.string "numeric"
+
+        BuiltIn Url ->
+            Encode.string "url"
+
+        BuiltIn Matches ->
+            Encode.string "matches"
+
+        BuiltIn EqualTo ->
+            Encode.string "equalTo"
+
+        BuiltIn LessThan ->
+            Encode.string "lessThan"
+
+        BuiltIn GreaterThan ->
+            Encode.string "greaterThan"
+
+        BuiltIn RequiredIf ->
+            Encode.string "requiredIf"
+
+        Custom name ->
+            Encode.string name
+
+
+encodeValidateOn : ValidateOn -> Encode.Value
+encodeValidateOn vo =
+    case vo of
+        OnChange ->
+            Encode.string "change"
+
+        OnBlur ->
+            Encode.string "blur"
+
+        OnSubmit ->
+            Encode.string "submit"
+
+
+encodeCheck : ValidationCheck -> Encode.Value
+encodeCheck check =
+    Encode.object
+        [ ( "type", encodeCheckType check.type_ )
+        , ( "args", Encode.dict identity JsonRender.Internal.PropValue.encode check.args )
+        , ( "message", Encode.string check.message )
+        ]
+
+
+encodeValidationConfig : ValidationConfig -> Encode.Value
+encodeValidationConfig config =
+    Encode.object
+        [ ( "checks", Encode.list encodeCheck config.checks )
+        , ( "validateOn", encodeValidateOn config.validateOn )
+        ]
+
+
+configDecoder : Decode.Decoder ValidationConfig
+configDecoder =
+    Decode.map3 (\checks validateOn enabled -> { checks = checks, validateOn = validateOn, enabled = enabled })
+        (Decode.field "checks" (Decode.list checkDecoder))
+        (Decode.field "validateOn" validateOnDecoder)
+        (Decode.succeed Nothing)
 
 
 

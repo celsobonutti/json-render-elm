@@ -34,6 +34,7 @@ suite =
         , deepArgResolutionSuite
         , pipelineSuite
         , extractValidationSuite
+        , configRoundTripSuite
         ]
 
 
@@ -1204,4 +1205,60 @@ extractValidationSuite =
 
                     Nothing ->
                         Expect.fail "Expected Just, got Nothing"
+        ]
+
+
+
+-- Config round-trip tests
+
+
+configRoundTripSuite : Test
+configRoundTripSuite =
+    describe "config round-trip"
+        [ test "encodeValidationConfig >> configDecoder round-trips" <|
+            \_ ->
+                let
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn Required
+                              , args = Dict.empty
+                              , message = "Field is required"
+                              }
+                            , { type_ = BuiltIn MinLength
+                              , args = Dict.fromList [ ( "min", IntValue 3 ) ]
+                              , message = "Too short"
+                              }
+                            ]
+                        , validateOn = OnBlur
+                        , enabled = Nothing
+                        }
+
+                    encoded =
+                        Validation.encodeValidationConfig config
+
+                    decoded =
+                        Decode.decodeValue Validation.configDecoder encoded
+                in
+                decoded |> Expect.equal (Ok config)
+        , test "round-trips custom check type" <|
+            \_ ->
+                let
+                    config =
+                        { checks =
+                            [ { type_ = Custom "myValidator"
+                              , args = Dict.empty
+                              , message = "Custom failed"
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    encoded =
+                        Validation.encodeValidationConfig config
+
+                    decoded =
+                        Decode.decodeValue Validation.configDecoder encoded
+                in
+                decoded |> Expect.equal (Ok config)
         ]
