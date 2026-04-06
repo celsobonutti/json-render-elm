@@ -51,7 +51,7 @@ decodeTestAction name params =
 
 testModel : Encode.Value -> Actions.Model
 testModel state =
-    { spec = Nothing, state = state, seed = Random.initialSeed 42, validationState = Dict.empty }
+    { spec = Nothing, state = state, seed = Random.initialSeed 42, validationState = Dict.empty, validationRegistry = Dict.empty }
 
 
 executeAction : String -> List ( String, PropValue ) -> Msg TestAction
@@ -1161,6 +1161,7 @@ suite =
                             , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "test@example.com" ) ] ) ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
+                            , validationRegistry = Dict.empty
                             }
 
                         binding =
@@ -1194,6 +1195,7 @@ suite =
                             , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "" ) ] ) ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
+                            , validationRegistry = Dict.empty
                             }
 
                         binding =
@@ -1239,6 +1241,7 @@ suite =
                             , state = Encode.object [ ( "form", Encode.object [ ( "name", Encode.string "Alice" ) ] ) ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
+                            , validationRegistry = Dict.empty
                             }
 
                         binding =
@@ -1283,6 +1286,7 @@ suite =
                                     ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
+                            , validationRegistry = Dict.empty
                             }
 
                         binding =
@@ -1330,6 +1334,7 @@ suite =
                             , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "" ) ] ) ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
+                            , validationRegistry = Dict.empty
                             }
 
                         ( newModel, _ ) =
@@ -1363,6 +1368,7 @@ suite =
                             , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "test@example.com" ) ] ) ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
+                            , validationRegistry = Dict.empty
                             }
 
                         ( newModel, _ ) =
@@ -1381,6 +1387,65 @@ suite =
                             Actions.update Dict.empty testActionConfig (ValidateField "/form/email") model
                     in
                     Expect.equal Dict.empty newModel.validationState
+            ]
+        , describe "RegisterValidation / UnregisterValidation"
+            [ test "RegisterValidation adds config to validationRegistry" <|
+                \_ ->
+                    let
+                        config =
+                            { checks =
+                                [ { type_ = Validation.BuiltIn Validation.Required
+                                  , args = Dict.empty
+                                  , message = "Required"
+                                  }
+                                ]
+                            , validateOn = OnSubmit
+                            , enabled = Nothing
+                            }
+
+                        model =
+                            testModel (Encode.object [])
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (RegisterValidation "/form/email" config) model
+                    in
+                    Dict.member "/form/email" newModel.validationRegistry
+                        |> Expect.equal True
+            , test "UnregisterValidation removes config from validationRegistry" <|
+                \_ ->
+                    let
+                        config =
+                            { checks =
+                                [ { type_ = Validation.BuiltIn Validation.Required
+                                  , args = Dict.empty
+                                  , message = "Required"
+                                  }
+                                ]
+                            , validateOn = OnSubmit
+                            , enabled = Nothing
+                            }
+
+                        model =
+                            testModel (Encode.object [])
+
+                        ( registered, _ ) =
+                            Actions.update Dict.empty testActionConfig (RegisterValidation "/form/email" config) model
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (UnregisterValidation "/form/email") registered
+                    in
+                    Dict.member "/form/email" newModel.validationRegistry
+                        |> Expect.equal False
+            , test "UnregisterValidation on missing path is no-op" <|
+                \_ ->
+                    let
+                        model =
+                            testModel (Encode.object [])
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (UnregisterValidation "/form/ghost") model
+                    in
+                    Expect.equal Dict.empty newModel.validationRegistry
             ]
         ]
 

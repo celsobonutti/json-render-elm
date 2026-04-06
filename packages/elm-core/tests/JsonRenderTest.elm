@@ -160,6 +160,7 @@ suite =
                                     [ ( "existing", Encode.string "keep me" ) ]
                             , seed = testSeed
                             , validationState = Dict.empty
+                            , validationRegistry = Dict.empty
                             }
 
                         result =

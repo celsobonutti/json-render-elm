@@ -72,6 +72,7 @@ init seed =
     , state = Encode.object []
     , seed = seed
     , validationState = Dict.empty
+    , validationRegistry = Dict.empty
     }
 
 

@@ -30,6 +30,7 @@ type alias Model =
     , state : Value
     , seed : Random.Seed
     , validationState : Dict String Validation.FieldValidation
+    , validationRegistry : Dict String Validation.ValidationConfig
     }
 
 
@@ -59,6 +60,8 @@ type Msg action
     | ActionError String
     | ValidateField String
     | ValidateAndEmit String String (Maybe RepeatContext)
+    | RegisterValidation String Validation.ValidationConfig
+    | UnregisterValidation String
 
 
 update : Resolve.FunctionDict -> ActionConfig action -> Msg action -> Model -> ( Model, Cmd (Msg action) )
@@ -78,6 +81,12 @@ update functions config msg model =
 
         ValidateField path ->
             ( validateFieldHelper functions model path, Cmd.none )
+
+        RegisterValidation path validationConfig ->
+            ( { model | validationRegistry = Dict.insert path validationConfig model.validationRegistry }, Cmd.none )
+
+        UnregisterValidation path ->
+            ( { model | validationRegistry = Dict.remove path model.validationRegistry }, Cmd.none )
 
         ValidateAndEmit path eventName repeatCtx ->
             let
