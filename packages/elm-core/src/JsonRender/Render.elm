@@ -271,7 +271,19 @@ render : Registry (Msg action) -> Value -> Dict String Validation.FieldValidatio
 render registry state validationState spec =
     case Dict.get spec.root spec.elements of
         Just element ->
-            renderElement registry state validationState Nothing spec element
+            Html.node "jr-validation-root"
+                [ Html.Attributes.style "display" "contents"
+                , Html.Events.on "validation-register"
+                    (Decode.map2 RegisterValidation
+                        (Decode.at [ "detail", "path" ] Decode.string)
+                        (Decode.at [ "detail", "config" ] (Decode.string |> Decode.andThen decodeConfigString))
+                    )
+                , Html.Events.on "validation-unregister"
+                    (Decode.at [ "detail", "path" ] Decode.string
+                        |> Decode.map UnregisterValidation
+                    )
+                ]
+                [ renderElement registry state validationState Nothing spec element ]
 
         Nothing ->
             Html.text ""
@@ -371,16 +383,57 @@ renderElementInner registry state validationState repeatCtx spec element =
 
                 watcherTriggers =
                     renderWatcherTriggers state repeatCtx element.watch
+
+                validationFields =
+                    case Validation.extractValidation element.checks element.validateOn element.enabled element.props of
+                        Just ( path, config ) ->
+                            let
+                                isEnabled =
+                                    case config.enabled of
+                                        Just condition ->
+                                            Visibility.evaluate state repeatCtx condition
+                                                |> Result.withDefault True
+
+                                        Nothing ->
+                                            True
+                            in
+                            if isEnabled then
+                                [ Html.node "validation-field"
+                                    [ Html.Attributes.attribute "data-path" path
+                                    , Html.Attributes.attribute "data-config"
+                                        (Encode.encode 0 (Validation.encodeValidationConfig config))
+                                    ]
+                                    []
+                                ]
+
+                            else
+                                []
+
+                        Nothing ->
+                            []
+
+                siblings =
+                    watcherTriggers ++ validationFields
             in
-            if List.isEmpty watcherTriggers then
+            if List.isEmpty siblings then
                 componentHtml
 
             else
                 Html.div [ Html.Attributes.style "display" "contents" ]
-                    (componentHtml :: watcherTriggers)
+                    (componentHtml :: siblings)
 
         Nothing ->
             Html.text ""
+
+
+decodeConfigString : String -> Decode.Decoder Validation.ValidationConfig
+decodeConfigString jsonStr =
+    case Decode.decodeString Validation.configDecoder jsonStr of
+        Ok config ->
+            Decode.succeed config
+
+        Err err ->
+            Decode.fail (Decode.errorToString err)
 
 
 renderWatcherTriggers : Value -> Maybe RepeatContext -> Dict String EventHandler -> List (Html (Msg action))
