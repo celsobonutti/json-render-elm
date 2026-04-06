@@ -5,7 +5,8 @@ import Expect
 import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender.Internal.Condition as Condition
-import JsonRender.Internal.PropValue exposing (PropValue(..))
+import JsonRender.Internal.PropValue exposing (ConditionExpr(..), PropValue(..))
+import JsonRender.Resolve as Resolve
 import JsonRender.Validation as Validation
     exposing
         ( BuiltInCheck(..)
@@ -35,6 +36,7 @@ suite =
         , pipelineSuite
         , extractValidationSuite
         , configRoundTripSuite
+        , complexExprArgsSuite
         ]
 
 
@@ -1337,4 +1339,267 @@ configRoundTripSuite =
 
                     Err err ->
                         Expect.fail (Decode.errorToString err)
+        ]
+
+
+
+-- complex expression args tests
+
+
+complexExprArgsSuite : Test
+complexExprArgsSuite =
+    describe "complex expression args"
+        [ test "$computed in check args resolves function result" <|
+            \_ ->
+                let
+                    functions =
+                        Dict.fromList
+                            [ ( "getMinLength"
+                              , \args ->
+                                    case Dict.get "base" args of
+                                        Just (Resolve.RInt n) ->
+                                            Resolve.RInt (n + 2)
+
+                                        _ ->
+                                            Resolve.RError "expected int"
+                              )
+                            ]
+
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn MinLength
+                              , args = Dict.fromList
+                                    [ ( "min", ComputedExpr "getMinLength" (Dict.fromList [ ( "base", IntValue 3 ) ]) ) ]
+                              , message = "Too short"
+                              , raw = Encode.null
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    -- "ab" has length 2, minLength is 3+2=5, should fail
+                    fieldValue =
+                        Encode.string "ab"
+
+                    state =
+                        Encode.object []
+
+                    result =
+                        Validation.runValidation Dict.empty functions config fieldValue state Nothing
+                in
+                Expect.equal False result.valid
+        , test "$computed in check args — passing when value meets computed min" <|
+            \_ ->
+                let
+                    functions =
+                        Dict.fromList
+                            [ ( "getMinLength"
+                              , \args ->
+                                    case Dict.get "base" args of
+                                        Just (Resolve.RInt n) ->
+                                            Resolve.RInt (n + 2)
+
+                                        _ ->
+                                            Resolve.RError "expected int"
+                              )
+                            ]
+
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn MinLength
+                              , args = Dict.fromList
+                                    [ ( "min", ComputedExpr "getMinLength" (Dict.fromList [ ( "base", IntValue 3 ) ]) ) ]
+                              , message = "Too short"
+                              , raw = Encode.null
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    -- "hello" has length 5, minLength is 5, should pass
+                    fieldValue =
+                        Encode.string "hello"
+
+                    state =
+                        Encode.object []
+
+                    result =
+                        Validation.runValidation Dict.empty functions config fieldValue state Nothing
+                in
+                Expect.equal True result.valid
+        , test "$cond in check args resolves conditional value" <|
+            \_ ->
+                let
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn Matches
+                              , args =
+                                    Dict.fromList
+                                        [ ( "other"
+                                          , ConditionalExpr
+                                                (TruthyExpr (StateExpr "/useCustom"))
+                                                (StateExpr "/customValue")
+                                                (StringValue "default")
+                                          )
+                                        ]
+                              , message = "Must match"
+                              , raw = Encode.null
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    -- /useCustom is false, so $cond resolves to "default"
+                    state =
+                        Encode.object
+                            [ ( "useCustom", Encode.bool False )
+                            , ( "customValue", Encode.string "custom" )
+                            ]
+
+                    fieldValue =
+                        Encode.string "default"
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config fieldValue state Nothing
+                in
+                Expect.equal True result.valid
+        , test "$cond in check args — fails when field doesn't match resolved branch" <|
+            \_ ->
+                let
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn Matches
+                              , args =
+                                    Dict.fromList
+                                        [ ( "other"
+                                          , ConditionalExpr
+                                                (TruthyExpr (StateExpr "/useCustom"))
+                                                (StateExpr "/customValue")
+                                                (StringValue "default")
+                                          )
+                                        ]
+                              , message = "Must match"
+                              , raw = Encode.null
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    -- /useCustom is true, so $cond resolves to /customValue = "custom"
+                    state =
+                        Encode.object
+                            [ ( "useCustom", Encode.bool True )
+                            , ( "customValue", Encode.string "custom" )
+                            ]
+
+                    fieldValue =
+                        Encode.string "default"
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config fieldValue state Nothing
+                in
+                Expect.equal False result.valid
+        , test "$item in check args resolves to absolute state path string" <|
+            \_ ->
+                let
+                    repeatCtx =
+                        Just
+                            { item = Encode.object []
+                            , index = 0
+                            , basePath = "/users/0"
+                            }
+
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn Matches
+                              , args = Dict.fromList [ ( "other", ItemExpr "confirmPassword" ) ]
+                              , message = "Must match path"
+                              , raw = Encode.null
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    -- $item "confirmPassword" in action context resolves to the absolute path string "/users/0/confirmPassword"
+                    fieldValue =
+                        Encode.string "/users/0/confirmPassword"
+
+                    state =
+                        Encode.object []
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config fieldValue state repeatCtx
+                in
+                Expect.equal True result.valid
+        , test "$item in check args — fails when field value doesn't match resolved path" <|
+            \_ ->
+                let
+                    repeatCtx =
+                        Just
+                            { item = Encode.object []
+                            , index = 0
+                            , basePath = "/users/0"
+                            }
+
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn Matches
+                              , args = Dict.fromList [ ( "other", ItemExpr "confirmPassword" ) ]
+                              , message = "Must match path"
+                              , raw = Encode.null
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    -- $item "confirmPassword" resolves to "/users/0/confirmPassword", but fieldValue is different
+                    fieldValue =
+                        Encode.string "secret123"
+
+                    state =
+                        Encode.object []
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config fieldValue state repeatCtx
+                in
+                Expect.equal False result.valid
+        , test "$index in check args resolves to current index" <|
+            \_ ->
+                let
+                    repeatCtx =
+                        Just
+                            { item = Encode.object []
+                            , index = 5
+                            , basePath = "/items/5"
+                            }
+
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn Min
+                              , args = Dict.fromList [ ( "min", IndexExpr ) ]
+                              , message = "Must be at least index value"
+                              , raw = Encode.null
+                              }
+                            ]
+                        , validateOn = OnSubmit
+                        , enabled = Nothing
+                        }
+
+                    fieldValue =
+                        Encode.int 3
+
+                    state =
+                        Encode.object []
+
+                    result =
+                        Validation.runValidation Dict.empty Dict.empty config fieldValue state repeatCtx
+                in
+                -- value 3 < index 5, so min check fails
+                Expect.equal False result.valid
         ]
