@@ -1161,7 +1161,20 @@ suite =
                             , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "test@example.com" ) ] ) ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
-                            , validationRegistry = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/email"
+                                      , { checks =
+                                            [ { type_ = BuiltIn Required
+                                              , args = Dict.empty
+                                              , message = "Email is required"
+                                              }
+                                            ]
+                                        , validateOn = OnSubmit
+                                        , enabled = Nothing
+                                        }
+                                      )
+                                    ]
                             }
 
                         binding =
@@ -1195,7 +1208,20 @@ suite =
                             , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "" ) ] ) ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
-                            , validationRegistry = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/email"
+                                      , { checks =
+                                            [ { type_ = BuiltIn Required
+                                              , args = Dict.empty
+                                              , message = "Email is required"
+                                              }
+                                            ]
+                                        , validateOn = OnSubmit
+                                        , enabled = Nothing
+                                        }
+                                      )
+                                    ]
                             }
 
                         binding =
@@ -1241,7 +1267,20 @@ suite =
                             , state = Encode.object [ ( "form", Encode.object [ ( "name", Encode.string "Alice" ) ] ) ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
-                            , validationRegistry = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/name"
+                                      , { checks =
+                                            [ { type_ = BuiltIn Required
+                                              , args = Dict.empty
+                                              , message = "Name is required"
+                                              }
+                                            ]
+                                        , validateOn = OnSubmit
+                                        , enabled = Nothing
+                                        }
+                                      )
+                                    ]
                             }
 
                         binding =
@@ -1286,7 +1325,31 @@ suite =
                                     ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
-                            , validationRegistry = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/email"
+                                      , { checks =
+                                            [ { type_ = BuiltIn Required
+                                              , args = Dict.empty
+                                              , message = "Email is required"
+                                              }
+                                            ]
+                                        , validateOn = OnSubmit
+                                        , enabled = Nothing
+                                        }
+                                      )
+                                    , ( "/form/name"
+                                      , { checks =
+                                            [ { type_ = BuiltIn Required
+                                              , args = Dict.empty
+                                              , message = "Name is required"
+                                              }
+                                            ]
+                                        , validateOn = OnSubmit
+                                        , enabled = Nothing
+                                        }
+                                      )
+                                    ]
                             }
 
                         binding =
@@ -1334,7 +1397,20 @@ suite =
                             , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "" ) ] ) ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
-                            , validationRegistry = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/email"
+                                      , { checks =
+                                            [ { type_ = BuiltIn Required
+                                              , args = Dict.empty
+                                              , message = "Email is required"
+                                              }
+                                            ]
+                                        , validateOn = OnSubmit
+                                        , enabled = Nothing
+                                        }
+                                      )
+                                    ]
                             }
 
                         ( newModel, _ ) =
@@ -1368,7 +1444,20 @@ suite =
                             , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "test@example.com" ) ] ) ]
                             , seed = Random.initialSeed 42
                             , validationState = Dict.empty
-                            , validationRegistry = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/email"
+                                      , { checks =
+                                            [ { type_ = BuiltIn Required
+                                              , args = Dict.empty
+                                              , message = "Email is required"
+                                              }
+                                            ]
+                                        , validateOn = OnSubmit
+                                        , enabled = Nothing
+                                        }
+                                      )
+                                    ]
                             }
 
                         ( newModel, _ ) =
@@ -1377,7 +1466,7 @@ suite =
                     Dict.get "/form/email" newModel.validationState
                         |> Maybe.map .errors
                         |> Expect.equal (Just [])
-            , test "ValidateField with no spec does nothing" <|
+            , test "ValidateField with no registry entry produces valid empty result" <|
                 \_ ->
                     let
                         model =
@@ -1386,7 +1475,9 @@ suite =
                         ( newModel, _ ) =
                             Actions.update Dict.empty testActionConfig (ValidateField "/form/email") model
                     in
-                    Expect.equal Dict.empty newModel.validationState
+                    Dict.get "/form/email" newModel.validationState
+                        |> Maybe.map .errors
+                        |> Expect.equal (Just [])
             ]
         , describe "RegisterValidation / UnregisterValidation"
             [ test "RegisterValidation adds config to validationRegistry" <|

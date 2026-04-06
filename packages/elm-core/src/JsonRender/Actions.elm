@@ -317,46 +317,53 @@ applyAction functions config resolved model =
             ( { model | state = State.remove fullPath model.state }, Cmd.none )
 
         ValidateForm { statePath } ->
-            case model.spec of
-                Just spec ->
-                    let
-                        allFieldValidations =
-                            collectValidations functions spec model.state
+            let
+                allFieldValidations =
+                    Dict.foldl
+                        (\path validationConfig acc ->
+                            let
+                                fieldValue =
+                                    State.get path model.state |> Maybe.withDefault Encode.null
 
-                        allValid =
-                            List.all (\( _, result ) -> result.valid) allFieldValidations
+                                result =
+                                    Validation.runValidation Dict.empty functions validationConfig fieldValue model.state Nothing
+                            in
+                            ( path, result ) :: acc
+                        )
+                        []
+                        model.validationRegistry
 
-                        errorsObject =
-                            allFieldValidations
-                                |> List.filter (\( _, result ) -> not result.valid)
-                                |> List.map (\( path, result ) -> ( path, Encode.list Encode.string result.errors ))
-                                |> Encode.object
+                allValid =
+                    List.all (\( _, result ) -> result.valid) allFieldValidations
 
-                        resultValue =
-                            Encode.object
-                                [ ( "valid", Encode.bool allValid )
-                                , ( "errors", errorsObject )
-                                ]
+                errorsObject =
+                    allFieldValidations
+                        |> List.filter (\( _, result ) -> not result.valid)
+                        |> List.map (\( path, result ) -> ( path, Encode.list Encode.string result.errors ))
+                        |> Encode.object
 
-                        newValidationState =
-                            List.foldl
-                                (\( path, result ) acc ->
-                                    Dict.insert path
-                                        { errors = result.errors, touched = True, validated = True }
-                                        acc
-                                )
-                                model.validationState
-                                allFieldValidations
-                    in
-                    ( { model
-                        | state = State.set statePath resultValue model.state
-                        , validationState = newValidationState
-                      }
-                    , Cmd.none
-                    )
+                resultValue =
+                    Encode.object
+                        [ ( "valid", Encode.bool allValid )
+                        , ( "errors", errorsObject )
+                        ]
 
-                Nothing ->
-                    ( model, Cmd.none )
+                newValidationState =
+                    List.foldl
+                        (\( path, result ) acc ->
+                            Dict.insert path
+                                { errors = result.errors, touched = True, validated = True }
+                                acc
+                        )
+                        model.validationState
+                        allFieldValidations
+            in
+            ( { model
+                | state = State.set statePath resultValue model.state
+                , validationState = newValidationState
+              }
+            , Cmd.none
+            )
 
         CustomAction action ->
             config.handleAction action model
@@ -368,78 +375,27 @@ applyAction functions config resolved model =
 
 validateFieldHelper : Resolve.FunctionDict -> Model -> String -> Model
 validateFieldHelper functions model path =
-    case model.spec of
-        Just spec ->
-            let
-                maybeConfig =
-                    findValidationConfig spec path
+    let
+        maybeConfig =
+            Dict.get path model.validationRegistry
 
-                fieldValue =
-                    State.get path model.state |> Maybe.withDefault Encode.null
+        fieldValue =
+            State.get path model.state |> Maybe.withDefault Encode.null
 
-                result =
-                    case maybeConfig of
-                        Just config_ ->
-                            Validation.runValidation Dict.empty functions config_ fieldValue model.state Nothing
-
-                        Nothing ->
-                            { valid = True, errors = [] }
-
-                newValidationState =
-                    Dict.insert path
-                        { errors = result.errors, touched = True, validated = True }
-                        model.validationState
-            in
-            { model | validationState = newValidationState }
-
-        Nothing ->
-            model
-
-
-collectValidations : Resolve.FunctionDict -> Spec -> Value -> List ( String, Validation.ValidationResult )
-collectValidations functions spec state =
-    Dict.foldl
-        (\_ element acc ->
-            case Validation.extractValidation element.checks element.validateOn element.enabled element.props of
-                Just ( path, validationConfig ) ->
-                    let
-                        fieldValue =
-                            State.get path state |> Maybe.withDefault Encode.null
-
-                        result =
-                            Validation.runValidation Dict.empty functions validationConfig fieldValue state Nothing
-                    in
-                    ( path, result ) :: acc
+        result =
+            case maybeConfig of
+                Just config_ ->
+                    Validation.runValidation Dict.empty functions config_ fieldValue model.state Nothing
 
                 Nothing ->
-                    acc
-        )
-        []
-        spec.elements
+                    { valid = True, errors = [] }
 
-
-findValidationConfig : Spec -> String -> Maybe Validation.ValidationConfig
-findValidationConfig spec path =
-    Dict.foldl
-        (\_ element acc ->
-            case acc of
-                Just _ ->
-                    acc
-
-                Nothing ->
-                    case Validation.extractValidation element.checks element.validateOn element.enabled element.props of
-                        Just ( p, cfg ) ->
-                            if p == path then
-                                Just cfg
-
-                            else
-                                Nothing
-
-                        Nothing ->
-                            Nothing
-        )
-        Nothing
-        spec.elements
+        newValidationState =
+            Dict.insert path
+                { errors = result.errors, touched = True, validated = True }
+                model.validationState
+    in
+    { model | validationState = newValidationState }
 
 
 findElementByBindPath : Spec -> String -> Maybe Spec.Element
