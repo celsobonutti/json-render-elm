@@ -18,6 +18,8 @@ module JsonRender.Internal.ElmCodeGen exposing
     , propsDecoder
     , propsTypeAlias
     , registryModule
+    , validationDecoder
+    , validationTypeAlias
     )
 
 import Dict exposing (Dict)
@@ -206,10 +208,18 @@ propsDecoder componentName schema =
 bindingsTypeAlias : String -> ComponentSchema -> String
 bindingsTypeAlias componentName schema =
     let
-        fields =
+        bindableFields =
             Dict.toList schema.fields
+                |> List.filter (\( name, _ ) -> List.member name schema.bindable)
                 |> List.sortBy Tuple.first
-                |> List.map
+    in
+    if List.isEmpty bindableFields then
+        ""
+
+    else
+        let
+            fields =
+                List.map
                     (\( name, field ) ->
                         ( name
                         , CG.maybeAnn
@@ -219,12 +229,13 @@ bindingsTypeAlias componentName schema =
                             )
                         )
                     )
-    in
-    CG.aliasDecl Nothing
-        (componentName ++ "Bindings")
-        [ "msg" ]
-        (CG.recordAnn fields)
-        |> renderDecl
+                    bindableFields
+        in
+        CG.aliasDecl Nothing
+            (componentName ++ "Bindings")
+            [ "msg" ]
+            (CG.recordAnn fields)
+            |> renderDecl
 
 
 fieldToEncoderExpr : String -> SchemaParser.FieldType -> CG.Expression
@@ -269,33 +280,95 @@ fieldToEncoderExpr fieldName fieldType =
 bindingsDecoder : String -> ComponentSchema -> String
 bindingsDecoder componentName schema =
     let
-        fields =
+        bindableFields =
             Dict.toList schema.fields
+                |> List.filter (\( name, _ ) -> List.member name schema.bindable)
                 |> List.sortBy Tuple.first
-
-        pipelineSteps =
-            List.map
-                (\( name, field ) ->
-                    CG.apply
-                        [ CG.fqVal [ "Bind" ] "bindableTyped"
-                        , CG.string name
-                        , fieldToEncoderExpr name field.fieldType
-                        ]
-                )
-                fields
-
-        body =
-            CG.pipe
-                (CG.apply [ CG.fqVal [ "Bind" ] "succeed", CG.val (componentName ++ "Bindings") ])
-                pipelineSteps
-
-        typeAnn =
-            CG.funAnn
-                (CG.typed "Dict" [ CG.stringAnn, CG.funAnn (CG.typed "Value" []) (CG.typed "EventHandle" [ CG.typeVar "msg" ]) ])
-                (CG.typed (componentName ++ "Bindings") [ CG.typeVar "msg" ])
     in
-    CG.funDecl Nothing (Just typeAnn) "bindingsDecoder" [] body
-        |> renderDecl
+    if List.isEmpty bindableFields then
+        ""
+
+    else
+        let
+            pipelineSteps =
+                List.map
+                    (\( name, field ) ->
+                        CG.apply
+                            [ CG.fqVal [ "Bind" ] "bindableTyped"
+                            , CG.string name
+                            , fieldToEncoderExpr name field.fieldType
+                            ]
+                    )
+                    bindableFields
+
+            body =
+                CG.pipe
+                    (CG.apply [ CG.fqVal [ "Bind" ] "succeed", CG.val (componentName ++ "Bindings") ])
+                    pipelineSteps
+
+            typeAnn =
+                CG.funAnn
+                    (CG.typed "Dict" [ CG.stringAnn, CG.funAnn (CG.typed "Value" []) (CG.typed "EventHandle" [ CG.typeVar "msg" ]) ])
+                    (CG.typed (componentName ++ "Bindings") [ CG.typeVar "msg" ])
+        in
+        CG.funDecl Nothing (Just typeAnn) "bindingsDecoder" [] body
+            |> renderDecl
+
+
+validationTypeAlias : String -> ComponentSchema -> String
+validationTypeAlias componentName schema =
+    if List.isEmpty schema.validatable then
+        ""
+
+    else
+        let
+            fields =
+                schema.validatable
+                    |> List.sort
+                    |> List.map
+                        (\name ->
+                            ( name
+                            , CG.maybeAnn (CG.typed "FieldValidation" [])
+                            )
+                        )
+        in
+        CG.aliasDecl Nothing
+            (componentName ++ "Validation")
+            []
+            (CG.recordAnn fields)
+            |> renderDecl
+
+
+validationDecoder : String -> ComponentSchema -> String
+validationDecoder componentName schema =
+    if List.isEmpty schema.validatable then
+        ""
+
+    else
+        let
+            pipelineSteps =
+                schema.validatable
+                    |> List.sort
+                    |> List.map
+                        (\name ->
+                            CG.apply
+                                [ CG.fqVal [ "Validation" ] "field"
+                                , CG.string name
+                                ]
+                        )
+
+            body =
+                CG.pipe
+                    (CG.apply [ CG.fqVal [ "Validation" ] "succeed", CG.val (componentName ++ "Validation") ])
+                    pipelineSteps
+
+            typeAnn =
+                CG.funAnn
+                    (CG.typed "Dict" [ CG.stringAnn, CG.typed "FieldValidation" [] ])
+                    (CG.typed (componentName ++ "Validation") [])
+        in
+        CG.funDecl Nothing (Just typeAnn) "validationDecoder" [] body
+            |> renderDecl
 
 
 generatedComment : String -> ComponentSchema -> String
@@ -304,8 +377,14 @@ generatedComment componentName schema =
         enums =
             collectEnumsFromFields schema.fields
 
+        bindableEnums =
+            collectEnumsFromBindableFields schema
+
         objects =
             collectObjectFields schema.fields
+
+        bindableObjects =
+            collectBindableObjectFields schema
 
         enumEntries =
             List.concatMap
@@ -316,11 +395,19 @@ generatedComment componentName schema =
 
                         baseName =
                             TypeMapping.enumFnBaseName variants
+
+                        hasToString =
+                            List.member variants bindableEnums
                     in
                     [ "   - type " ++ typeName
                     , "   - " ++ baseName ++ "FromString"
-                    , "   - " ++ baseName ++ "ToString"
                     ]
+                        ++ (if hasToString then
+                                [ "   - " ++ baseName ++ "ToString" ]
+
+                            else
+                                []
+                           )
                 )
                 enums
 
@@ -333,21 +420,64 @@ generatedComment componentName schema =
 
                         baseName =
                             objectFnBaseName fieldName
+
+                        hasEncoder =
+                            List.any (\( n, _ ) -> n == fieldName) bindableObjects
                     in
                     [ "   - type alias " ++ typeName
                     , "   - " ++ baseName ++ "Decoder"
-                    , "   - " ++ baseName ++ "Encoder"
                     ]
+                        ++ (if hasEncoder then
+                                [ "   - " ++ baseName ++ "Encoder" ]
+
+                            else
+                                []
+                           )
                 )
                 objects
 
+        hasBindable =
+            not (List.isEmpty schema.bindable)
+
+        hasValidatable =
+            not (List.isEmpty schema.validatable)
+
+        bindingsTypeEntries =
+            if hasBindable then
+                [ "   - type alias " ++ componentName ++ "Bindings" ]
+
+            else
+                []
+
+        validationTypeEntries =
+            if hasValidatable then
+                [ "   - type alias " ++ componentName ++ "Validation" ]
+
+            else
+                []
+
+        bindingsDecoderEntries =
+            if hasBindable then
+                [ "   - bindingsDecoder" ]
+
+            else
+                []
+
+        validationDecoderEntries =
+            if hasValidatable then
+                [ "   - validationDecoder" ]
+
+            else
+                []
+
         coreEntries =
-            [ "   - type alias " ++ componentName ++ "Props"
-            , "   - type alias " ++ componentName ++ "Bindings"
-            , "   - propsDecoder"
-            , "   - bindingsDecoder"
-            , "   - component"
-            ]
+            [ "   - type alias " ++ componentName ++ "Props" ]
+                ++ bindingsTypeEntries
+                ++ validationTypeEntries
+                ++ [ "   - propsDecoder" ]
+                ++ bindingsDecoderEntries
+                ++ validationDecoderEntries
+                ++ [ "   - component" ]
 
         allEntries =
             enumEntries ++ objectEntries ++ coreEntries
@@ -377,8 +507,14 @@ expectedDeclarations componentName schema =
         enums =
             collectEnumsFromFields schema.fields
 
+        bindableEnums =
+            collectEnumsFromBindableFields schema
+
         objects =
             collectObjectFields schema.fields
+
+        bindableObjects =
+            collectBindableObjectFields schema
 
         enumDecls =
             List.concatMap
@@ -389,6 +525,9 @@ expectedDeclarations componentName schema =
 
                         baseName =
                             TypeMapping.enumFnBaseName variants
+
+                        hasToString =
+                            List.member variants bindableEnums
                     in
                     [ { name = typeName
                       , kind = CustomTypeDecl
@@ -398,11 +537,17 @@ expectedDeclarations componentName schema =
                       , kind = FunctionDecl
                       , code = TypeMapping.enumFromStringFunction variants
                       }
-                    , { name = baseName ++ "ToString"
-                      , kind = FunctionDecl
-                      , code = TypeMapping.enumToStringFunction variants
-                      }
                     ]
+                        ++ (if hasToString then
+                                [ { name = baseName ++ "ToString"
+                                  , kind = FunctionDecl
+                                  , code = TypeMapping.enumToStringFunction variants
+                                  }
+                                ]
+
+                            else
+                                []
+                           )
                 )
                 enums
 
@@ -498,6 +643,8 @@ expectedDeclarations componentName schema =
                         encoderCode =
                             CG.funDecl Nothing (Just encoderTypeAnn) (baseName ++ "Encoder") [ CG.varPattern "record" ] encoderBody
                                 |> renderDecl
+                        isBindable =
+                            List.any (\( n, _ ) -> n == fieldName) bindableObjects
                     in
                     [ { name = typeName
                       , kind = TypeAliasDecl
@@ -507,39 +654,103 @@ expectedDeclarations componentName schema =
                       , kind = FunctionDecl
                       , code = decoderCode
                       }
-                    , { name = baseName ++ "Encoder"
-                      , kind = FunctionDecl
-                      , code = encoderCode
-                      }
                     ]
+                        ++ (if isBindable then
+                                [ { name = baseName ++ "Encoder"
+                                  , kind = FunctionDecl
+                                  , code = encoderCode
+                                  }
+                                ]
+
+                            else
+                                []
+                           )
                 )
                 objects
+
+        hasBindable =
+            not (List.isEmpty schema.bindable)
+
+        hasValidatable =
+            not (List.isEmpty schema.validatable)
+
+        bindingsDecls =
+            if hasBindable then
+                [ { name = componentName ++ "Bindings"
+                  , kind = TypeAliasDecl
+                  , code = bindingsTypeAlias componentName schema
+                  }
+                ]
+
+            else
+                []
+
+        validationDecls =
+            if hasValidatable then
+                [ { name = componentName ++ "Validation"
+                  , kind = TypeAliasDecl
+                  , code = validationTypeAlias componentName schema
+                  }
+                ]
+
+            else
+                []
+
+        bindingsArg =
+            if hasBindable then
+                CG.val "bindingsDecoder"
+
+            else
+                CG.parens (CG.lambda [ CG.allPattern ] CG.unit)
+
+        validationArg =
+            if hasValidatable then
+                CG.val "validationDecoder"
+
+            else
+                CG.parens (CG.lambda [ CG.allPattern ] CG.unit)
 
         coreDecls =
             [ { name = componentName ++ "Props"
               , kind = TypeAliasDecl
               , code = propsTypeAlias componentName schema
               }
-            , { name = componentName ++ "Bindings"
-              , kind = TypeAliasDecl
-              , code = bindingsTypeAlias componentName schema
-              }
-            , { name = "propsDecoder"
-              , kind = FunctionDecl
-              , code = propsDecoder componentName schema
-              }
-            , { name = "bindingsDecoder"
-              , kind = FunctionDecl
-              , code = bindingsDecoder componentName schema
-              }
-            , { name = "component"
-              , kind = FunctionDecl
-              , code =
-                    CG.funDecl Nothing (Just (CG.typed "Component" [ CG.typeVar "msg" ])) "component" []
-                        (CG.apply [ CG.val "register", CG.val "propsDecoder", CG.val "bindingsDecoder", CG.val "view" ])
-                        |> renderDecl
-              }
             ]
+                ++ bindingsDecls
+                ++ validationDecls
+                ++ [ { name = "propsDecoder"
+                     , kind = FunctionDecl
+                     , code = propsDecoder componentName schema
+                     }
+                   ]
+                ++ (if hasBindable then
+                        [ { name = "bindingsDecoder"
+                          , kind = FunctionDecl
+                          , code = bindingsDecoder componentName schema
+                          }
+                        ]
+
+                    else
+                        []
+                   )
+                ++ (if hasValidatable then
+                        [ { name = "validationDecoder"
+                          , kind = FunctionDecl
+                          , code = validationDecoder componentName schema
+                          }
+                        ]
+
+                    else
+                        []
+                   )
+                ++ [ { name = "component"
+                     , kind = FunctionDecl
+                     , code =
+                        CG.funDecl Nothing (Just (CG.typed "Component" [ CG.typeVar "msg" ])) "component" []
+                            (CG.apply [ CG.val "register", CG.val "propsDecoder", bindingsArg, validationArg, CG.val "view" ])
+                            |> renderDecl
+                     }
+                   ]
     in
     enumDecls ++ objectDecls ++ coreDecls
 
@@ -559,6 +770,34 @@ componentScaffold namespace componentName schema =
         bodyCode =
             List.map .code decls
                 |> String.join "\n\n\n"
+
+        hasBindable =
+            not (List.isEmpty schema.bindable)
+
+        hasValidatable =
+            not (List.isEmpty schema.validatable)
+
+        jsonEncodeImport =
+            if hasBindable then
+                "import Json.Encode exposing (Value)\n"
+
+            else
+                ""
+
+        bindImport =
+            if hasBindable then
+                "import JsonRender.Bind as Bind\n"
+                    ++ "import JsonRender.Events exposing (EventHandle)\n"
+
+            else
+                ""
+
+        validationImport =
+            if hasValidatable then
+                "import JsonRender.Validation exposing (FieldValidation)\n"
+
+            else
+                ""
     in
     comment
         ++ "\n"
@@ -567,22 +806,43 @@ componentScaffold namespace componentName schema =
         ++ " exposing (component)\n\n"
         ++ "import Dict exposing (Dict)\n"
         ++ "import Html exposing (Html)\n"
-        ++ "import Json.Encode exposing (Value)\n"
-        ++ "import JsonRender.Bind as Bind\n"
-        ++ "import JsonRender.Events exposing (EventHandle)\n"
+        ++ jsonEncodeImport
+        ++ bindImport
+        ++ validationImport
         ++ "import JsonRender.Render exposing (Component, ComponentContext, register)\n"
         ++ "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)\n\n\n"
         ++ bodyCode
 
 
-defaultViewFunction : String -> String
-defaultViewFunction componentName =
+defaultViewFunction : String -> ComponentSchema -> String
+defaultViewFunction componentName schema =
     let
+        hasBindable =
+            not (List.isEmpty schema.bindable)
+
+        hasValidatable =
+            not (List.isEmpty schema.validatable)
+
+        bindingsType =
+            if hasBindable then
+                CG.typed (componentName ++ "Bindings") [ CG.typeVar "msg" ]
+
+            else
+                CG.unitAnn
+
+        validationType =
+            if hasValidatable then
+                CG.typed (componentName ++ "Validation") []
+
+            else
+                CG.unitAnn
+
         typeAnn =
             CG.funAnn
                 (CG.typed "ComponentContext"
                     [ CG.typed (componentName ++ "Props") []
-                    , CG.typed (componentName ++ "Bindings") [ CG.typeVar "msg" ]
+                    , bindingsType
+                    , validationType
                     , CG.typeVar "msg"
                     ]
                 )
@@ -596,7 +856,7 @@ componentModule : String -> String -> ComponentSchema -> String
 componentModule namespace componentName schema =
     componentScaffold namespace componentName schema
         ++ "\n\n\n"
-        ++ defaultViewFunction componentName
+        ++ defaultViewFunction componentName schema
 
 
 actionParamsType : String -> ActionSchema -> String
@@ -871,6 +1131,29 @@ enumHelpersWithDecoder variants =
 collectObjectFields : Dict String SchemaParser.FieldSchema -> List ( String, Dict String SchemaParser.FieldSchema )
 collectObjectFields fields =
     Dict.toList fields
+        |> List.filterMap
+            (\( name, field ) ->
+                case field.fieldType of
+                    FObject subFields ->
+                        Just ( name, subFields )
+
+                    _ ->
+                        Nothing
+            )
+
+
+collectEnumsFromBindableFields : ComponentSchema -> List (List String)
+collectEnumsFromBindableFields schema =
+    Dict.toList schema.fields
+        |> List.filter (\( name, _ ) -> List.member name schema.bindable)
+        |> List.concatMap (\( _, field ) -> collectEnumsFromFieldType field.fieldType)
+        |> dedupLists
+
+
+collectBindableObjectFields : ComponentSchema -> List ( String, Dict String SchemaParser.FieldSchema )
+collectBindableObjectFields schema =
+    Dict.toList schema.fields
+        |> List.filter (\( name, _ ) -> List.member name schema.bindable)
         |> List.filterMap
             (\( name, field ) ->
                 case field.fieldType of

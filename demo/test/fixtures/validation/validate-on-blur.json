@@ -1,0 +1,18 @@
+{
+  "state": { "form": { "name": "" } },
+  "root": "input-1",
+  "elements": {
+    "input-1": {
+      "type": "Input",
+      "props": {
+        "label": "Name",
+        "value": { "$bindState": "/form/name" }
+      },
+      "checks": [
+        { "type": "required", "message": "Name is required" }
+      ],
+      "validateOn": "blur",
+      "children": []
+    }
+  }
+}

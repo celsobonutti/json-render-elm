@@ -1,0 +1,57 @@
+{
+  "state": { "form": { "name": "", "secret": "" }, "result": null },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["name-input", "secret-input", "btn", "status"]
+    },
+    "name-input": {
+      "type": "Input",
+      "props": {
+        "label": "Name",
+        "value": { "$bindState": "/form/name" }
+      },
+      "checks": [
+        { "type": "required", "message": "Name is required" }
+      ],
+      "children": []
+    },
+    "secret-input": {
+      "type": "Input",
+      "props": {
+        "label": "Secret",
+        "value": { "$bindState": "/form/secret" }
+      },
+      "visible": false,
+      "checks": [
+        { "type": "required", "message": "Secret is required" }
+      ],
+      "children": []
+    },
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Submit" },
+      "on": {
+        "press": {
+          "action": "validateForm",
+          "params": { "statePath": "/result" }
+        }
+      },
+      "children": []
+    },
+    "status": {
+      "type": "Text",
+      "props": {
+        "content": {
+          "$cond": { "$state": "/result/valid", "eq": true },
+          "$then": "All valid!",
+          "$else": "Has errors"
+        }
+      },
+      "visible": { "$state": "/result" },
+      "children": []
+    }
+  }
+}

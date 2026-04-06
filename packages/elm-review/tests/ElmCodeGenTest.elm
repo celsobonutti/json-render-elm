@@ -16,6 +16,8 @@ cardSchema =
             ]
     , description = "A card container"
     , slots = [ "default" ]
+    , bindable = []
+    , validatable = []
     }
 
 
@@ -38,6 +40,8 @@ cardWithObjectSchema =
             ]
     , description = "A card with object field"
     , slots = []
+    , bindable = [ "meta", "title" ]
+    , validatable = []
     }
 
 
@@ -50,6 +54,36 @@ badgeSchema =
             ]
     , description = "A badge"
     , slots = []
+    , bindable = [ "color", "label" ]
+    , validatable = []
+    }
+
+
+inputSchema : ComponentSchema
+inputSchema =
+    { fields =
+        Dict.fromList
+            [ ( "label", { fieldType = FString, required = False } )
+            , ( "placeholder", { fieldType = FString, required = False } )
+            , ( "value", { fieldType = FString, required = False } )
+            ]
+    , description = "A text input"
+    , slots = []
+    , bindable = [ "value" ]
+    , validatable = [ "value" ]
+    }
+
+
+noBindSchema : ComponentSchema
+noBindSchema =
+    { fields =
+        Dict.fromList
+            [ ( "content", { fieldType = FString, required = True } )
+            ]
+    , description = "A text block"
+    , slots = []
+    , bindable = []
+    , validatable = []
     }
 
 
@@ -117,7 +151,9 @@ suite =
                 Expect.all
                     [ \c -> String.contains "module Catalog.Components.Card" c |> Expect.equal True
                     , \c -> String.contains "view ctx =" c |> Expect.equal True
-                    , \c -> String.contains "()" c |> Expect.equal True
+                    , \c -> String.contains "register propsDecoder (\\_ -> ()) (\\_ -> ()) view" c |> Expect.equal True
+                    , \c -> String.contains "CardBindings" c |> Expect.equal False
+                    , \c -> String.contains "import JsonRender.Bind" c |> Expect.equal False
                     ]
                     code
         , test "generates registry module" <|
@@ -133,44 +169,35 @@ suite =
                     , \c -> String.contains "( \"Card\", Catalog.Components.Card.component )" c |> Expect.equal True
                     ]
                     code
-        , test "generates bindings type alias" <|
+        , test "generates bindings type alias for bindable component" <|
             \_ ->
                 let
                     code =
-                        ElmCodeGen.bindingsTypeAlias "Card" cardSchema
+                        ElmCodeGen.bindingsTypeAlias "Input" inputSchema
                 in
                 Expect.all
-                    [ \c -> String.contains "type alias CardBindings msg" c |> Expect.equal True
-                    , \c -> String.contains "subtitle : Maybe (String -> EventHandle msg)" c |> Expect.equal True
-                    , \c -> String.contains "title : Maybe (String -> EventHandle msg)" c |> Expect.equal True
+                    [ \c -> String.contains "type alias InputBindings msg" c |> Expect.equal True
+                    , \c -> String.contains "value : Maybe (String -> EventHandle msg)" c |> Expect.equal True
                     ]
                     code
-        , test "generates bindings decoder" <|
+        , test "generates bindings decoder for bindable component" <|
             \_ ->
                 let
                     code =
-                        ElmCodeGen.bindingsDecoder "Card" cardSchema
+                        ElmCodeGen.bindingsDecoder "Input" inputSchema
                 in
                 Expect.all
-                    [ \c -> String.contains "Bind.succeed CardBindings" c |> Expect.equal True
-                    , \c -> String.contains "|> Bind.bindableTyped \"subtitle\" Json.Encode.string" c |> Expect.equal True
-                    , \c -> String.contains "|> Bind.bindableTyped \"title\" Json.Encode.string" c |> Expect.equal True
+                    [ \c -> String.contains "Bind.succeed InputBindings" c |> Expect.equal True
+                    , \c -> String.contains "|> Bind.bindableTyped \"value\" Json.Encode.string" c |> Expect.equal True
                     ]
                     code
-        , test "component module includes bindings" <|
+        , test "non-bindable component produces no bindings" <|
             \_ ->
-                let
-                    code =
-                        ElmCodeGen.componentModule "Catalog" "Card" cardSchema
-                in
                 Expect.all
-                    [ \c -> String.contains "CardBindings" c |> Expect.equal True
-                    , \c -> String.contains "import JsonRender.Bind as Bind" c |> Expect.equal True
-                    , \c -> String.contains "register propsDecoder bindingsDecoder view" c |> Expect.equal True
-                    , \c -> String.contains "import JsonRender.Events exposing (EventHandle)" c |> Expect.equal True
-                    , \c -> String.contains "ComponentContext CardProps (CardBindings msg) msg" c |> Expect.equal True
+                    [ \_ -> ElmCodeGen.bindingsTypeAlias "Card" cardSchema |> Expect.equal ""
+                    , \_ -> ElmCodeGen.bindingsDecoder "Card" cardSchema |> Expect.equal ""
                     ]
-                    code
+                    ()
         , test "generates action params type alias" <|
             \_ ->
                 ElmCodeGen.actionParamsType "Export" exportAction
@@ -462,9 +489,21 @@ suite =
                         """{- This module was generated by the CatalogSync elm-review rule.
    These values were created by the rule, and will be overwritten by it if changed:
    - type alias CardProps
-   - type alias CardBindings
+   - propsDecoder
+   - component
+-}"""
+        , test "generated comment includes bindings when bindable" <|
+            \_ ->
+                ElmCodeGen.generatedComment "Input" inputSchema
+                    |> Expect.equal
+                        """{- This module was generated by the CatalogSync elm-review rule.
+   These values were created by the rule, and will be overwritten by it if changed:
+   - type alias InputProps
+   - type alias InputBindings
+   - type alias InputValidation
    - propsDecoder
    - bindingsDecoder
+   - validationDecoder
    - component
 -}"""
         , test "generated comment includes enum helpers" <|
@@ -497,24 +536,27 @@ suite =
    - bindingsDecoder
    - component
 -}"""
-        , test "expectedDeclarations for simple component has 5 entries" <|
+        , test "expectedDeclarations for non-bindable component has 3 entries" <|
             \_ ->
                 ElmCodeGen.expectedDeclarations "Card" cardSchema
                     |> List.length
-                    |> Expect.equal 5
-        , test "expectedDeclarations names are correct for simple component" <|
+                    |> Expect.equal 3
+        , test "expectedDeclarations names for non-bindable component" <|
             \_ ->
                 ElmCodeGen.expectedDeclarations "Card" cardSchema
                     |> List.map .name
-                    |> Expect.equal [ "CardProps", "CardBindings", "propsDecoder", "bindingsDecoder", "component" ]
-        , test "expectedDeclarations kinds are correct for simple component" <|
+                    |> Expect.equal [ "CardProps", "propsDecoder", "component" ]
+        , test "expectedDeclarations with bindable/validatable includes all" <|
+            \_ ->
+                ElmCodeGen.expectedDeclarations "Input" inputSchema
+                    |> List.map .name
+                    |> Expect.equal [ "InputProps", "InputBindings", "InputValidation", "propsDecoder", "bindingsDecoder", "validationDecoder", "component" ]
+        , test "expectedDeclarations kinds are correct for non-bindable component" <|
             \_ ->
                 ElmCodeGen.expectedDeclarations "Card" cardSchema
                     |> List.map .kind
                     |> Expect.equal
                         [ ElmCodeGen.TypeAliasDecl
-                        , ElmCodeGen.TypeAliasDecl
-                        , ElmCodeGen.FunctionDecl
                         , ElmCodeGen.FunctionDecl
                         , ElmCodeGen.FunctionDecl
                         ]
@@ -578,4 +620,65 @@ suite =
                 ElmCodeGen.componentModule "Catalog" "Card" cardSchema
                     |> String.startsWith "{- This module was generated by the CatalogSync elm-review rule."
                     |> Expect.equal True
+        , test "bindings type alias only includes bindable fields" <|
+            \_ ->
+                let
+                    code =
+                        ElmCodeGen.bindingsTypeAlias "Input" inputSchema
+                in
+                Expect.all
+                    [ \c -> String.contains "value : Maybe" c |> Expect.equal True
+                    , \c -> String.contains "label : Maybe" c |> Expect.equal False
+                    , \c -> String.contains "placeholder : Maybe" c |> Expect.equal False
+                    ]
+                    code
+        , test "bindings decoder only includes bindable fields" <|
+            \_ ->
+                let
+                    code =
+                        ElmCodeGen.bindingsDecoder "Input" inputSchema
+                in
+                Expect.all
+                    [ \c -> String.contains "Bind.bindableTyped \"value\"" c |> Expect.equal True
+                    , \c -> String.contains "Bind.bindableTyped \"label\"" c |> Expect.equal False
+                    ]
+                    code
+        , test "empty bindable produces unit bindings type" <|
+            \_ ->
+                ElmCodeGen.bindingsTypeAlias "Text" noBindSchema
+                    |> Expect.equal ""
+        , test "empty bindable produces unit bindings decoder" <|
+            \_ ->
+                ElmCodeGen.bindingsDecoder "Text" noBindSchema
+                    |> Expect.equal ""
+        , test "validation type alias includes validatable fields" <|
+            \_ ->
+                let
+                    code =
+                        ElmCodeGen.validationTypeAlias "Input" inputSchema
+                in
+                Expect.all
+                    [ \c -> String.contains "type alias InputValidation" c |> Expect.equal True
+                    , \c -> String.contains "value : Maybe FieldValidation" c |> Expect.equal True
+                    ]
+                    code
+        , test "validation decoder includes validatable fields" <|
+            \_ ->
+                let
+                    code =
+                        ElmCodeGen.validationDecoder "Input" inputSchema
+                in
+                Expect.all
+                    [ \c -> String.contains "Validation.succeed InputValidation" c |> Expect.equal True
+                    , \c -> String.contains "Validation.field \"value\"" c |> Expect.equal True
+                    ]
+                    code
+        , test "empty validatable produces no validation type" <|
+            \_ ->
+                ElmCodeGen.validationTypeAlias "Text" noBindSchema
+                    |> Expect.equal ""
+        , test "empty validatable produces no validation decoder" <|
+            \_ ->
+                ElmCodeGen.validationDecoder "Text" noBindSchema
+                    |> Expect.equal ""
         ]

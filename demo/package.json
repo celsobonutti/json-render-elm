@@ -14,7 +14,7 @@
     "test": "elm-test-rs",
     "catalog": "npx tsx generate-catalog-schema.ts && npx tsx generate-review-catalog.ts",
     "upgrade": "elm-json upgrade && cd review && elm-json upgrade && cd ..",
-    "elm-review:fix": "elm-review --fix-all",
+    "elm-review:fix": "elm-review --fix-all-without-prompt",
     "test:e2e": "playwright test --config test/playwright.config.ts"
   },
   "dependencies": {

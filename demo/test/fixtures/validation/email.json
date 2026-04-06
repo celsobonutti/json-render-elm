@@ -1,0 +1,34 @@
+{
+  "state": { "form": { "email": "" }, "result": null },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["input-1", "btn"]
+    },
+    "input-1": {
+      "type": "Input",
+      "props": {
+        "label": "Email",
+        "value": { "$bindState": "/form/email" }
+      },
+      "checks": [
+        { "type": "required", "message": "Email is required" },
+        { "type": "email", "message": "Invalid email address" }
+      ],
+      "children": []
+    },
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Submit" },
+      "on": {
+        "press": {
+          "action": "validateForm",
+          "params": { "statePath": "/result" }
+        }
+      },
+      "children": []
+    }
+  }
+}

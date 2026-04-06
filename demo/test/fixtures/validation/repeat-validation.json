@@ -1,0 +1,47 @@
+{
+  "state": {
+    "items": [
+      { "name": "Alice" },
+      { "name": "" },
+      { "name": "Charlie" }
+    ],
+    "result": null
+  },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["list", "btn"]
+    },
+    "list": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "repeat": { "statePath": "/items" },
+      "children": ["item-input"],
+      "on": {}
+    },
+    "item-input": {
+      "type": "Input",
+      "props": {
+        "label": "Name",
+        "value": { "$bindItem": "name" }
+      },
+      "checks": [
+        { "type": "required", "message": "Name is required" }
+      ],
+      "children": []
+    },
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Validate All" },
+      "on": {
+        "press": {
+          "action": "validateForm",
+          "params": { "statePath": "/result" }
+        }
+      },
+      "children": []
+    }
+  }
+}

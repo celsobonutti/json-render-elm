@@ -35,6 +35,7 @@ import JsonRender.Internal.EventHandle exposing (EventHandle)
 import JsonRender.Render as Render exposing (Component, ComponentContext, Registry)
 import JsonRender.Resolve exposing (ResolvedValue)
 import JsonRender.Spec as Spec exposing (Spec)
+import JsonRender.Validation as Validation
 import Random
 
 
@@ -70,6 +71,8 @@ init seed =
     { spec = Nothing
     , state = Encode.object []
     , seed = seed
+    , validationState = Dict.empty
+    , validationRegistry = Dict.empty
     }
 
 
@@ -112,26 +115,27 @@ create config =
             in
             case jr.spec of
                 Just spec ->
-                    Html.map config.toMsg (Render.render config.registry jr.state spec)
+                    Html.map config.toMsg (Render.render config.registry jr.state jr.validationState spec)
 
                 Nothing ->
                     Html.text ""
     }
 
 
-{-| Render a spec to Html using the given registry and state.
+{-| Render a spec to Html using the given registry, state, and validation state.
 -}
-render : Registry (Msg action) -> Value -> Spec -> Html (Msg action)
+render : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Spec -> Html (Msg action)
 render =
     Render.render
 
 
-{-| Register a component with a props decoder, bindings decoder, and view function.
+{-| Register a component with a props decoder, bindings decoder, validation decoder, and view function.
 -}
 register :
     (Dict String ResolvedValue -> Result String props)
     -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
-    -> (ComponentContext props bindings (Msg action) -> Html (Msg action))
+    -> (Dict String Validation.FieldValidation -> validation)
+    -> (ComponentContext props bindings validation (Msg action) -> Html (Msg action))
     -> Component (Msg action)
 register =
     Render.register

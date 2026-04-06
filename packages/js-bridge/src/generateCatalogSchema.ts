@@ -8,12 +8,12 @@
 export function generateCatalogSchema(catalog: {
   componentNames: string[]
   data: {
-    components: Record<string, { props: { toJSONSchema(): object }; description?: string; slots?: string[] }>
+    components: Record<string, { props: { toJSONSchema(): object }; description?: string; slots?: string[]; bindable?: string[]; validatable?: string[] }>
     actions: Record<string, { params: { toJSONSchema(): object }; description?: string }>
     functions?: Record<string, { params: { toJSONSchema(): object }; returnType: { toJSONSchema(): object }; description?: string }>
   }
 }): Record<string, unknown> {
-  const components: Record<string, { props: object; description: string; slots: string[] }> = {}
+  const components: Record<string, { props: object; description: string; slots: string[]; bindable: string[]; validatable: string[] }> = {}
   for (const name of catalog.componentNames) {
     const def = catalog.data.components[name]
     if (!def) continue
@@ -21,6 +21,8 @@ export function generateCatalogSchema(catalog: {
       props: def.props.toJSONSchema(),
       description: def.description ?? '',
       slots: def.slots ?? [],
+      bindable: def.bindable ?? [],
+      validatable: def.validatable ?? [],
     }
   }
 

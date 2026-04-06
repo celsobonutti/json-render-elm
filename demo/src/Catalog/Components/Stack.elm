@@ -2,11 +2,8 @@
    These values were created by the rule, and will be overwritten by it if changed:
    - type VerticalOrHorizontal
    - verticalOrHorizontalFromString
-   - verticalOrHorizontalToString
    - type alias StackProps
-   - type alias StackBindings
    - propsDecoder
-   - bindingsDecoder
    - component
 -}
 
@@ -16,9 +13,6 @@ module Catalog.Components.Stack exposing (StackProps, component, propsDecoder)
 import Dict exposing (Dict)
 import Html exposing (Html, div)
 import Html.Attributes exposing (class, style)
-import Json.Encode exposing (Value)
-import JsonRender.Bind as Bind
-import JsonRender.Events exposing (EventHandle)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -41,22 +35,8 @@ verticalOrHorizontalFromString str =
             Err ("Unknown value: " ++ str ++ ". Expected one of: vertical, horizontal")
 
 
-verticalOrHorizontalToString : VerticalOrHorizontal -> String
-verticalOrHorizontalToString value =
-    case value of
-        Vertical ->
-            "vertical"
-
-        Horizontal ->
-            "horizontal"
-
-
 type alias StackProps =
     { direction : Maybe VerticalOrHorizontal, gap : Maybe Int }
-
-
-type alias StackBindings msg =
-    { direction : Maybe (VerticalOrHorizontal -> EventHandle msg), gap : Maybe (Int -> EventHandle msg) }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String StackProps
@@ -69,19 +49,12 @@ propsDecoder =
         |> ResolvedValue.optional "gap" ResolvedValue.int Nothing
 
 
-bindingsDecoder : Dict String (Value -> EventHandle msg) -> StackBindings msg
-bindingsDecoder =
-    Bind.succeed StackBindings
-        |> Bind.bindableTyped "direction" (Json.Encode.string << verticalOrHorizontalToString)
-        |> Bind.bindableTyped "gap" Json.Encode.int
-
-
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder (\_ -> ()) (\_ -> ()) view
 
 
-view : ComponentContext StackProps (StackBindings msg) msg -> Html msg
+view : ComponentContext StackProps () () msg -> Html msg
 view ctx =
     let
         dirClass =

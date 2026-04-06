@@ -14,10 +14,11 @@ module JsonRender.Actions exposing
 
 import Dict exposing (Dict)
 import Json.Decode as Decode
-import Json.Encode exposing (Value)
+import Json.Encode as Encode exposing (Value)
 import JsonRender.Resolve as Resolve exposing (RepeatContext)
-import JsonRender.Spec exposing (ActionBinding, EventHandler(..), Spec)
+import JsonRender.Spec as Spec exposing (ActionBinding, EventHandler(..), Spec)
 import JsonRender.State as State
+import JsonRender.Validation as Validation
 import Random
 import Recursion
 import Recursion.Fold
@@ -28,6 +29,8 @@ type alias Model =
     { spec : Maybe Spec
     , state : Value
     , seed : Random.Seed
+    , validationState : Dict String Validation.FieldValidation
+    , validationRegistry : Dict String ( Validation.ValidationConfig, Maybe RepeatContext )
     }
 
 
@@ -46,6 +49,7 @@ type ResolvedAction action
     = SetState { path : String, value : Value }
     | PushState { path : String, value : Value, clearPath : Maybe String }
     | RemoveState { path : String, index : Maybe Int }
+    | ValidateForm { statePath : String }
     | CustomAction action
 
 
@@ -54,6 +58,10 @@ type Msg action
     | ExecuteAction EventHandler (Maybe RepeatContext)
     | BindingUpdate String Value
     | ActionError String
+    | ValidateField String
+    | ValidateAndEmit String String (Maybe RepeatContext)
+    | RegisterValidation String Validation.ValidationConfig (Maybe RepeatContext)
+    | UnregisterValidation String
 
 
 update : Resolve.FunctionDict -> ActionConfig action -> Msg action -> Model -> ( Model, Cmd (Msg action) )
@@ -70,6 +78,37 @@ update functions config msg model =
 
         ActionError _ ->
             ( model, Cmd.none )
+
+        ValidateField path ->
+            ( validateFieldHelper functions model path, Cmd.none )
+
+        RegisterValidation path validationConfig repeatCtx ->
+            ( { model | validationRegistry = Dict.insert path ( validationConfig, repeatCtx ) model.validationRegistry }, Cmd.none )
+
+        UnregisterValidation path ->
+            ( { model | validationRegistry = Dict.remove path model.validationRegistry }, Cmd.none )
+
+        ValidateAndEmit path eventName repeatCtx ->
+            let
+                validatedModel =
+                    validateFieldHelper functions model path
+            in
+            case validatedModel.spec of
+                Just spec ->
+                    case findElementByBindPath spec path of
+                        Just element ->
+                            case Dict.get eventName element.on of
+                                Just handler ->
+                                    executeHandler functions config handler repeatCtx validatedModel
+
+                                Nothing ->
+                                    ( validatedModel, Cmd.none )
+
+                        Nothing ->
+                            ( validatedModel, Cmd.none )
+
+                Nothing ->
+                    ( validatedModel, Cmd.none )
 
 
 {-| Execute an EventHandler (single or chained actions) against the model.
@@ -91,7 +130,7 @@ executeHandler functions config handler repeatCtx model =
                 Ok ( resolved, newSeed ) ->
                     let
                         ( newModel, newCmd ) =
-                            applyAction config resolved { accModel | seed = newSeed }
+                            applyAction functions config resolved { accModel | seed = newSeed }
                     in
                     ( newModel, Cmd.batch [ accCmd, newCmd ] )
 
@@ -124,7 +163,7 @@ substituteIdsStep ( seed, value ) =
                     ( uuid, newSeed ) =
                         Random.step UUID.generator seed
                 in
-                Recursion.base ( Json.Encode.string (UUID.toString uuid), newSeed )
+                Recursion.base ( Encode.string (UUID.toString uuid), newSeed )
 
             else
                 Recursion.base ( value, seed )
@@ -142,7 +181,7 @@ substituteIdsStep ( seed, value ) =
                         pairs
                         |> Recursion.map
                             (\( processedPairs, finalSeed ) ->
-                                ( Json.Encode.object (List.reverse processedPairs), finalSeed )
+                                ( Encode.object (List.reverse processedPairs), finalSeed )
                             )
 
                 Err _ ->
@@ -158,7 +197,7 @@ substituteIdsStep ( seed, value ) =
                                 items
                                 |> Recursion.map
                                     (\( processedItems, finalSeed ) ->
-                                        ( Json.Encode.list identity (List.reverse processedItems), finalSeed )
+                                        ( Encode.list identity (List.reverse processedItems), finalSeed )
                                     )
 
                         Err _ ->
@@ -227,6 +266,15 @@ resolveBinding functions config binding repeatCtx model =
                 Nothing ->
                     Err "removeState: missing statePath"
 
+        "validateForm" ->
+            let
+                statePath =
+                    Dict.get "statePath" resolvedParams
+                        |> Maybe.andThen (\v -> Decode.decodeValue Decode.string v |> Result.toMaybe)
+                        |> Maybe.withDefault "/formValidation"
+            in
+            Ok ( ValidateForm { statePath = statePath }, model.seed )
+
         _ ->
             case config.decodeAction binding.action resolvedParams of
                 Ok action ->
@@ -238,8 +286,8 @@ resolveBinding functions config binding repeatCtx model =
 
 {-| Apply a ResolvedAction to the model.
 -}
-applyAction : ActionConfig action -> ResolvedAction action -> Model -> ( Model, Cmd (Msg action) )
-applyAction config resolved model =
+applyAction : Resolve.FunctionDict -> ActionConfig action -> ResolvedAction action -> Model -> ( Model, Cmd (Msg action) )
+applyAction functions config resolved model =
     case resolved of
         SetState { path, value } ->
             ( { model | state = State.set path value model.state }, Cmd.none )
@@ -251,7 +299,7 @@ applyAction config resolved model =
             in
             case clearPath of
                 Just cp ->
-                    ( { pushed | state = State.set cp (Json.Encode.string "") pushed.state }, Cmd.none )
+                    ( { pushed | state = State.set cp (Encode.string "") pushed.state }, Cmd.none )
 
                 Nothing ->
                     ( pushed, Cmd.none )
@@ -268,5 +316,95 @@ applyAction config resolved model =
             in
             ( { model | state = State.remove fullPath model.state }, Cmd.none )
 
+        ValidateForm { statePath } ->
+            let
+                ( allValid, errorPairs, newValidationState ) =
+                    Dict.foldl
+                        (\path ( validationConfig, repeatCtx ) ( valid, errs, valState ) ->
+                            let
+                                fieldValue =
+                                    State.get path model.state |> Maybe.withDefault Encode.null
+
+                                result =
+                                    Validation.runValidation Dict.empty functions validationConfig fieldValue model.state repeatCtx
+                            in
+                            ( valid && result.valid
+                            , if result.valid then
+                                errs
+
+                              else
+                                ( path, Encode.list Encode.string result.errors ) :: errs
+                            , Dict.insert path { errors = result.errors, touched = True, validated = True } valState
+                            )
+                        )
+                        ( True, [], model.validationState )
+                        model.validationRegistry
+
+                resultValue =
+                    Encode.object
+                        [ ( "valid", Encode.bool allValid )
+                        , ( "errors", Encode.object errorPairs )
+                        ]
+            in
+            ( { model
+                | state = State.set statePath resultValue model.state
+                , validationState = newValidationState
+              }
+            , Cmd.none
+            )
+
         CustomAction action ->
             config.handleAction action model
+
+
+
+-- Helpers
+
+
+validateFieldHelper : Resolve.FunctionDict -> Model -> String -> Model
+validateFieldHelper functions model path =
+    let
+        maybeEntry =
+            Dict.get path model.validationRegistry
+
+        fieldValue =
+            State.get path model.state |> Maybe.withDefault Encode.null
+
+        result =
+            case maybeEntry of
+                Just ( config_, repeatCtx ) ->
+                    Validation.runValidation Dict.empty functions config_ fieldValue model.state repeatCtx
+
+                Nothing ->
+                    { valid = True, errors = [] }
+
+        newValidationState =
+            Dict.insert path
+                { errors = result.errors, touched = True, validated = True }
+                model.validationState
+    in
+    { model | validationState = newValidationState }
+
+
+findElementByBindPath : Spec -> String -> Maybe Spec.Element
+findElementByBindPath spec path =
+    Dict.foldl
+        (\_ element acc ->
+            case acc of
+                Just _ ->
+                    acc
+
+                Nothing ->
+                    case Validation.extractValidation element.checks element.validateOn element.enabled element.props Nothing of
+                        Just ( p, _ ) ->
+                            if p == path then
+                                Just element
+
+                            else
+                                Nothing
+
+                        Nothing ->
+                            Nothing
+        )
+        Nothing
+        spec.elements

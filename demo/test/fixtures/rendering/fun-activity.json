@@ -1,0 +1,591 @@
+{
+  "root": "main",
+  "elements": {
+    "main": {
+      "type": "Stack",
+      "props": {
+        "direction": "vertical",
+        "gap": 4
+      },
+      "children": ["header", "quiz-card", "result-card"]
+    },
+    "header": {
+      "type": "Card",
+      "props": {
+        "title": "🧠 Quiz de Curiosidades",
+        "subtitle": "Responda as perguntas e descubra sua pontuação!"
+      },
+      "children": ["header-badges"]
+    },
+    "header-badges": {
+      "type": "Stack",
+      "props": {
+        "direction": "horizontal",
+        "gap": 2
+      },
+      "children": ["badge-score", "badge-question"]
+    },
+    "badge-score": {
+      "type": "Badge",
+      "props": {
+        "label": {
+          "$template": "⭐ Pontuação: ${/score}"
+        },
+        "color": "yellow"
+      },
+      "children": []
+    },
+    "badge-question": {
+      "type": "Badge",
+      "props": {
+        "label": {
+          "$template": "📋 Pergunta ${/currentQuestion} de ${/totalQuestions}"
+        },
+        "color": "blue"
+      },
+      "children": []
+    },
+    "quiz-card": {
+      "type": "Card",
+      "props": {
+        "title": ""
+      },
+      "visible": {
+        "$state": "/finished",
+        "not": true
+      },
+      "children": ["q1", "q2", "q3", "q4", "q5"]
+    },
+
+    "q1": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 3 },
+      "visible": { "$state": "/currentQuestion", "eq": 1 },
+      "children": ["q1-text", "q1-opts", "q1-feedback", "q1-next"]
+    },
+    "q1-text": {
+      "type": "Text",
+      "props": { "content": "🌍 Qual é o maior oceano do mundo?", "size": "lg" },
+      "children": []
+    },
+    "q1-opts": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 2 },
+      "children": ["q1-a", "q1-b", "q1-c", "q1-d"]
+    },
+    "q1-a": {
+      "type": "Button",
+      "props": {
+        "label": "🌊 Oceano Atlântico",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q1-a" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q1-a" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! O Oceano Pacífico é o maior do mundo." } }
+        ]
+      },
+      "children": []
+    },
+    "q1-b": {
+      "type": "Button",
+      "props": {
+        "label": "🌊 Oceano Pacífico",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q1-b" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q1-b" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "✅ Correto! O Oceano Pacífico é o maior do mundo!" } },
+          { "action": "setState", "params": { "statePath": "/score", "value": { "$computed": "add", "args": { "a": { "$state": "/score" }, "b": 1 } } } }
+        ]
+      },
+      "children": []
+    },
+    "q1-c": {
+      "type": "Button",
+      "props": {
+        "label": "🌊 Oceano Índico",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q1-c" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q1-c" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! O Oceano Pacífico é o maior do mundo." } }
+        ]
+      },
+      "children": []
+    },
+    "q1-d": {
+      "type": "Button",
+      "props": {
+        "label": "🌊 Oceano Ártico",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q1-d" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q1-d" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! O Oceano Pacífico é o maior do mundo." } }
+        ]
+      },
+      "children": []
+    },
+    "q1-feedback": {
+      "type": "Badge",
+      "props": {
+        "label": { "$state": "/feedback" },
+        "color": { "$cond": { "$state": "/selectedAnswer", "eq": "q1-b" }, "$then": "green", "$else": "red" }
+      },
+      "visible": { "$state": "/answered" },
+      "children": []
+    },
+    "q1-next": {
+      "type": "Button",
+      "props": { "label": "Próxima Pergunta ➡️", "variant": "primary" },
+      "visible": { "$state": "/answered" },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/currentQuestion", "value": 2 } },
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": false } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "" } }
+        ]
+      },
+      "children": []
+    },
+
+    "q2": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 3 },
+      "visible": { "$state": "/currentQuestion", "eq": 2 },
+      "children": ["q2-text", "q2-opts", "q2-feedback", "q2-next"]
+    },
+    "q2-text": {
+      "type": "Text",
+      "props": { "content": "🦁 Qual animal é conhecido como o Rei da Selva?", "size": "lg" },
+      "children": []
+    },
+    "q2-opts": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 2 },
+      "children": ["q2-a", "q2-b", "q2-c", "q2-d"]
+    },
+    "q2-a": {
+      "type": "Button",
+      "props": {
+        "label": "🐯 Tigre",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q2-a" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q2-a" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! O Leão é o Rei da Selva." } }
+        ]
+      },
+      "children": []
+    },
+    "q2-b": {
+      "type": "Button",
+      "props": {
+        "label": "🦁 Leão",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q2-b" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q2-b" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "✅ Correto! O Leão é o Rei da Selva!" } },
+          { "action": "setState", "params": { "statePath": "/score", "value": { "$computed": "add", "args": { "a": { "$state": "/score" }, "b": 1 } } } }
+        ]
+      },
+      "children": []
+    },
+    "q2-c": {
+      "type": "Button",
+      "props": {
+        "label": "🐻 Urso",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q2-c" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q2-c" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! O Leão é o Rei da Selva." } }
+        ]
+      },
+      "children": []
+    },
+    "q2-d": {
+      "type": "Button",
+      "props": {
+        "label": "🐆 Leopardo",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q2-d" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q2-d" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! O Leão é o Rei da Selva." } }
+        ]
+      },
+      "children": []
+    },
+    "q2-feedback": {
+      "type": "Badge",
+      "props": {
+        "label": { "$state": "/feedback" },
+        "color": { "$cond": { "$state": "/selectedAnswer", "eq": "q2-b" }, "$then": "green", "$else": "red" }
+      },
+      "visible": { "$state": "/answered" },
+      "children": []
+    },
+    "q2-next": {
+      "type": "Button",
+      "props": { "label": "Próxima Pergunta ➡️", "variant": "primary" },
+      "visible": { "$state": "/answered" },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/currentQuestion", "value": 3 } },
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": false } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "" } }
+        ]
+      },
+      "children": []
+    },
+
+    "q3": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 3 },
+      "visible": { "$state": "/currentQuestion", "eq": 3 },
+      "children": ["q3-text", "q3-opts", "q3-feedback", "q3-next"]
+    },
+    "q3-text": {
+      "type": "Text",
+      "props": { "content": "🪐 Qual é o planeta mais próximo do Sol?", "size": "lg" },
+      "children": []
+    },
+    "q3-opts": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 2 },
+      "children": ["q3-a", "q3-b", "q3-c", "q3-d"]
+    },
+    "q3-a": {
+      "type": "Button",
+      "props": {
+        "label": "🌍 Terra",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q3-a" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q3-a" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! Mercúrio é o mais próximo do Sol." } }
+        ]
+      },
+      "children": []
+    },
+    "q3-b": {
+      "type": "Button",
+      "props": {
+        "label": "♀️ Vênus",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q3-b" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q3-b" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! Mercúrio é o mais próximo do Sol." } }
+        ]
+      },
+      "children": []
+    },
+    "q3-c": {
+      "type": "Button",
+      "props": {
+        "label": "☿ Mercúrio",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q3-c" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q3-c" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "✅ Correto! Mercúrio é o mais próximo do Sol!" } },
+          { "action": "setState", "params": { "statePath": "/score", "value": { "$computed": "add", "args": { "a": { "$state": "/score" }, "b": 1 } } } }
+        ]
+      },
+      "children": []
+    },
+    "q3-d": {
+      "type": "Button",
+      "props": {
+        "label": "♂️ Marte",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q3-d" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q3-d" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! Mercúrio é o mais próximo do Sol." } }
+        ]
+      },
+      "children": []
+    },
+    "q3-feedback": {
+      "type": "Badge",
+      "props": {
+        "label": { "$state": "/feedback" },
+        "color": { "$cond": { "$state": "/selectedAnswer", "eq": "q3-c" }, "$then": "green", "$else": "red" }
+      },
+      "visible": { "$state": "/answered" },
+      "children": []
+    },
+    "q3-next": {
+      "type": "Button",
+      "props": { "label": "Próxima Pergunta ➡️", "variant": "primary" },
+      "visible": { "$state": "/answered" },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/currentQuestion", "value": 4 } },
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": false } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "" } }
+        ]
+      },
+      "children": []
+    },
+
+    "q4": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 3 },
+      "visible": { "$state": "/currentQuestion", "eq": 4 },
+      "children": ["q4-text", "q4-opts", "q4-feedback", "q4-next"]
+    },
+    "q4-text": {
+      "type": "Text",
+      "props": { "content": "⚽ Em qual país foi realizada a primeira Copa do Mundo de Futebol?", "size": "lg" },
+      "children": []
+    },
+    "q4-opts": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 2 },
+      "children": ["q4-a", "q4-b", "q4-c", "q4-d"]
+    },
+    "q4-a": {
+      "type": "Button",
+      "props": {
+        "label": "🇧🇷 Brasil",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q4-a" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q4-a" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! A primeira Copa foi no Uruguai em 1930." } }
+        ]
+      },
+      "children": []
+    },
+    "q4-b": {
+      "type": "Button",
+      "props": {
+        "label": "🇦🇷 Argentina",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q4-b" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q4-b" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! A primeira Copa foi no Uruguai em 1930." } }
+        ]
+      },
+      "children": []
+    },
+    "q4-c": {
+      "type": "Button",
+      "props": {
+        "label": "🇺🇾 Uruguai",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q4-c" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q4-c" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "✅ Correto! A primeira Copa foi no Uruguai em 1930!" } },
+          { "action": "setState", "params": { "statePath": "/score", "value": { "$computed": "add", "args": { "a": { "$state": "/score" }, "b": 1 } } } }
+        ]
+      },
+      "children": []
+    },
+    "q4-d": {
+      "type": "Button",
+      "props": {
+        "label": "🇫🇷 França",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q4-d" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q4-d" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! A primeira Copa foi no Uruguai em 1930." } }
+        ]
+      },
+      "children": []
+    },
+    "q4-feedback": {
+      "type": "Badge",
+      "props": {
+        "label": { "$state": "/feedback" },
+        "color": { "$cond": { "$state": "/selectedAnswer", "eq": "q4-c" }, "$then": "green", "$else": "red" }
+      },
+      "visible": { "$state": "/answered" },
+      "children": []
+    },
+    "q4-next": {
+      "type": "Button",
+      "props": { "label": "Próxima Pergunta ➡️", "variant": "primary" },
+      "visible": { "$state": "/answered" },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/currentQuestion", "value": 5 } },
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": false } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "" } }
+        ]
+      },
+      "children": []
+    },
+
+    "q5": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 3 },
+      "visible": { "$state": "/currentQuestion", "eq": 5 },
+      "children": ["q5-text", "q5-opts", "q5-feedback", "q5-finish"]
+    },
+    "q5-text": {
+      "type": "Text",
+      "props": { "content": "🎨 Quem pintou a Mona Lisa?", "size": "lg" },
+      "children": []
+    },
+    "q5-opts": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 2 },
+      "children": ["q5-a", "q5-b", "q5-c", "q5-d"]
+    },
+    "q5-a": {
+      "type": "Button",
+      "props": {
+        "label": "🎨 Pablo Picasso",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q5-a" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q5-a" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! Leonardo da Vinci pintou a Mona Lisa." } }
+        ]
+      },
+      "children": []
+    },
+    "q5-b": {
+      "type": "Button",
+      "props": {
+        "label": "🎨 Leonardo da Vinci",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q5-b" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q5-b" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "✅ Correto! Leonardo da Vinci pintou a Mona Lisa!" } },
+          { "action": "setState", "params": { "statePath": "/score", "value": { "$computed": "add", "args": { "a": { "$state": "/score" }, "b": 1 } } } }
+        ]
+      },
+      "children": []
+    },
+    "q5-c": {
+      "type": "Button",
+      "props": {
+        "label": "🎨 Michelangelo",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q5-c" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q5-c" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! Leonardo da Vinci pintou a Mona Lisa." } }
+        ]
+      },
+      "children": []
+    },
+    "q5-d": {
+      "type": "Button",
+      "props": {
+        "label": "🎨 Vincent van Gogh",
+        "variant": { "$cond": { "$state": "/selectedAnswer", "eq": "q5-d" }, "$then": "primary", "$else": "secondary" }
+      },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "q5-d" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": true } },
+          { "action": "setState", "params": { "statePath": "/feedback", "value": "❌ Errado! Leonardo da Vinci pintou a Mona Lisa." } }
+        ]
+      },
+      "children": []
+    },
+    "q5-feedback": {
+      "type": "Badge",
+      "props": {
+        "label": { "$state": "/feedback" },
+        "color": { "$cond": { "$state": "/selectedAnswer", "eq": "q5-b" }, "$then": "green", "$else": "red" }
+      },
+      "visible": { "$state": "/answered" },
+      "children": []
+    },
+    "q5-finish": {
+      "type": "Button",
+      "props": { "label": "Ver Resultado 🏆", "variant": "primary" },
+      "visible": { "$state": "/answered" },
+      "on": {
+        "press": [
+          { "action": "setState", "params": { "statePath": "/finished", "value": true } },
+          { "action": "setState", "params": { "statePath": "/selectedAnswer", "value": "" } },
+          { "action": "setState", "params": { "statePath": "/answered", "value": false } }
+        ]
+      },
+      "children": []
+    },
+
+    "result-card": {
+      "type": "Card",
+      "props": {
+        "title": "🏆 Resultado Final",
+        "subtitle": { "$template": "Você acertou ${/score} de ${/totalQuestions} perguntas!" }
+      },
+      "visible": { "$state": "/finished" },
+      "children": ["result-badge"]
+    },
+    "result-badge": {
+      "type": "Badge",
+      "props": {
+        "label": { "$template": "⭐ Pontuação: ${/score}/${/totalQuestions}" },
+        "color": { "$cond": { "$state": "/score", "gte": 3 }, "$then": "green", "$else": "red" }
+      },
+      "children": []
+    }
+  },
+  "state": {
+    "score": 0,
+    "currentQuestion": 1,
+    "totalQuestions": 5,
+    "selectedAnswer": "",
+    "answered": false,
+    "finished": false,
+    "feedback": ""
+  }
+}

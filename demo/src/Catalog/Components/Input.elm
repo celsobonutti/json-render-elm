@@ -2,33 +2,37 @@
    These values were created by the rule, and will be overwritten by it if changed:
    - type alias InputProps
    - type alias InputBindings
+   - type alias InputValidation
    - propsDecoder
    - bindingsDecoder
+   - validationDecoder
    - component
 -}
 
 
-module Catalog.Components.Input exposing (InputBindings, InputProps, bindingsDecoder, component, propsDecoder)
+module Catalog.Components.Input exposing (InputBindings, InputProps, InputValidation, bindingsDecoder, component, propsDecoder, validationDecoder)
 
 import Dict exposing (Dict)
-import Html exposing (Html, div, input, label, text)
+import Html exposing (Html, div, input, label, p, text)
 import Html.Attributes exposing (class, placeholder, type_)
 import Json.Encode exposing (Value)
 import JsonRender.Bind as Bind
 import JsonRender.Events as Events exposing (EventHandle)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
+import JsonRender.Validation as Validation exposing (FieldValidation, ValidateOn(..))
 
 
 type alias InputProps =
-    { label : Maybe String, placeholder : Maybe String, value : Maybe String }
+    { label : Maybe String, placeholder : Maybe String, value : String }
 
 
 type alias InputBindings msg =
-    { label : Maybe (String -> EventHandle msg)
-    , placeholder : Maybe (String -> EventHandle msg)
-    , value : Maybe (String -> EventHandle msg)
-    }
+    { value : Maybe (String -> EventHandle msg) }
+
+
+type alias InputValidation =
+    { value : Maybe FieldValidation }
 
 
 propsDecoder : Dict String ResolvedValue -> Result String InputProps
@@ -36,23 +40,25 @@ propsDecoder =
     ResolvedValue.succeed InputProps
         |> ResolvedValue.optional "label" ResolvedValue.string Nothing
         |> ResolvedValue.optional "placeholder" ResolvedValue.string Nothing
-        |> ResolvedValue.optional "value" ResolvedValue.string Nothing
+        |> ResolvedValue.required "value" ResolvedValue.string
 
 
 bindingsDecoder : Dict String (Value -> EventHandle msg) -> InputBindings msg
 bindingsDecoder =
-    Bind.succeed InputBindings
-        |> Bind.bindableTyped "label" Json.Encode.string
-        |> Bind.bindableTyped "placeholder" Json.Encode.string
-        |> Bind.bindableTyped "value" Json.Encode.string
+    Bind.succeed InputBindings |> Bind.bindableTyped "value" Json.Encode.string
+
+
+validationDecoder : Dict String FieldValidation -> InputValidation
+validationDecoder =
+    Validation.succeed InputValidation |> Validation.field "value"
 
 
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder bindingsDecoder validationDecoder view
 
 
-view : ComponentContext InputProps (InputBindings msg) msg -> Html msg
+view : ComponentContext InputProps (InputBindings msg) InputValidation msg -> Html msg
 view ctx =
     div [ class "jr-input-wrapper" ]
         ((case ctx.props.label of
@@ -66,14 +72,32 @@ view ctx =
                     [ type_ "text"
                     , class "jr-input"
                     , placeholder (Maybe.withDefault "" ctx.props.placeholder)
-                    , Html.Attributes.value (Maybe.withDefault "" ctx.props.value)
+                    , Html.Attributes.value ctx.props.value
                     , case ctx.bindings.value of
                         Just setValue ->
                             Events.onInput setValue
 
                         Nothing ->
                             class ""
+                    , Events.onBlur
+                        (if ctx.validateOn == OnBlur then
+                            ctx.validateAndEmit "blur"
+
+                         else
+                            ctx.emit "blur"
+                        )
                     ]
                     []
+               , case ctx.validation.value of
+                    Just fv ->
+                        if not (List.isEmpty fv.errors) && fv.touched then
+                            p [ class "jr-input-error" ]
+                                [ text (List.head fv.errors |> Maybe.withDefault "") ]
+
+                        else
+                            text ""
+
+                    Nothing ->
+                        text ""
                ]
         )

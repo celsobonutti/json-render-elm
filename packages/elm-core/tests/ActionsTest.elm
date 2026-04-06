@@ -5,9 +5,10 @@ import Expect
 import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender.Actions as Actions exposing (Msg(..), ResolvedAction(..))
-import JsonRender.Spec exposing (EventHandler(..))
+import JsonRender.Spec as Spec exposing (EventHandler(..))
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.State as State
+import JsonRender.Validation as Validation exposing (BuiltInCheck(..), CheckType(..), ValidateOn(..))
 import Random
 import Test exposing (..)
 import UUID
@@ -50,7 +51,7 @@ decodeTestAction name params =
 
 testModel : Encode.Value -> Actions.Model
 testModel state =
-    { spec = Nothing, state = state, seed = Random.initialSeed 42 }
+    { spec = Nothing, state = state, seed = Random.initialSeed 42, validationState = Dict.empty, validationRegistry = Dict.empty }
 
 
 executeAction : String -> List ( String, PropValue ) -> Msg TestAction
@@ -1142,4 +1143,460 @@ suite =
                         Ok _ ->
                             Expect.fail "Expected Err for missing statePath"
             ]
+        , describe "validateForm action"
+            [ test "validateForm writes valid:true when all fields pass" <|
+                \_ ->
+                    let
+                        spec =
+                            testSpec
+                                [ ( "email-input"
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/email" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required", raw = Encode.null } ]
+                                  )
+                                ]
+
+                        model =
+                            { spec = Just spec
+                            , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "test@example.com" ) ] ) ]
+                            , seed = Random.initialSeed 42
+                            , validationState = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/email"
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Email is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
+                                      )
+                                    ]
+                            }
+
+                        binding =
+                            { action = "validateForm"
+                            , params =
+                                Dict.fromList
+                                    [ ( "statePath", StringValue "/result" ) ]
+                            , preventDefault = False
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                    in
+                    State.get "/result/valid" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.bool >> Result.toMaybe)
+                        |> Expect.equal (Just True)
+            , test "validateForm writes errors when field fails" <|
+                \_ ->
+                    let
+                        spec =
+                            testSpec
+                                [ ( "email-input"
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/email" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required", raw = Encode.null } ]
+                                  )
+                                ]
+
+                        model =
+                            { spec = Just spec
+                            , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "" ) ] ) ]
+                            , seed = Random.initialSeed 42
+                            , validationState = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/email"
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Email is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
+                                      )
+                                    ]
+                            }
+
+                        binding =
+                            { action = "validateForm"
+                            , params =
+                                Dict.fromList
+                                    [ ( "statePath", StringValue "/result" ) ]
+                            , preventDefault = False
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                    in
+                    Expect.all
+                        [ \m ->
+                            State.get "/result/valid" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.bool >> Result.toMaybe)
+                                |> Expect.equal (Just False)
+                        , \m ->
+                            Dict.get "/form/email" m.validationState
+                                |> Maybe.map .errors
+                                |> Expect.equal (Just [ "Email is required" ])
+                        , \m ->
+                            Dict.get "/form/email" m.validationState
+                                |> Maybe.map .validated
+                                |> Expect.equal (Just True)
+                        ]
+                        newModel
+            , test "validateForm defaults to /formValidation path" <|
+                \_ ->
+                    let
+                        spec =
+                            testSpec
+                                [ ( "name-input"
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/name" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Name is required", raw = Encode.null } ]
+                                  )
+                                ]
+
+                        model =
+                            { spec = Just spec
+                            , state = Encode.object [ ( "form", Encode.object [ ( "name", Encode.string "Alice" ) ] ) ]
+                            , seed = Random.initialSeed 42
+                            , validationState = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/name"
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Name is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
+                                      )
+                                    ]
+                            }
+
+                        binding =
+                            { action = "validateForm"
+                            , params = Dict.empty
+                            , preventDefault = False
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                    in
+                    State.get "/formValidation/valid" newModel.state
+                        |> Maybe.andThen (Decode.decodeValue Decode.bool >> Result.toMaybe)
+                        |> Expect.equal (Just True)
+            , test "validateForm validates multiple fields" <|
+                \_ ->
+                    let
+                        spec =
+                            testSpec
+                                [ ( "email-input"
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/email" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required", raw = Encode.null } ]
+                                  )
+                                , ( "name-input"
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/name" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Name is required", raw = Encode.null } ]
+                                  )
+                                ]
+
+                        model =
+                            { spec = Just spec
+                            , state =
+                                Encode.object
+                                    [ ( "form"
+                                      , Encode.object
+                                            [ ( "email", Encode.string "" )
+                                            , ( "name", Encode.string "" )
+                                            ]
+                                      )
+                                    ]
+                            , seed = Random.initialSeed 42
+                            , validationState = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/email"
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Email is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
+                                      )
+                                    , ( "/form/name"
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Name is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
+                                      )
+                                    ]
+                            }
+
+                        binding =
+                            { action = "validateForm"
+                            , params =
+                                Dict.fromList
+                                    [ ( "statePath", StringValue "/result" ) ]
+                            , preventDefault = False
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (ExecuteAction (SingleAction binding) Nothing) model
+                    in
+                    Expect.all
+                        [ \m ->
+                            State.get "/result/valid" m.state
+                                |> Maybe.andThen (Decode.decodeValue Decode.bool >> Result.toMaybe)
+                                |> Expect.equal (Just False)
+                        , \m ->
+                            Dict.get "/form/email" m.validationState
+                                |> Maybe.map .validated
+                                |> Expect.equal (Just True)
+                        , \m ->
+                            Dict.get "/form/name" m.validationState
+                                |> Maybe.map .validated
+                                |> Expect.equal (Just True)
+                        ]
+                        newModel
+            ]
+        , describe "ValidateField message"
+            [ test "ValidateField updates validationState for field with checks" <|
+                \_ ->
+                    let
+                        spec =
+                            testSpec
+                                [ ( "email-input"
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/email" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required", raw = Encode.null } ]
+                                  )
+                                ]
+
+                        model =
+                            { spec = Just spec
+                            , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "" ) ] ) ]
+                            , seed = Random.initialSeed 42
+                            , validationState = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/email"
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Email is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (ValidateField "/form/email") model
+                    in
+                    Expect.all
+                        [ \m ->
+                            Dict.get "/form/email" m.validationState
+                                |> Maybe.map .errors
+                                |> Expect.equal (Just [ "Email is required" ])
+                        , \m ->
+                            Dict.get "/form/email" m.validationState
+                                |> Maybe.map .touched
+                                |> Expect.equal (Just True)
+                        ]
+                        newModel
+            , test "ValidateField with passing value produces no errors" <|
+                \_ ->
+                    let
+                        spec =
+                            testSpec
+                                [ ( "email-input"
+                                  , testElementWithChecks "Input"
+                                        [ ( "value", BindStateExpr "/form/email" ) ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required", raw = Encode.null } ]
+                                  )
+                                ]
+
+                        model =
+                            { spec = Just spec
+                            , state = Encode.object [ ( "form", Encode.object [ ( "email", Encode.string "test@example.com" ) ] ) ]
+                            , seed = Random.initialSeed 42
+                            , validationState = Dict.empty
+                            , validationRegistry =
+                                Dict.fromList
+                                    [ ( "/form/email"
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Email is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
+                                      )
+                                    ]
+                            }
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (ValidateField "/form/email") model
+                    in
+                    Dict.get "/form/email" newModel.validationState
+                        |> Maybe.map .errors
+                        |> Expect.equal (Just [])
+            , test "ValidateField with no registry entry produces valid empty result" <|
+                \_ ->
+                    let
+                        model =
+                            testModel (Encode.object [])
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (ValidateField "/form/email") model
+                    in
+                    Dict.get "/form/email" newModel.validationState
+                        |> Maybe.map .errors
+                        |> Expect.equal (Just [])
+            ]
+        , describe "RegisterValidation / UnregisterValidation"
+            [ test "RegisterValidation adds config to validationRegistry" <|
+                \_ ->
+                    let
+                        config =
+                            { checks =
+                                [ { type_ = Validation.BuiltIn Validation.Required
+                                  , args = Dict.empty
+                                  , message = "Required"
+                                  , raw = Encode.null
+                                  }
+                                ]
+                            , validateOn = OnSubmit
+                            , enabled = Nothing
+                            }
+
+                        model =
+                            testModel (Encode.object [])
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (RegisterValidation "/form/email" config Nothing) model
+                    in
+                    Dict.member "/form/email" newModel.validationRegistry
+                        |> Expect.equal True
+            , test "UnregisterValidation removes config from validationRegistry" <|
+                \_ ->
+                    let
+                        config =
+                            { checks =
+                                [ { type_ = Validation.BuiltIn Validation.Required
+                                  , args = Dict.empty
+                                  , message = "Required"
+                                  , raw = Encode.null
+                                  }
+                                ]
+                            , validateOn = OnSubmit
+                            , enabled = Nothing
+                            }
+
+                        model =
+                            testModel (Encode.object [])
+
+                        ( registered, _ ) =
+                            Actions.update Dict.empty testActionConfig (RegisterValidation "/form/email" config Nothing) model
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (UnregisterValidation "/form/email") registered
+                    in
+                    Dict.member "/form/email" newModel.validationRegistry
+                        |> Expect.equal False
+            , test "UnregisterValidation on missing path is no-op" <|
+                \_ ->
+                    let
+                        model =
+                            testModel (Encode.object [])
+
+                        ( newModel, _ ) =
+                            Actions.update Dict.empty testActionConfig (UnregisterValidation "/form/ghost") model
+                    in
+                    Expect.equal Dict.empty newModel.validationRegistry
+            ]
         ]
+
+
+testSpec : List ( String, Spec.Element ) -> Spec.Spec
+testSpec elements =
+    { root = "root"
+    , elements = Dict.fromList elements
+    , state = Nothing
+    }
+
+
+testElement : String -> List ( String, PropValue ) -> Spec.Element
+testElement type_ props =
+    { type_ = type_
+    , props = Dict.fromList props
+    , children = []
+    , visible = Nothing
+    , repeat = Nothing
+    , on = Dict.empty
+    , watch = Dict.empty
+    , enabled = Nothing
+    , checks = []
+    , validateOn = OnSubmit
+    }
+
+
+testElementWithChecks : String -> List ( String, PropValue ) -> List Validation.ValidationCheck -> Spec.Element
+testElementWithChecks type_ props checks =
+    { type_ = type_
+    , props = Dict.fromList props
+    , children = []
+    , visible = Nothing
+    , repeat = Nothing
+    , on = Dict.empty
+    , watch = Dict.empty
+    , enabled = Nothing
+    , checks = checks
+    , validateOn = OnSubmit
+    }

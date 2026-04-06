@@ -22,6 +22,7 @@ import Json.Decode.Pipeline exposing (optional, required)
 import Json.Encode exposing (Value)
 import JsonRender.Internal.PropValue as PropValue exposing (PropValue)
 import JsonRender.Internal.Condition exposing (Condition)
+import JsonRender.Validation as Validation exposing (ValidateOn(..), ValidationCheck)
 import JsonRender.Visibility
 
 
@@ -40,6 +41,9 @@ type alias Element =
     , repeat : Maybe Repeat
     , on : Dict String EventHandler
     , watch : Dict String EventHandler
+    , enabled : Maybe Condition
+    , checks : List ValidationCheck
+    , validateOn : ValidateOn
     }
 
 
@@ -79,6 +83,9 @@ elementDecoder =
         |> optional "repeat" (Decode.map Just repeatDecoder) Nothing
         |> optional "on" (Decode.dict eventHandlerDecoder) Dict.empty
         |> optional "watch" (Decode.dict eventHandlerDecoder) Dict.empty
+        |> optional "enabled" (Decode.map Just JsonRender.Visibility.decoder) Nothing
+        |> optional "checks" (Decode.list Validation.checkDecoder) []
+        |> optional "validateOn" Validation.validateOnDecoder OnSubmit
 
 
 repeatDecoder : Decoder Repeat

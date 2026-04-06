@@ -20,6 +20,8 @@ export const catalog = defineCatalog(schema, {
         subtitle: z.string().optional(),
       }),
       slots: ["default"],
+      bindable: [],
+      validatable: [],
       description: "A card container with a title and optional subtitle",
     },
     Button: {
@@ -28,6 +30,8 @@ export const catalog = defineCatalog(schema, {
         variant: z.enum(["primary", "secondary", "danger"]).optional(),
       }),
       slots: [],
+      bindable: [],
+      validatable: [],
       description: "A clickable button",
     },
     Text: {
@@ -36,16 +40,21 @@ export const catalog = defineCatalog(schema, {
         size: z.enum(["sm", "md", "lg", "xl"]).optional(),
       }),
       slots: [],
+      bindable: [],
+      validatable: [],
       description: "A text block",
     },
     Input: {
       props: z.object({
         placeholder: z.string().optional(),
         label: z.string().optional(),
-        value: z.string().optional(),
+        value: z.string(),
       }),
       slots: [],
-      description: "A text input field with an optional label",
+      bindable: ["value"],
+      validatable: ["value"],
+      description:
+        "A text input field with an optional label. Use { $bindState } on value for two-way binding. Use checks for validation.",
     },
     Stack: {
       props: z.object({
@@ -53,6 +62,8 @@ export const catalog = defineCatalog(schema, {
         gap: z.number().int().optional(),
       }),
       slots: ["default"],
+      bindable: [],
+      validatable: [],
       description:
         "A flex container that stacks children vertically or horizontally",
     },
@@ -62,6 +73,8 @@ export const catalog = defineCatalog(schema, {
         alt: z.string(),
       }),
       slots: [],
+      bindable: [],
+      validatable: [],
       description: "An image element",
     },
     Badge: {
@@ -70,6 +83,8 @@ export const catalog = defineCatalog(schema, {
         color: z.enum(["green", "red", "yellow", "blue", "gray"]).optional(),
       }),
       slots: [],
+      bindable: [],
+      validatable: [],
       description: "A small colored badge/tag",
     },
   },
@@ -88,6 +103,11 @@ export const catalog = defineCatalog(schema, {
       params: z.object({ text: z.string() }),
       returnType: z.string(),
       description: "Convert text to uppercase",
+    },
+    add: {
+      params: z.object({ a: z.number(), b: z.number() }),
+      returnType: z.number(),
+      description: "Add two numbers together",
     },
   },
 });

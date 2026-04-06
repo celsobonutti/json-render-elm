@@ -462,7 +462,7 @@ declarationListVisitor declarations context =
 
                                                     -- Check imports
                                                     missingImportLines =
-                                                        requiredComponentImportLines
+                                                        requiredComponentImportLines schema
                                                             |> List.filter (\( modName, _ ) -> not (Set.member modName context.importedModules))
 
                                                     importFixes =
@@ -502,15 +502,46 @@ declarationListVisitor declarations context =
                         ( [], context )
 
 
-requiredComponentImportLines : List ( String, String )
-requiredComponentImportLines =
-    [ ( "Dict", "import Dict exposing (Dict)" )
-    , ( "Json.Encode", "import Json.Encode exposing (Value)" )
-    , ( "JsonRender.Bind", "import JsonRender.Bind as Bind" )
-    , ( "JsonRender.Events", "import JsonRender.Events exposing (EventHandle)" )
-    , ( "JsonRender.Render", "import JsonRender.Render exposing (Component, ComponentContext, register)" )
-    , ( "JsonRender.Resolve", "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)" )
-    ]
+requiredComponentImportLines : SchemaParser.ComponentSchema -> List ( String, String )
+requiredComponentImportLines schema =
+    let
+        hasBindable =
+            not (List.isEmpty schema.bindable)
+
+        hasValidatable =
+            not (List.isEmpty schema.validatable)
+
+        bindImports =
+            if hasBindable then
+                [ ( "JsonRender.Bind", "import JsonRender.Bind as Bind" )
+                , ( "JsonRender.Events", "import JsonRender.Events exposing (EventHandle)" )
+                ]
+
+            else
+                []
+
+        validationImports =
+            if hasValidatable then
+                [ ( "JsonRender.Validation", "import JsonRender.Validation exposing (FieldValidation)" ) ]
+
+            else
+                []
+    in
+    let
+        jsonEncodeImport =
+            if hasBindable then
+                [ ( "Json.Encode", "import Json.Encode exposing (Value)" ) ]
+
+            else
+                []
+    in
+    [ ( "Dict", "import Dict exposing (Dict)" ) ]
+        ++ jsonEncodeImport
+        ++ bindImports
+        ++ validationImports
+        ++ [ ( "JsonRender.Render", "import JsonRender.Render exposing (Component, ComponentContext, register)" )
+           , ( "JsonRender.Resolve", "import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)" )
+           ]
 
 
 findDeclarationRange : String -> ElmCodeGen.DeclKind -> List (Node Declaration) -> Maybe Range

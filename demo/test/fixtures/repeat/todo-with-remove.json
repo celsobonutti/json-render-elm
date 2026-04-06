@@ -31,7 +31,7 @@
         "press": {
           "action": "setState",
           "params": {
-            "path": "/selectedForRemoval",
+            "statePath": "/selectedForRemoval",
             "value": { "$item": "id" }
           }
         }

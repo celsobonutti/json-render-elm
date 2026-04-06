@@ -2,11 +2,8 @@
    These values were created by the rule, and will be overwritten by it if changed:
    - type GreenOrRedOrYellowOrBlueOrGray
    - greenOrRedOrYellowOrBlueOrGrayFromString
-   - greenOrRedOrYellowOrBlueOrGrayToString
    - type alias BadgeProps
-   - type alias BadgeBindings
    - propsDecoder
-   - bindingsDecoder
    - component
 -}
 
@@ -16,9 +13,6 @@ module Catalog.Components.Badge exposing (BadgeProps, component, propsDecoder)
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)
 import Html.Attributes exposing (class)
-import Json.Encode exposing (Value)
-import JsonRender.Bind as Bind
-import JsonRender.Events exposing (EventHandle)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -76,10 +70,6 @@ type alias BadgeProps =
     { color : Maybe GreenOrRedOrYellowOrBlueOrGray, label : String }
 
 
-type alias BadgeBindings msg =
-    { color : Maybe (GreenOrRedOrYellowOrBlueOrGray -> EventHandle msg), label : Maybe (String -> EventHandle msg) }
-
-
 propsDecoder : Dict String ResolvedValue -> Result String BadgeProps
 propsDecoder =
     ResolvedValue.succeed BadgeProps
@@ -90,19 +80,12 @@ propsDecoder =
         |> ResolvedValue.required "label" ResolvedValue.string
 
 
-bindingsDecoder : Dict String (Value -> EventHandle msg) -> BadgeBindings msg
-bindingsDecoder =
-    Bind.succeed BadgeBindings
-        |> Bind.bindableTyped "color" (Json.Encode.string << greenOrRedOrYellowOrBlueOrGrayToString)
-        |> Bind.bindableTyped "label" Json.Encode.string
-
-
 component : Component msg
 component =
-    register propsDecoder bindingsDecoder view
+    register propsDecoder (\_ -> ()) (\_ -> ()) view
 
 
-view : ComponentContext BadgeProps (BadgeBindings msg) msg -> Html msg
+view : ComponentContext BadgeProps () () msg -> Html msg
 view ctx =
     let
         colorClass =

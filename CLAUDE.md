@@ -101,7 +101,7 @@ The JS bridge extracts the `state` field from incoming specs and sends it to Elm
 
 ### Elm Schema vs React/Vue/Svelte
 Our `defineSchema` in `packages/js-bridge/src/schema.ts` differs from other renderers:
-- Three built-in actions: `setState`, `pushState`, `removeState` (no `validateForm`)
+- Four built-in actions: `setState`, `pushState`, `removeState`, `validateForm`
 - Action params use `statePath` as the path parameter name (matching React renderer)
 - `removeState` supports an `index` param for removing array items by index
 - Expressions: `$state`, `$item`, `$index`, `$template`, `$bindState`, `$bindItem`, `$cond`, `$computed`
@@ -138,6 +138,7 @@ Run with: `cd demo && npx playwright test --project=parity`
    - `RenderTest.elm` for full pipeline integration (JSON → decode → render → assert Html)
    - `BindTest.elm` for binding combinators
    - `ActionsTest.elm` for state mutations
+   - `ValidationTest.elm` for validation checks, config round-tripping, complex expression args
 
 2. **Playwright e2e tests** (`demo/test/`) — test in a real browser:
    - Create JSON fixture files in `demo/test/fixtures/<category>/`
@@ -197,7 +198,7 @@ Compared against the [json-render](https://github.com/nichochar/json-render) cor
 | Feature | Details |
 |---|---|
 | **Expressions** | All 8 types: `$state`, `$bindState`, `$item`, `$bindItem`, `$index`, `$template`, `$cond`, `$computed` |
-| **Actions** | `setState`, `pushState` (with `clearStatePath` + `$id` auto-generation), `removeState` + custom actions via `ActionConfig` |
+| **Actions** | `setState`, `pushState` (with `clearStatePath` + `$id` auto-generation), `removeState`, `validateForm` + custom actions via `ActionConfig`, `preventDefault` flag |
 | **Chained actions** | Array of action bindings executed sequentially |
 | **Event bindings** | `on` field mapping event names to action bindings |
 | **Watchers** | `watch` field with state path triggers, repeat-aware |
@@ -206,6 +207,8 @@ Compared against the [json-render](https://github.com/nichochar/json-render) cor
 | **State on spec** | `state` field on spec for initial state |
 | **Catalog schema** | `defineSchema` with components, actions, functions + `generateCatalogSchema` export |
 | **Props error rendering** | Red error box when props fail to decode |
+| **Form validation** | `validateForm` action, 14 built-in checks (`required`, `email`, `minLength`, `maxLength`, `pattern`, `min`, `max`, `numeric`, `url`, `matches`, `equalTo`, `lessThan`, `greaterThan`, `requiredIf`), `validateOn` timing (`change`/`blur`/`submit`), cross-field validation, conditional validation via `enabled`, custom validators via `ValidationFunctionDict`, `$computed`/`$cond`/`$item` in check args, DOM-based field registration (invisible fields auto-excluded) |
+| **Bindable/validatable schema** | `bindable` and `validatable` arrays on component definitions, conditional code generation for bindings/validation types and decoders |
 
 ### Not Yet Implemented
 
@@ -214,11 +217,8 @@ Gaps versus json-render core, grouped by area and roughly prioritized:
 #### Action gaps
 - **`confirm` dialogs** — `{ "confirm": { "title": "...", "message": "...", "variant": "danger" } }` on action bindings to show a confirmation dialog before executing
 - **`onSuccess` / `onError` handlers** — post-action callbacks: navigate, set state, or chain another action
-- **`preventDefault` flag** — prevents default browser behavior on action trigger
-
 #### Larger features
 - **Named slots** — `ComponentContext props slots` with typed slot records decoded same way as props. The spec's `children` becomes `Dict String (List String)` keyed by slot name
-- **Form validation** — `validateForm` action + validation checks (`required`, `email`, `minLength`, `pattern`, etc.), `validateOn` timing, cross-field validation, conditional validation, custom validators
 - **Streaming / SpecStream** — JSONL + RFC 6902 JSON Patch incremental rendering instead of full spec snapshots
 - **Edit modes** — `buildEditInstructions()`, `deepMergeSpec()`, `diffToPatches()` for spec editing workflows
 
@@ -247,10 +247,12 @@ Discovered via parity tests (`demo/test/specs/parity/`). These are behavioral di
 | `packages/elm-core/src/JsonRender/Spec.elm` | Spec types + JSON decoder |
 | `packages/elm-core/src/JsonRender/Internal/PropValue.elm` | Expression variants + decoder |
 | `packages/elm-core/src/JsonRender/Visibility.elm` | Visibility conditions + evaluation |
-| `packages/elm-core/src/JsonRender/Actions.elm` | Msg type + update for built-in actions |
+| `packages/elm-core/src/JsonRender/Actions.elm` | Msg type + update for built-in actions, validation registry |
+| `packages/elm-core/src/JsonRender/Validation.elm` | Validation types, 14 built-in checks, config encoding/decoding, pipeline combinators |
 | `packages/elm-core/src/JsonRender/State.elm` | JSON Pointer (RFC 6901) operations |
 | `packages/js-bridge/src/schema.ts` | Elm-specific `defineSchema` for `@json-render/core` |
 | `packages/js-bridge/src/index.ts` | `createElmBridge` + port wiring |
+| `packages/js-bridge/src/ValidationField.js` | `<jr-validation-root>` and `<validation-field>` custom elements for DOM-based registration |
 | `packages/elm-review/src/JsonRender/CatalogSync.elm` | elm-review rule for catalog sync |
 | `packages/elm-review/src/JsonRender/Internal/ElmCodeGen.elm` | Generates Elm code for components |
 | `demo/catalog.ts` | Component catalog (single source of truth for AI prompts) |
