@@ -68,4 +68,20 @@ test.describe("Form Validation", () => {
     await page.locator(".jr-button").click()
     await expect(page.locator(".jr-text")).toContainText("All valid!")
   })
+
+  test("invisible field is excluded from validateForm", async ({ page }) => {
+    await sendSpec(page, "validation/invisible-field.json")
+    await page.locator(".jr-button").click()
+    const errors = page.locator(".jr-input-error")
+    // Only the visible "name" field should show an error, not the hidden "secret"
+    await expect(errors).toHaveCount(1)
+    await expect(errors.first()).toHaveText("Name is required")
+  })
+
+  test("invisible field: filling visible field and submitting shows success", async ({ page }) => {
+    await sendSpec(page, "validation/invisible-field.json")
+    await page.locator(".jr-input").fill("Alice")
+    await page.locator(".jr-button").click()
+    await expect(page.locator(".jr-text")).toContainText("All valid!")
+  })
 })
