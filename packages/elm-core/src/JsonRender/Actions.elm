@@ -318,9 +318,9 @@ applyAction functions config resolved model =
 
         ValidateForm { statePath } ->
             let
-                allFieldValidations =
+                ( allValid, errorPairs, newValidationState ) =
                     Dict.foldl
-                        (\path ( validationConfig, repeatCtx ) acc ->
+                        (\path ( validationConfig, repeatCtx ) ( valid, errs, valState ) ->
                             let
                                 fieldValue =
                                     State.get path model.state |> Maybe.withDefault Encode.null
@@ -328,35 +328,23 @@ applyAction functions config resolved model =
                                 result =
                                     Validation.runValidation Dict.empty functions validationConfig fieldValue model.state repeatCtx
                             in
-                            ( path, result ) :: acc
+                            ( valid && result.valid
+                            , if result.valid then
+                                errs
+
+                              else
+                                ( path, Encode.list Encode.string result.errors ) :: errs
+                            , Dict.insert path { errors = result.errors, touched = True, validated = True } valState
+                            )
                         )
-                        []
+                        ( True, [], model.validationState )
                         model.validationRegistry
-
-                allValid =
-                    List.all (\( _, result ) -> result.valid) allFieldValidations
-
-                errorsObject =
-                    allFieldValidations
-                        |> List.filter (\( _, result ) -> not result.valid)
-                        |> List.map (\( path, result ) -> ( path, Encode.list Encode.string result.errors ))
-                        |> Encode.object
 
                 resultValue =
                     Encode.object
                         [ ( "valid", Encode.bool allValid )
-                        , ( "errors", errorsObject )
+                        , ( "errors", Encode.object errorPairs )
                         ]
-
-                newValidationState =
-                    List.foldl
-                        (\( path, result ) acc ->
-                            Dict.insert path
-                                { errors = result.errors, touched = True, validated = True }
-                                acc
-                        )
-                        model.validationState
-                        allFieldValidations
             in
             ( { model
                 | state = State.set statePath resultValue model.state
