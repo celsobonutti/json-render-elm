@@ -2,6 +2,7 @@ export { schema, type ElmSchema, type ElmSpec } from './schema'
 export { generateCatalogSchema } from './generateCatalogSchema'
 export { generateElmReviewCatalog } from './generateElmReviewCatalog'
 import './WatcherTrigger.js'
+import './ValidationField.js'
 
 export interface ElmPorts {
   jsonRenderSpecIn: {
