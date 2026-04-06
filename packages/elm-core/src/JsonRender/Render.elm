@@ -274,9 +274,12 @@ render registry state validationState spec =
             Html.node "jr-validation-root"
                 [ Html.Attributes.style "display" "contents"
                 , Html.Events.on "validation-register"
-                    (Decode.map2 RegisterValidation
-                        (Decode.at [ "detail", "path" ] Decode.string)
-                        (Decode.at [ "detail", "config" ] (Decode.string |> Decode.andThen decodeConfigString))
+                    (Decode.at [ "detail", "config" ] (Decode.string |> Decode.andThen decodeConfigString)
+                        |> Decode.andThen
+                            (\( config, repeatCtx ) ->
+                                Decode.at [ "detail", "path" ] Decode.string
+                                    |> Decode.map (\path -> RegisterValidation path config repeatCtx)
+                            )
                     )
                 , Html.Events.on "validation-unregister"
                     (Decode.at [ "detail", "path" ] Decode.string
@@ -401,7 +404,7 @@ renderElementInner registry state validationState repeatCtx spec element =
                                 [ Html.node "validation-field"
                                     [ Html.Attributes.attribute "data-path" path
                                     , Html.Attributes.attribute "data-config"
-                                        (Encode.encode 0 (Validation.encodeValidationConfig config))
+                                        (Encode.encode 0 (Validation.encodeValidationConfig config repeatCtx))
                                     ]
                                     []
                                 ]
@@ -426,11 +429,11 @@ renderElementInner registry state validationState repeatCtx spec element =
             Html.text ""
 
 
-decodeConfigString : String -> Decode.Decoder Validation.ValidationConfig
+decodeConfigString : String -> Decode.Decoder ( Validation.ValidationConfig, Maybe RepeatContext )
 decodeConfigString jsonStr =
     case Decode.decodeString Validation.configDecoder jsonStr of
-        Ok config ->
-            Decode.succeed config
+        Ok result ->
+            Decode.succeed result
 
         Err err ->
             Decode.fail (Decode.errorToString err)

@@ -728,7 +728,7 @@ runValidationCheckSuite =
                 let
                     config =
                         { checks =
-                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
+                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null } ]
                         , validateOn = OnSubmit
                         , enabled = Nothing
                         }
@@ -752,6 +752,7 @@ runValidationCheckSuite =
                             [ { type_ = BuiltIn MinLength
                               , args = Dict.fromList [ ( "min", StateExpr "/minLen" ) ]
                               , message = "Too short"
+                              , raw = Encode.null
                               }
                             ]
                         , validateOn = OnSubmit
@@ -767,7 +768,7 @@ runValidationCheckSuite =
                 let
                     config =
                         { checks =
-                            [ { type_ = Custom "unknownFunction", args = Dict.empty, message = "Unknown" } ]
+                            [ { type_ = Custom "unknownFunction", args = Dict.empty, message = "Unknown", raw = Encode.null } ]
                         , validateOn = OnSubmit
                         , enabled = Nothing
                         }
@@ -792,7 +793,7 @@ runValidationCheckSuite =
 
                     config =
                         { checks =
-                            [ { type_ = Custom "startsWithA", args = Dict.empty, message = "Must start with A" } ]
+                            [ { type_ = Custom "startsWithA", args = Dict.empty, message = "Must start with A", raw = Encode.null } ]
                         , validateOn = OnSubmit
                         , enabled = Nothing
                         }
@@ -816,8 +817,8 @@ runValidationSuite =
                 let
                     config =
                         { checks =
-                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" }
-                            , { type_ = BuiltIn Email, args = Dict.empty, message = "Invalid email" }
+                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null }
+                            , { type_ = BuiltIn Email, args = Dict.empty, message = "Invalid email", raw = Encode.null }
                             ]
                         , validateOn = OnSubmit
                         , enabled = Nothing
@@ -836,8 +837,8 @@ runValidationSuite =
                 let
                     config =
                         { checks =
-                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" }
-                            , { type_ = BuiltIn Email, args = Dict.empty, message = "Invalid email" }
+                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null }
+                            , { type_ = BuiltIn Email, args = Dict.empty, message = "Invalid email", raw = Encode.null }
                             ]
                         , validateOn = OnSubmit
                         , enabled = Nothing
@@ -857,7 +858,7 @@ runValidationSuite =
                 let
                     config =
                         { checks =
-                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
+                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null } ]
                         , validateOn = OnSubmit
                         , enabled = Just (Condition.Compare (Condition.StateSource "/enabled") (Condition.Eq (Condition.Literal (Encode.bool True))))
                         }
@@ -878,7 +879,7 @@ runValidationSuite =
 
                     config =
                         { checks =
-                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
+                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null } ]
                         , validateOn = OnSubmit
                         , enabled = Just (Condition.Compare (Condition.StateSource "/enabled") Condition.IsTruthy)
                         }
@@ -898,8 +899,8 @@ runValidationSuite =
 
                     config =
                         { checks =
-                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" }
-                            , { type_ = Custom "alwaysFail", args = Dict.empty, message = "Always fails" }
+                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null }
+                            , { type_ = Custom "alwaysFail", args = Dict.empty, message = "Always fails", raw = Encode.null }
                             ]
                         , validateOn = OnSubmit
                         , enabled = Nothing
@@ -918,10 +919,11 @@ runValidationSuite =
                 let
                     config =
                         { checks =
-                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" }
+                            [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null }
                             , { type_ = BuiltIn MinLength
                               , args = Dict.fromList [ ( "min", IntValue 3 ) ]
                               , message = "Too short"
+                              , raw = Encode.null
                               }
                             ]
                         , validateOn = OnSubmit
@@ -961,6 +963,7 @@ deepArgResolutionSuite =
                             [ { type_ = BuiltIn Matches
                               , args = Dict.fromList [ ( "other", StateExpr "/form/password" ) ]
                               , message = "Passwords must match"
+                              , raw = Encode.null
                               }
                             ]
                         , validateOn = OnSubmit
@@ -986,6 +989,7 @@ deepArgResolutionSuite =
                             [ { type_ = BuiltIn LessThan
                               , args = Dict.fromList [ ( "other", StateExpr "/form/maxPrice" ) ]
                               , message = "Must be less than max price"
+                              , raw = Encode.null
                               }
                             ]
                         , validateOn = OnSubmit
@@ -1011,6 +1015,7 @@ deepArgResolutionSuite =
                             [ { type_ = BuiltIn RequiredIf
                               , args = Dict.fromList [ ( "field", StateExpr "/form/enableEmail" ) ]
                               , message = "Email is required"
+                              , raw = Encode.null
                               }
                             ]
                         , validateOn = OnSubmit
@@ -1036,6 +1041,7 @@ deepArgResolutionSuite =
                             [ { type_ = BuiltIn RequiredIf
                               , args = Dict.fromList [ ( "field", StateExpr "/form/enableEmail" ) ]
                               , message = "Email is required"
+                              , raw = Encode.null
                               }
                             ]
                         , validateOn = OnSubmit
@@ -1130,8 +1136,8 @@ extractValidationSuite =
             \_ ->
                 let
                     checks =
-                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" }
-                        , { type_ = BuiltIn Email, args = Dict.empty, message = "Invalid email" }
+                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required", raw = Encode.null }
+                        , { type_ = BuiltIn Email, args = Dict.empty, message = "Invalid email", raw = Encode.null }
                         ]
 
                     props =
@@ -1162,7 +1168,7 @@ extractValidationSuite =
             \_ ->
                 let
                     checks =
-                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
+                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null } ]
 
                     props =
                         Dict.fromList
@@ -1174,7 +1180,7 @@ extractValidationSuite =
             \_ ->
                 let
                     checks =
-                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
+                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null } ]
 
                     props =
                         Dict.fromList
@@ -1190,7 +1196,7 @@ extractValidationSuite =
             \_ ->
                 let
                     checks =
-                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required" } ]
+                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null } ]
 
                     props =
                         Dict.fromList
@@ -1215,50 +1221,120 @@ extractValidationSuite =
 configRoundTripSuite : Test
 configRoundTripSuite =
     describe "config round-trip"
-        [ test "encodeValidationConfig >> configDecoder round-trips" <|
+        [ test "encodeValidationConfig >> configDecoder round-trips check count and validateOn" <|
+            \_ ->
+                let
+                    json =
+                        """{"checks":[{"type":"required","message":"Field is required"},{"type":"minLength","args":{"min":3},"message":"Too short"}],"validateOn":"blur"}"""
+                in
+                case Decode.decodeString Validation.configDecoder json of
+                    Ok ( config, maybeRepeatCtx ) ->
+                        Expect.all
+                            [ \_ -> Expect.equal 2 (List.length config.checks)
+                            , \_ -> Expect.equal OnBlur config.validateOn
+                            , \_ -> Expect.equal Nothing maybeRepeatCtx
+                            , \_ ->
+                                List.head config.checks
+                                    |> Maybe.map .type_
+                                    |> Expect.equal (Just (BuiltIn Required))
+                            , \_ ->
+                                List.drop 1 config.checks
+                                    |> List.head
+                                    |> Maybe.map .type_
+                                    |> Expect.equal (Just (BuiltIn MinLength))
+                            ]
+                            ()
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
+        , test "round-trips custom check type" <|
+            \_ ->
+                let
+                    json =
+                        """{"checks":[{"type":"myValidator","message":"Custom failed"}],"validateOn":"submit"}"""
+                in
+                case Decode.decodeString Validation.configDecoder json of
+                    Ok ( config, maybeRepeatCtx ) ->
+                        Expect.all
+                            [ \_ -> Expect.equal 1 (List.length config.checks)
+                            , \_ -> Expect.equal OnSubmit config.validateOn
+                            , \_ -> Expect.equal Nothing maybeRepeatCtx
+                            , \_ ->
+                                List.head config.checks
+                                    |> Maybe.map .type_
+                                    |> Expect.equal (Just (Custom "myValidator"))
+                            ]
+                            ()
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
+        , test "encodeValidationConfig with repeatCtx encodes and decodes repeatCtx" <|
             \_ ->
                 let
                     config =
                         { checks =
                             [ { type_ = BuiltIn Required
                               , args = Dict.empty
-                              , message = "Field is required"
-                              }
-                            , { type_ = BuiltIn MinLength
-                              , args = Dict.fromList [ ( "min", IntValue 3 ) ]
-                              , message = "Too short"
-                              }
-                            ]
-                        , validateOn = OnBlur
-                        , enabled = Nothing
-                        }
-
-                    encoded =
-                        Validation.encodeValidationConfig config
-
-                    decoded =
-                        Decode.decodeValue Validation.configDecoder encoded
-                in
-                decoded |> Expect.equal (Ok config)
-        , test "round-trips custom check type" <|
-            \_ ->
-                let
-                    config =
-                        { checks =
-                            [ { type_ = Custom "myValidator"
-                              , args = Dict.empty
-                              , message = "Custom failed"
+                              , message = "Required"
+                              , raw = Encode.object [ ( "type", Encode.string "required" ), ( "message", Encode.string "Required" ) ]
                               }
                             ]
                         , validateOn = OnSubmit
                         , enabled = Nothing
                         }
 
+                    repeatCtx =
+                        Just { item = Encode.object [ ( "name", Encode.string "Alice" ) ], index = 2, basePath = "/items" }
+
                     encoded =
-                        Validation.encodeValidationConfig config
+                        Validation.encodeValidationConfig config repeatCtx
 
                     decoded =
                         Decode.decodeValue Validation.configDecoder encoded
                 in
-                decoded |> Expect.equal (Ok config)
+                case decoded of
+                    Ok ( decodedConfig, decodedRepeatCtx ) ->
+                        Expect.all
+                            [ \_ -> Expect.equal 1 (List.length decodedConfig.checks)
+                            , \_ -> Expect.equal OnSubmit decodedConfig.validateOn
+                            , \_ ->
+                                decodedRepeatCtx
+                                    |> Maybe.map .index
+                                    |> Expect.equal (Just 2)
+                            , \_ ->
+                                decodedRepeatCtx
+                                    |> Maybe.map .basePath
+                                    |> Expect.equal (Just "/items")
+                            ]
+                            ()
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
+        , test "encodeValidationConfig without repeatCtx produces Nothing on decode" <|
+            \_ ->
+                let
+                    config =
+                        { checks =
+                            [ { type_ = BuiltIn Required
+                              , args = Dict.empty
+                              , message = "Required"
+                              , raw = Encode.object [ ( "type", Encode.string "required" ), ( "message", Encode.string "Required" ) ]
+                              }
+                            ]
+                        , validateOn = OnChange
+                        , enabled = Nothing
+                        }
+
+                    encoded =
+                        Validation.encodeValidationConfig config Nothing
+
+                    decoded =
+                        Decode.decodeValue Validation.configDecoder encoded
+                in
+                case decoded of
+                    Ok ( _, maybeRepeatCtx ) ->
+                        Expect.equal Nothing maybeRepeatCtx
+
+                    Err err ->
+                        Expect.fail (Decode.errorToString err)
         ]

@@ -12,9 +12,11 @@ module JsonRender.Validation exposing
     , checkTypeDecoder
     , configDecoder
     , emptyFieldValidation
+    , encodeRepeatContext
     , encodeValidationConfig
     , extractValidation
     , field
+    , repeatContextDecoder
     , runCheck
     , runValidation
     , succeed
@@ -69,6 +71,7 @@ type alias ValidationCheck =
     { type_ : CheckType
     , args : Dict String PropValue
     , message : String
+    , raw : Value
     }
 
 
@@ -184,64 +187,20 @@ validateOnDecoder =
 
 checkDecoder : Decoder ValidationCheck
 checkDecoder =
-    Decode.map3 ValidationCheck
-        (Decode.field "type" checkTypeDecoder)
-        (Decode.oneOf
-            [ Decode.field "args" (Decode.dict JsonRender.Internal.PropValue.decoder)
-            , Decode.succeed Dict.empty
-            ]
-        )
-        (Decode.field "message" Decode.string)
+    Decode.value
+        |> Decode.andThen
+            (\raw ->
+                Decode.map4 ValidationCheck
+                    (Decode.field "type" checkTypeDecoder)
+                    (Decode.oneOf
+                        [ Decode.field "args" (Decode.dict JsonRender.Internal.PropValue.decoder)
+                        , Decode.succeed Dict.empty
+                        ]
+                    )
+                    (Decode.field "message" Decode.string)
+                    (Decode.succeed raw)
+            )
 
-
-
-encodeCheckType : CheckType -> Encode.Value
-encodeCheckType ct =
-    case ct of
-        BuiltIn Required ->
-            Encode.string "required"
-
-        BuiltIn Email ->
-            Encode.string "email"
-
-        BuiltIn MinLength ->
-            Encode.string "minLength"
-
-        BuiltIn MaxLength ->
-            Encode.string "maxLength"
-
-        BuiltIn Pattern ->
-            Encode.string "pattern"
-
-        BuiltIn Min ->
-            Encode.string "min"
-
-        BuiltIn Max ->
-            Encode.string "max"
-
-        BuiltIn Numeric ->
-            Encode.string "numeric"
-
-        BuiltIn Url ->
-            Encode.string "url"
-
-        BuiltIn Matches ->
-            Encode.string "matches"
-
-        BuiltIn EqualTo ->
-            Encode.string "equalTo"
-
-        BuiltIn LessThan ->
-            Encode.string "lessThan"
-
-        BuiltIn GreaterThan ->
-            Encode.string "greaterThan"
-
-        BuiltIn RequiredIf ->
-            Encode.string "requiredIf"
-
-        Custom name ->
-            Encode.string name
 
 
 encodeValidateOn : ValidateOn -> Encode.Value
@@ -259,27 +218,56 @@ encodeValidateOn vo =
 
 encodeCheck : ValidationCheck -> Encode.Value
 encodeCheck check =
+    check.raw
+
+
+encodeRepeatContext : RepeatContext -> Encode.Value
+encodeRepeatContext ctx =
     Encode.object
-        [ ( "type", encodeCheckType check.type_ )
-        , ( "args", Encode.dict identity JsonRender.Internal.PropValue.encode check.args )
-        , ( "message", Encode.string check.message )
+        [ ( "item", ctx.item )
+        , ( "index", Encode.int ctx.index )
+        , ( "basePath", Encode.string ctx.basePath )
         ]
 
 
-encodeValidationConfig : ValidationConfig -> Encode.Value
-encodeValidationConfig config =
-    Encode.object
-        [ ( "checks", Encode.list encodeCheck config.checks )
-        , ( "validateOn", encodeValidateOn config.validateOn )
-        ]
+repeatContextDecoder : Decode.Decoder RepeatContext
+repeatContextDecoder =
+    Decode.map3 RepeatContext
+        (Decode.field "item" Decode.value)
+        (Decode.field "index" Decode.int)
+        (Decode.field "basePath" Decode.string)
 
 
-configDecoder : Decode.Decoder ValidationConfig
+encodeValidationConfig : ValidationConfig -> Maybe RepeatContext -> Encode.Value
+encodeValidationConfig config maybeRepeatCtx =
+    let
+        base =
+            [ ( "checks", Encode.list encodeCheck config.checks )
+            , ( "validateOn", encodeValidateOn config.validateOn )
+            ]
+
+        withCtx =
+            case maybeRepeatCtx of
+                Just ctx ->
+                    base ++ [ ( "repeatCtx", encodeRepeatContext ctx ) ]
+
+                Nothing ->
+                    base
+    in
+    Encode.object withCtx
+
+
+configDecoder : Decode.Decoder ( ValidationConfig, Maybe RepeatContext )
 configDecoder =
-    Decode.map3 (\checks validateOn enabled -> { checks = checks, validateOn = validateOn, enabled = enabled })
+    Decode.map3
+        (\checks validateOn repeatCtx ->
+            ( { checks = checks, validateOn = validateOn, enabled = Nothing }
+            , repeatCtx
+            )
+        )
         (Decode.field "checks" (Decode.list checkDecoder))
         (Decode.field "validateOn" validateOnDecoder)
-        (Decode.succeed Nothing)
+        (Decode.maybe (Decode.field "repeatCtx" repeatContextDecoder))
 
 
 

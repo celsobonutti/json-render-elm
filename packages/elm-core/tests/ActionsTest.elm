@@ -1152,7 +1152,7 @@ suite =
                                 [ ( "email-input"
                                   , testElementWithChecks "Input"
                                         [ ( "value", BindStateExpr "/form/email" ) ]
-                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" } ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required", raw = Encode.null } ]
                                   )
                                 ]
 
@@ -1164,15 +1164,18 @@ suite =
                             , validationRegistry =
                                 Dict.fromList
                                     [ ( "/form/email"
-                                      , { checks =
-                                            [ { type_ = BuiltIn Required
-                                              , args = Dict.empty
-                                              , message = "Email is required"
-                                              }
-                                            ]
-                                        , validateOn = OnSubmit
-                                        , enabled = Nothing
-                                        }
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Email is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
                                       )
                                     ]
                             }
@@ -1199,7 +1202,7 @@ suite =
                                 [ ( "email-input"
                                   , testElementWithChecks "Input"
                                         [ ( "value", BindStateExpr "/form/email" ) ]
-                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" } ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required", raw = Encode.null } ]
                                   )
                                 ]
 
@@ -1211,15 +1214,18 @@ suite =
                             , validationRegistry =
                                 Dict.fromList
                                     [ ( "/form/email"
-                                      , { checks =
-                                            [ { type_ = BuiltIn Required
-                                              , args = Dict.empty
-                                              , message = "Email is required"
-                                              }
-                                            ]
-                                        , validateOn = OnSubmit
-                                        , enabled = Nothing
-                                        }
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Email is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
                                       )
                                     ]
                             }
@@ -1258,7 +1264,7 @@ suite =
                                 [ ( "name-input"
                                   , testElementWithChecks "Input"
                                         [ ( "value", BindStateExpr "/form/name" ) ]
-                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Name is required" } ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Name is required", raw = Encode.null } ]
                                   )
                                 ]
 
@@ -1270,15 +1276,18 @@ suite =
                             , validationRegistry =
                                 Dict.fromList
                                     [ ( "/form/name"
-                                      , { checks =
-                                            [ { type_ = BuiltIn Required
-                                              , args = Dict.empty
-                                              , message = "Name is required"
-                                              }
-                                            ]
-                                        , validateOn = OnSubmit
-                                        , enabled = Nothing
-                                        }
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Name is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
                                       )
                                     ]
                             }
@@ -1303,12 +1312,12 @@ suite =
                                 [ ( "email-input"
                                   , testElementWithChecks "Input"
                                         [ ( "value", BindStateExpr "/form/email" ) ]
-                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" } ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required", raw = Encode.null } ]
                                   )
                                 , ( "name-input"
                                   , testElementWithChecks "Input"
                                         [ ( "value", BindStateExpr "/form/name" ) ]
-                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Name is required" } ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Name is required", raw = Encode.null } ]
                                   )
                                 ]
 
@@ -1328,26 +1337,32 @@ suite =
                             , validationRegistry =
                                 Dict.fromList
                                     [ ( "/form/email"
-                                      , { checks =
-                                            [ { type_ = BuiltIn Required
-                                              , args = Dict.empty
-                                              , message = "Email is required"
-                                              }
-                                            ]
-                                        , validateOn = OnSubmit
-                                        , enabled = Nothing
-                                        }
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Email is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
                                       )
                                     , ( "/form/name"
-                                      , { checks =
-                                            [ { type_ = BuiltIn Required
-                                              , args = Dict.empty
-                                              , message = "Name is required"
-                                              }
-                                            ]
-                                        , validateOn = OnSubmit
-                                        , enabled = Nothing
-                                        }
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Name is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
                                       )
                                     ]
                             }
@@ -1388,7 +1403,7 @@ suite =
                                 [ ( "email-input"
                                   , testElementWithChecks "Input"
                                         [ ( "value", BindStateExpr "/form/email" ) ]
-                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" } ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required", raw = Encode.null } ]
                                   )
                                 ]
 
@@ -1400,15 +1415,18 @@ suite =
                             , validationRegistry =
                                 Dict.fromList
                                     [ ( "/form/email"
-                                      , { checks =
-                                            [ { type_ = BuiltIn Required
-                                              , args = Dict.empty
-                                              , message = "Email is required"
-                                              }
-                                            ]
-                                        , validateOn = OnSubmit
-                                        , enabled = Nothing
-                                        }
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Email is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
                                       )
                                     ]
                             }
@@ -1435,7 +1453,7 @@ suite =
                                 [ ( "email-input"
                                   , testElementWithChecks "Input"
                                         [ ( "value", BindStateExpr "/form/email" ) ]
-                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required" } ]
+                                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Email is required", raw = Encode.null } ]
                                   )
                                 ]
 
@@ -1447,15 +1465,18 @@ suite =
                             , validationRegistry =
                                 Dict.fromList
                                     [ ( "/form/email"
-                                      , { checks =
-                                            [ { type_ = BuiltIn Required
-                                              , args = Dict.empty
-                                              , message = "Email is required"
-                                              }
-                                            ]
-                                        , validateOn = OnSubmit
-                                        , enabled = Nothing
-                                        }
+                                      , ( { checks =
+                                                [ { type_ = BuiltIn Required
+                                                  , args = Dict.empty
+                                                  , message = "Email is required"
+                                                  , raw = Encode.null
+                                                  }
+                                                ]
+                                          , validateOn = OnSubmit
+                                          , enabled = Nothing
+                                          }
+                                        , Nothing
+                                        )
                                       )
                                     ]
                             }
@@ -1488,6 +1509,7 @@ suite =
                                 [ { type_ = Validation.BuiltIn Validation.Required
                                   , args = Dict.empty
                                   , message = "Required"
+                                  , raw = Encode.null
                                   }
                                 ]
                             , validateOn = OnSubmit
@@ -1498,7 +1520,7 @@ suite =
                             testModel (Encode.object [])
 
                         ( newModel, _ ) =
-                            Actions.update Dict.empty testActionConfig (RegisterValidation "/form/email" config) model
+                            Actions.update Dict.empty testActionConfig (RegisterValidation "/form/email" config Nothing) model
                     in
                     Dict.member "/form/email" newModel.validationRegistry
                         |> Expect.equal True
@@ -1510,6 +1532,7 @@ suite =
                                 [ { type_ = Validation.BuiltIn Validation.Required
                                   , args = Dict.empty
                                   , message = "Required"
+                                  , raw = Encode.null
                                   }
                                 ]
                             , validateOn = OnSubmit
@@ -1520,7 +1543,7 @@ suite =
                             testModel (Encode.object [])
 
                         ( registered, _ ) =
-                            Actions.update Dict.empty testActionConfig (RegisterValidation "/form/email" config) model
+                            Actions.update Dict.empty testActionConfig (RegisterValidation "/form/email" config Nothing) model
 
                         ( newModel, _ ) =
                             Actions.update Dict.empty testActionConfig (UnregisterValidation "/form/email") registered

@@ -2,7 +2,6 @@ module JsonRender.Internal.PropValue exposing
     ( ConditionExpr(..)
     , PropValue(..)
     , decoder
-    , encode
     )
 
 {-| Shared PropValue type and decoder, used by both Spec and Visibility.
@@ -11,7 +10,6 @@ module JsonRender.Internal.PropValue exposing
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (optional, required)
-import Json.Encode as Encode
 import JsonRender.Internal.Condition as Condition
 
 
@@ -66,59 +64,6 @@ decoder =
         , Decode.lazy (\_ -> Decode.dict decoder) |> Decode.map ObjectValue
         ]
 
-
-encode : PropValue -> Encode.Value
-encode pv =
-    encodeHelp pv
-
-
-encodeHelp : PropValue -> Encode.Value
-encodeHelp pv =
-    case pv of
-        StringValue s ->
-            Encode.string s
-
-        IntValue n ->
-            Encode.int n
-
-        FloatValue f ->
-            Encode.float f
-
-        BoolValue b ->
-            Encode.bool b
-
-        NullValue ->
-            Encode.null
-
-        StateExpr path ->
-            Encode.object [ ( "$state", Encode.string path ) ]
-
-        BindStateExpr path ->
-            Encode.object [ ( "$bindState", Encode.string path ) ]
-
-        ItemExpr field ->
-            Encode.object [ ( "$item", Encode.string field ) ]
-
-        BindItemExpr field ->
-            Encode.object [ ( "$bindItem", Encode.string field ) ]
-
-        IndexExpr ->
-            Encode.object [ ( "$index", Encode.bool True ) ]
-
-        TemplateExpr t ->
-            Encode.object [ ( "$template", Encode.string t ) ]
-
-        ConditionalExpr _ _ _ ->
-            Encode.string "<cond>"
-
-        ComputedExpr _ _ ->
-            Encode.string "<computed>"
-
-        ListValue items ->
-            items |> List.map encode |> Encode.list identity
-
-        ObjectValue fields ->
-            fields |> Dict.map (\_ v -> encode v) |> Dict.toList |> Encode.object
 
 
 conditionExprDecoder : Decoder ConditionExpr

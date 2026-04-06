@@ -30,7 +30,7 @@ type alias Model =
     , state : Value
     , seed : Random.Seed
     , validationState : Dict String Validation.FieldValidation
-    , validationRegistry : Dict String Validation.ValidationConfig
+    , validationRegistry : Dict String ( Validation.ValidationConfig, Maybe RepeatContext )
     }
 
 
@@ -60,7 +60,7 @@ type Msg action
     | ActionError String
     | ValidateField String
     | ValidateAndEmit String String (Maybe RepeatContext)
-    | RegisterValidation String Validation.ValidationConfig
+    | RegisterValidation String Validation.ValidationConfig (Maybe RepeatContext)
     | UnregisterValidation String
 
 
@@ -82,8 +82,8 @@ update functions config msg model =
         ValidateField path ->
             ( validateFieldHelper functions model path, Cmd.none )
 
-        RegisterValidation path validationConfig ->
-            ( { model | validationRegistry = Dict.insert path validationConfig model.validationRegistry }, Cmd.none )
+        RegisterValidation path validationConfig repeatCtx ->
+            ( { model | validationRegistry = Dict.insert path ( validationConfig, repeatCtx ) model.validationRegistry }, Cmd.none )
 
         UnregisterValidation path ->
             ( { model | validationRegistry = Dict.remove path model.validationRegistry }, Cmd.none )
@@ -320,13 +320,13 @@ applyAction functions config resolved model =
             let
                 allFieldValidations =
                     Dict.foldl
-                        (\path validationConfig acc ->
+                        (\path ( validationConfig, repeatCtx ) acc ->
                             let
                                 fieldValue =
                                     State.get path model.state |> Maybe.withDefault Encode.null
 
                                 result =
-                                    Validation.runValidation Dict.empty functions validationConfig fieldValue model.state Nothing
+                                    Validation.runValidation Dict.empty functions validationConfig fieldValue model.state repeatCtx
                             in
                             ( path, result ) :: acc
                         )
@@ -376,16 +376,16 @@ applyAction functions config resolved model =
 validateFieldHelper : Resolve.FunctionDict -> Model -> String -> Model
 validateFieldHelper functions model path =
     let
-        maybeConfig =
+        maybeEntry =
             Dict.get path model.validationRegistry
 
         fieldValue =
             State.get path model.state |> Maybe.withDefault Encode.null
 
         result =
-            case maybeConfig of
-                Just config_ ->
-                    Validation.runValidation Dict.empty functions config_ fieldValue model.state Nothing
+            case maybeEntry of
+                Just ( config_, repeatCtx ) ->
+                    Validation.runValidation Dict.empty functions config_ fieldValue model.state repeatCtx
 
                 Nothing ->
                     { valid = True, errors = [] }
