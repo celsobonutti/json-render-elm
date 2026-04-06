@@ -1,0 +1,43 @@
+{
+  "state": { "mode": "standard", "customValue": "custom123", "form": { "answer": "" }, "result": null },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["input", "btn"]
+    },
+    "input": {
+      "type": "Input",
+      "props": {
+        "label": "Answer",
+        "value": { "$bindState": "/form/answer" }
+      },
+      "checks": [
+        {
+          "type": "matches",
+          "args": {
+            "other": {
+              "$cond": { "$state": "/mode", "eq": "custom" },
+              "$then": { "$state": "/customValue" },
+              "$else": "default"
+            }
+          },
+          "message": "Answer must match expected value"
+        }
+      ],
+      "children": []
+    },
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Submit" },
+      "on": {
+        "press": {
+          "action": "validateForm",
+          "params": { "statePath": "/result" }
+        }
+      },
+      "children": []
+    }
+  }
+}

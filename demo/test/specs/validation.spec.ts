@@ -84,4 +84,69 @@ test.describe("Form Validation", () => {
     await page.locator(".jr-button").click()
     await expect(page.locator(".jr-text")).toContainText("All valid!")
   })
+
+  test("computed arg: minLength with $computed add function fails when too short", async ({ page }) => {
+    await sendSpec(page, "validation/computed-arg.json")
+    await page.locator(".jr-input").fill("abcd")
+    await page.locator(".jr-button").click()
+    await expect(page.locator(".jr-input-error")).toHaveText("Code must be at least 5 characters")
+  })
+
+  test("computed arg: passes when meeting computed minimum", async ({ page }) => {
+    await sendSpec(page, "validation/computed-arg.json")
+    await page.locator(".jr-input").fill("abcde")
+    await page.locator(".jr-button").click()
+    await expect(page.locator(".jr-input-error")).not.toBeVisible()
+  })
+
+  test("cond arg: matches default value in standard mode", async ({ page }) => {
+    await sendSpec(page, "validation/cond-arg.json")
+    await page.locator(".jr-input").fill("default")
+    await page.locator(".jr-button").click()
+    await expect(page.locator(".jr-input-error")).not.toBeVisible()
+  })
+
+  test("cond arg: fails when value doesn't match default", async ({ page }) => {
+    await sendSpec(page, "validation/cond-arg.json")
+    await page.locator(".jr-input").fill("wrong")
+    await page.locator(".jr-button").click()
+    await expect(page.locator(".jr-input-error")).toHaveText("Answer must match expected value")
+  })
+
+  test("cond arg: matches custom value when mode is custom", async ({ page }) => {
+    await sendSpec(page, "validation/cond-arg.json")
+    await setState(page, { mode: "custom", customValue: "custom123", form: { answer: "" }, result: null })
+    await page.locator(".jr-input").fill("custom123")
+    await page.locator(".jr-button").click()
+    await expect(page.locator(".jr-input-error")).not.toBeVisible()
+  })
+
+  test("repeat validation: shows error for empty item when validating all", async ({ page }) => {
+    await sendSpec(page, "validation/repeat-validation.json")
+    await page.locator(".jr-button").click()
+    const errors = page.locator(".jr-input-error")
+    await expect(errors).toHaveCount(1)
+    await expect(errors.first()).toHaveText("Name is required")
+  })
+
+  test("repeat validation: no errors when all items are filled", async ({ page }) => {
+    await sendSpec(page, "validation/repeat-validation.json")
+    await setState(page, {
+      items: [{ name: "Alice" }, { name: "Bob" }, { name: "Charlie" }],
+      result: null,
+    })
+    await page.locator(".jr-button").click()
+    await expect(page.locator(".jr-input-error")).not.toBeVisible()
+  })
+
+  test("repeat validation: shows errors for all empty items", async ({ page }) => {
+    await sendSpec(page, "validation/repeat-validation.json")
+    await setState(page, {
+      items: [{ name: "" }, { name: "" }, { name: "" }],
+      result: null,
+    })
+    await page.locator(".jr-button").click()
+    const errors = page.locator(".jr-input-error")
+    await expect(errors).toHaveCount(3)
+  })
 })

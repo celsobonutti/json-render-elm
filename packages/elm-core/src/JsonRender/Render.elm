@@ -150,8 +150,8 @@ findBindPropName props =
         props
 
 
-findBindStatePath : Dict String PropValue -> Maybe String
-findBindStatePath props =
+findBindStatePath : Dict String PropValue -> Maybe RepeatContext -> Maybe String
+findBindStatePath props repeatCtx =
     Dict.foldl
         (\_ propValue acc ->
             case acc of
@@ -162,6 +162,18 @@ findBindStatePath props =
                     case propValue of
                         BindStateExpr path ->
                             Just path
+
+                        BindItemExpr field ->
+                            case repeatCtx of
+                                Just ctx ->
+                                    if field == "" then
+                                        Just ctx.basePath
+
+                                    else
+                                        Just (ctx.basePath ++ "/" ++ field)
+
+                                Nothing ->
+                                    Nothing
 
                         _ ->
                             Nothing
@@ -341,7 +353,7 @@ renderElementInner registry state validationState repeatCtx spec element =
                     findBindPropName element.props
 
                 bindStatePath =
-                    findBindStatePath element.props
+                    findBindStatePath element.props repeatCtx
 
                 fieldValidation =
                     case ( bindPropName, bindStatePath ) of
@@ -388,7 +400,7 @@ renderElementInner registry state validationState repeatCtx spec element =
                     renderWatcherTriggers state repeatCtx element.watch
 
                 validationFields =
-                    case Validation.extractValidation element.checks element.validateOn element.enabled element.props of
+                    case Validation.extractValidation element.checks element.validateOn element.enabled element.props repeatCtx of
                         Just ( path, config ) ->
                             let
                                 isEnabled =

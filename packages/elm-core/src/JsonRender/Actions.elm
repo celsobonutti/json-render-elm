@@ -407,7 +407,7 @@ findElementByBindPath spec path =
                     acc
 
                 Nothing ->
-                    case Validation.extractValidation element.checks element.validateOn element.enabled element.props of
+                    case Validation.extractValidation element.checks element.validateOn element.enabled element.props Nothing of
                         Just ( p, _ ) ->
                             if p == path then
                                 Just element

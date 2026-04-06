@@ -1146,7 +1146,7 @@ extractValidationSuite =
                         Dict.fromList
                             [ ( "value", BindStateExpr "/email" ) ]
                 in
-                case Validation.extractValidation checks OnSubmit Nothing props of
+                case Validation.extractValidation checks OnSubmit Nothing props Nothing of
                     Just ( path, config ) ->
                         Expect.all
                             [ \_ -> Expect.equal "/email" path
@@ -1164,7 +1164,7 @@ extractValidationSuite =
                         Dict.fromList
                             [ ( "value", BindStateExpr "/email" ) ]
                 in
-                Validation.extractValidation [] OnSubmit Nothing props
+                Validation.extractValidation [] OnSubmit Nothing props Nothing
                     |> Expect.equal Nothing
         , test "returns Nothing when no bindState prop" <|
             \_ ->
@@ -1176,7 +1176,7 @@ extractValidationSuite =
                         Dict.fromList
                             [ ( "value", StringValue "hello" ) ]
                 in
-                Validation.extractValidation checks OnSubmit Nothing props
+                Validation.extractValidation checks OnSubmit Nothing props Nothing
                     |> Expect.equal Nothing
         , test "passes validateOn through" <|
             \_ ->
@@ -1188,7 +1188,7 @@ extractValidationSuite =
                         Dict.fromList
                             [ ( "value", BindStateExpr "/name" ) ]
                 in
-                case Validation.extractValidation checks OnBlur Nothing props of
+                case Validation.extractValidation checks OnBlur Nothing props Nothing of
                     Just ( _, config ) ->
                         Expect.equal OnBlur config.validateOn
 
@@ -1207,12 +1207,43 @@ extractValidationSuite =
                     enabledCond =
                         Just (Condition.And [])
                 in
-                case Validation.extractValidation checks OnSubmit enabledCond props of
+                case Validation.extractValidation checks OnSubmit enabledCond props Nothing of
                     Just ( _, config ) ->
                         Expect.equal enabledCond config.enabled
 
                     Nothing ->
                         Expect.fail "Expected Just, got Nothing"
+        , test "extracts path from $bindItem in repeat context" <|
+            \_ ->
+                let
+                    checks =
+                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null } ]
+
+                    props =
+                        Dict.fromList
+                            [ ( "value", BindItemExpr "name" ) ]
+
+                    repeatCtx =
+                        Just { item = Encode.object [ ( "name", Encode.string "Alice" ) ], index = 1, basePath = "/items/1" }
+                in
+                case Validation.extractValidation checks OnSubmit Nothing props repeatCtx of
+                    Just ( path, _ ) ->
+                        Expect.equal "/items/1/name" path
+
+                    Nothing ->
+                        Expect.fail "Expected Just, got Nothing"
+        , test "returns Nothing for $bindItem without repeat context" <|
+            \_ ->
+                let
+                    checks =
+                        [ { type_ = BuiltIn Required, args = Dict.empty, message = "Required", raw = Encode.null } ]
+
+                    props =
+                        Dict.fromList
+                            [ ( "value", BindItemExpr "name" ) ]
+                in
+                Validation.extractValidation checks OnSubmit Nothing props Nothing
+                    |> Expect.equal Nothing
         ]
 
 

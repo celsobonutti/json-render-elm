@@ -1,0 +1,39 @@
+{
+  "state": { "form": { "code": "" }, "result": null },
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical" },
+      "children": ["input", "btn"]
+    },
+    "input": {
+      "type": "Input",
+      "props": {
+        "label": "Code",
+        "value": { "$bindState": "/form/code" }
+      },
+      "checks": [
+        {
+          "type": "minLength",
+          "args": {
+            "min": { "$computed": "add", "args": { "a": 2, "b": 3 } }
+          },
+          "message": "Code must be at least 5 characters"
+        }
+      ],
+      "children": []
+    },
+    "btn": {
+      "type": "Button",
+      "props": { "label": "Submit" },
+      "on": {
+        "press": {
+          "action": "validateForm",
+          "params": { "statePath": "/result" }
+        }
+      },
+      "children": []
+    }
+  }
+}

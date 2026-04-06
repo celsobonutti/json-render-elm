@@ -617,15 +617,16 @@ runChecks validationFns functions checks fieldValue state repeatCtx =
 
 {-| Extract validation config from element-level fields.
 Takes checks, validateOn, and enabled from the Element, plus props to find the bindState path.
+Also accepts an optional RepeatContext to resolve $bindItem paths in repeat contexts.
 Returns `Just (bindStatePath, validationConfig)` if checks are present and a bindState path exists.
 -}
-extractValidation : List ValidationCheck -> ValidateOn -> Maybe Condition -> Dict String PropValue -> Maybe ( String, ValidationConfig )
-extractValidation checks validateOn enabledCondition props =
+extractValidation : List ValidationCheck -> ValidateOn -> Maybe Condition -> Dict String PropValue -> Maybe RepeatContext -> Maybe ( String, ValidationConfig )
+extractValidation checks validateOn enabledCondition props repeatCtx =
     if List.isEmpty checks then
         Nothing
 
     else
-        case findBindStatePath props of
+        case findBindStatePath props repeatCtx of
             Just path ->
                 Just
                     ( path
@@ -639,8 +640,8 @@ extractValidation checks validateOn enabledCondition props =
                 Nothing
 
 
-findBindStatePath : Dict String PropValue -> Maybe String
-findBindStatePath props =
+findBindStatePath : Dict String PropValue -> Maybe RepeatContext -> Maybe String
+findBindStatePath props repeatCtx =
     Dict.foldl
         (\_ v acc ->
             case acc of
@@ -651,6 +652,18 @@ findBindStatePath props =
                     case v of
                         BindStateExpr path ->
                             Just path
+
+                        BindItemExpr itemField ->
+                            case repeatCtx of
+                                Just ctx ->
+                                    if itemField == "" then
+                                        Just ctx.basePath
+
+                                    else
+                                        Just (ctx.basePath ++ "/" ++ itemField)
+
+                                Nothing ->
+                                    Nothing
 
                         _ ->
                             Nothing
