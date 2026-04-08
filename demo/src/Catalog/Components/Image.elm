@@ -6,7 +6,7 @@
 -}
 
 
-module Catalog.Components.Image exposing (ImageProps, component, propsDecoder)
+module Catalog.Components.Image exposing (ImageProps, component, propsDecoder, viewStateless)
 
 import Dict exposing (Dict)
 import Html exposing (Html, img)
@@ -31,11 +31,16 @@ component =
     register propsDecoder (\_ -> ()) (\_ -> ()) view
 
 
-view : ComponentContext ImageProps () () msg -> Html msg
-view ctx =
+viewStateless : ImageProps -> Html msg
+viewStateless props =
     img
-        [ src ctx.props.src
-        , alt ctx.props.alt
+        [ src props.src
+        , alt props.alt
         , class "jr-image"
         ]
         []
+
+
+view : ComponentContext ImageProps () () msg -> Html msg
+view ctx =
+    viewStateless ctx.props

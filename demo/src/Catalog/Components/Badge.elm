@@ -8,7 +8,7 @@
 -}
 
 
-module Catalog.Components.Badge exposing (BadgeProps, component, propsDecoder)
+module Catalog.Components.Badge exposing (BadgeProps, component, propsDecoder, viewStateless)
 
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)
@@ -85,15 +85,20 @@ component =
     register propsDecoder (\_ -> ()) (\_ -> ()) view
 
 
-view : ComponentContext BadgeProps () () msg -> Html msg
-view ctx =
+viewStateless : BadgeProps -> Html msg
+viewStateless props =
     let
         colorClass =
-            case ctx.props.color of
+            case props.color of
                 Just c ->
                     "jr-badge-" ++ greenOrRedOrYellowOrBlueOrGrayToString c
 
                 Nothing ->
                     "jr-badge-gray"
     in
-    span [ class ("jr-badge " ++ colorClass) ] [ text ctx.props.label ]
+    span [ class ("jr-badge " ++ colorClass) ] [ text props.label ]
+
+
+view : ComponentContext BadgeProps () () msg -> Html msg
+view ctx =
+    viewStateless ctx.props

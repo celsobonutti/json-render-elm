@@ -8,11 +8,12 @@
 -}
 
 
-module Catalog.Components.Button exposing (component)
+module Catalog.Components.Button exposing (ButtonProps, component, propsDecoder, viewStateless)
 
 import Dict exposing (Dict)
 import Html exposing (Html, button, text)
 import Html.Attributes exposing (class)
+import Html.Events
 import JsonRender.Events as Events
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
@@ -70,6 +71,15 @@ variantToClass variant =
 component : Component msg
 component =
     register propsDecoder (\_ -> ()) (\_ -> ()) view
+
+
+viewStateless : ButtonProps -> (String -> msg) -> Html msg
+viewStateless props emit =
+    button
+        [ class ("jr-button " ++ variantToClass props.variant)
+        , Html.Events.onClick (emit "press")
+        ]
+        [ text props.label ]
 
 
 view : ComponentContext ButtonProps () () msg -> Html msg
