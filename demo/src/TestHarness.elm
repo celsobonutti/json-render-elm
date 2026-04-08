@@ -61,7 +61,7 @@ encodeAction action =
 
 app : JsonRender.App Action Model Msg
 app =
-    JsonRender.create
+    JsonRender.createMiniApps
         { actionConfig =
             { handleAction = handleAction
             , decodeAction = decodeAction

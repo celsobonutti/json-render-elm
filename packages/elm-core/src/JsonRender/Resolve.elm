@@ -3,6 +3,7 @@ module JsonRender.Resolve exposing
     , RepeatContext
     , ResolvedValue(..)
     , bool
+    , encodeResolvedDict
     , float
     , int
     , optional
@@ -16,6 +17,7 @@ module JsonRender.Resolve exposing
     , resolvedToValue
     , string
     , succeed
+    , valueDecoder
     )
 
 {-| Expression evaluation and pipeline-style prop decoders.
@@ -65,6 +67,16 @@ resolvePropsWith functions state repeatCtx props =
 resolveProps : Value -> Maybe RepeatContext -> Dict String PropValue -> Dict String ResolvedValue
 resolveProps =
     resolvePropsWith Dict.empty
+
+
+{-| Encode an entire resolved props dict to a JSON object Value.
+-}
+encodeResolvedDict : Dict String ResolvedValue -> Value
+encodeResolvedDict dict =
+    dict
+        |> Dict.map (\_ v -> resolvedToValue v)
+        |> Dict.toList
+        |> Encode.object
 
 
 {-| Convert a ResolvedValue back to a JSON Value. Inverse of jsonValueToResolved.
@@ -384,6 +396,12 @@ jsonValueToResolved =
 
                                                                 Err _ ->
                                                                     Recursion.base RNull
+
+
+valueDecoder : Decode.Decoder ResolvedValue
+valueDecoder =
+    Decode.value
+        |> Decode.map jsonValueToResolved
 
 
 resolveTemplate : Value -> String -> String

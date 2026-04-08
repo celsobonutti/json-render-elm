@@ -6,13 +6,14 @@
 -}
 
 
-module Catalog.Components.Card exposing (CardProps, component, propsDecoder)
+module Catalog.Components.Card exposing (CardProps, component, propsDecoder, viewStateless)
 
 import Dict exposing (Dict)
 import Html exposing (Html, div, h3, p, text)
 import Html.Attributes exposing (class)
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
+import Html.Attributes as Attr
 
 
 type alias CardProps =
@@ -43,4 +44,19 @@ view ctx =
                         []
                )
             ++ [ div [ class "jr-card-body" ] ctx.children ]
+        )
+
+
+viewStateless : CardProps -> Html msg
+viewStateless props =
+    div [ class "jr-card" ]
+        (h3 [ class "jr-card-title" ] [ text props.title ]
+            :: (case props.subtitle of
+                    Just sub ->
+                        [ p [ class "jr-card-subtitle" ] [ text sub ] ]
+
+                    Nothing ->
+                        []
+               )
+            ++ [ div [ class "jr-card-body", Attr.attribute "data-children-slot" "" ] [] ]
         )

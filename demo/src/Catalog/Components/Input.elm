@@ -10,11 +10,13 @@
 -}
 
 
-module Catalog.Components.Input exposing (InputBindings, InputProps, InputValidation, bindingsDecoder, component, propsDecoder, validationDecoder)
+module Catalog.Components.Input exposing (InputBindings, InputProps, InputValidation, bindingsDecoder, component, propsDecoder, validationDecoder, viewStateless)
 
 import Dict exposing (Dict)
 import Html exposing (Html, div, input, label, p, text)
 import Html.Attributes exposing (class, placeholder, type_)
+import Html.Events
+import Json.Decode
 import Json.Encode exposing (Value)
 import JsonRender.Bind as Bind
 import JsonRender.Events as Events exposing (EventHandle)
@@ -56,6 +58,48 @@ validationDecoder =
 component : Component msg
 component =
     register propsDecoder bindingsDecoder validationDecoder view
+
+
+viewStateless :
+    InputProps
+    -> { onInput : Maybe (String -> msg), onBlur : msg, validation : Maybe FieldValidation }
+    -> Html msg
+viewStateless props ctx =
+    div [ class "jr-input-wrapper" ]
+        ((case props.label of
+            Just lbl ->
+                [ label [ class "jr-input-label" ] [ text lbl ] ]
+
+            Nothing ->
+                []
+         )
+            ++ [ input
+                    [ type_ "text"
+                    , class "jr-input"
+                    , placeholder (Maybe.withDefault "" props.placeholder)
+                    , Html.Attributes.value props.value
+                    , case ctx.onInput of
+                        Just handler ->
+                            Html.Events.onInput handler
+
+                        Nothing ->
+                            class ""
+                    , Html.Events.on "blur" (Json.Decode.succeed ctx.onBlur)
+                    ]
+                    []
+               , case ctx.validation of
+                    Just fv ->
+                        if not (List.isEmpty fv.errors) && fv.touched then
+                            p [ class "jr-input-error" ]
+                                [ text (List.head fv.errors |> Maybe.withDefault "") ]
+
+                        else
+                            text ""
+
+                    Nothing ->
+                        text ""
+               ]
+        )
 
 
 view : ComponentContext InputProps (InputBindings msg) InputValidation msg -> Html msg

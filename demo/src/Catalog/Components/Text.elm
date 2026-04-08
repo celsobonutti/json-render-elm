@@ -8,7 +8,7 @@
 -}
 
 
-module Catalog.Components.Text exposing (TextProps, component, propsDecoder)
+module Catalog.Components.Text exposing (TextProps, component, propsDecoder, viewStateless)
 
 import Dict exposing (Dict)
 import Html exposing (Html, span, text)
@@ -78,15 +78,20 @@ component =
     register propsDecoder (\_ -> ()) (\_ -> ()) view
 
 
-view : ComponentContext TextProps () () msg -> Html msg
-view ctx =
+viewStateless : TextProps -> Html msg
+viewStateless props =
     let
         sizeClass =
-            case ctx.props.size of
+            case props.size of
                 Just s ->
                     "jr-text-" ++ smOrMdOrLgOrXlToString s
 
                 Nothing ->
                     "jr-text-md"
     in
-    span [ class ("jr-text " ++ sizeClass) ] [ text ctx.props.content ]
+    span [ class ("jr-text " ++ sizeClass) ] [ text props.content ]
+
+
+view : ComponentContext TextProps () () msg -> Html msg
+view ctx =
+    viewStateless ctx.props

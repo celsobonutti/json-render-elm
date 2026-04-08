@@ -2,6 +2,7 @@ module ResolveTest exposing (..)
 
 import Dict
 import Expect
+import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (ResolvedValue(..))
@@ -426,5 +427,31 @@ suite =
                     Expect.equal
                         (Just (RError "Unknown function: missing"))
                         (Dict.get "val" resolved)
+            ]
+        , describe "encodeResolvedDict"
+            [ test "encodes a dict of resolved values to JSON" <|
+                \_ ->
+                    let
+                        dict =
+                            Dict.fromList
+                                [ ( "name", Resolve.RString "Alice" )
+                                , ( "age", Resolve.RInt 30 )
+                                , ( "active", Resolve.RBool True )
+                                ]
+
+                        encoded =
+                            Resolve.encodeResolvedDict dict
+
+                        decoded =
+                            Decode.decodeValue
+                                (Decode.map3 (\n a act -> ( n, a, act ))
+                                    (Decode.field "name" Decode.string)
+                                    (Decode.field "age" Decode.int)
+                                    (Decode.field "active" Decode.bool)
+                                )
+                                encoded
+                    in
+                    decoded
+                        |> Expect.equal (Ok ( "Alice", 30, True ))
             ]
         ]
