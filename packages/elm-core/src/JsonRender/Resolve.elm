@@ -17,6 +17,7 @@ module JsonRender.Resolve exposing
     , resolvedToValue
     , string
     , succeed
+    , valueDecoder
     )
 
 {-| Expression evaluation and pipeline-style prop decoders.
@@ -395,6 +396,12 @@ jsonValueToResolved =
 
                                                                 Err _ ->
                                                                     Recursion.base RNull
+
+
+valueDecoder : Decode.Decoder ResolvedValue
+valueDecoder =
+    Decode.value
+        |> Decode.map jsonValueToResolved
 
 
 resolveTemplate : Value -> String -> String
