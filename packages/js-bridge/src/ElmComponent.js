@@ -43,12 +43,31 @@ class ElmComponent extends HTMLElement {
         );
       });
     }
+
+    // After mounting, move any pre-existing children (rendered by parent Elm)
+    // into the mini app's [data-children-slot] element
+    this._moveChildren();
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
     if (!this._app || oldValue === newValue) return;
     if (this._app.ports && this._app.ports.propsIn) {
       this._app.ports.propsIn.send(this._collectFlags());
+    }
+    // After prop update, re-move children (parent may have re-rendered them)
+    requestAnimationFrame(() => this._moveChildren());
+  }
+
+  _moveChildren() {
+    if (!this._container) return;
+    const slot = this._container.querySelector("[data-children-slot]");
+    if (!slot) return;
+    // Move all direct children that aren't our container into the slot
+    const children = Array.from(this.children).filter(
+      (c) => c !== this._container
+    );
+    for (const child of children) {
+      slot.appendChild(child);
     }
   }
 

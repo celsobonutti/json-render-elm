@@ -8,11 +8,12 @@
 -}
 
 
-module Catalog.Components.Stack exposing (StackProps, component, propsDecoder)
+module Catalog.Components.Stack exposing (StackProps, component, propsDecoder, viewStateless)
 
 import Dict exposing (Dict)
 import Html exposing (Html, div)
 import Html.Attributes exposing (class, style)
+import Html.Attributes as Attr
 import JsonRender.Render exposing (Component, ComponentContext, register)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -74,3 +75,25 @@ view ctx =
                     []
     in
     div (class ("jr-stack " ++ dirClass) :: gapStyle) ctx.children
+
+
+viewStateless : StackProps -> Html msg
+viewStateless props =
+    let
+        dirClass =
+            case props.direction of
+                Just Horizontal ->
+                    "jr-stack-horizontal"
+
+                _ ->
+                    "jr-stack-vertical"
+
+        gapStyle =
+            case props.gap of
+                Just g ->
+                    [ style "gap" (String.fromInt g ++ "px") ]
+
+                Nothing ->
+                    []
+    in
+    div ([ class ("jr-stack " ++ dirClass), Attr.attribute "data-children-slot" "" ] ++ gapStyle) []
