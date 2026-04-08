@@ -3,8 +3,11 @@ module JsonRender.Render exposing
     , ComponentContext
     , RawComponentContext
     , Registry
+    , isStateful
     , register
+    , registerStateful
     , render
+    , renderMiniApps
     )
 
 {-| Spec-to-Html rendering with type-safe components.
@@ -53,6 +56,7 @@ type alias RawComponentContext msg =
 
 type Component msg
     = Component (RawComponentContext msg -> Html msg)
+    | Stateful
 
 
 type alias Registry msg =
@@ -94,6 +98,29 @@ register propsDecoder bindingsDecoder validationDecoder view =
                         ]
                         [ Html.text ("Props error: " ++ err) ]
         )
+
+
+registerStateful :
+    { init : props -> localModel
+    , update : localMsg -> localModel -> localModel
+    , propsDecoder : Dict String ResolvedValue -> Result String props
+    , bindingsDecoder : Dict String (Value -> EventHandle msg) -> bindings
+    , validationDecoder : Dict String Validation.FieldValidation -> validation
+    , view : localModel -> (localMsg -> msg) -> ComponentContext props bindings validation msg -> Html msg
+    }
+    -> Component msg
+registerStateful _ =
+    Stateful
+
+
+isStateful : Component msg -> Bool
+isStateful comp =
+    case comp of
+        Stateful ->
+            True
+
+        Component _ ->
+            False
 
 
 extractBindings : Maybe RepeatContext -> Dict String PropValue -> Dict String (Value -> EventHandle (Msg action))
@@ -333,6 +360,9 @@ renderElement registry state validationState repeatCtx spec element =
 renderElementInner : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
 renderElementInner registry state validationState repeatCtx spec element =
     case Dict.get element.type_ registry.components of
+        Just Stateful ->
+            Html.text ""
+
         Just (Component componentFn) ->
             let
                 resolved =
@@ -471,3 +501,307 @@ renderWatcherTriggers state repeatCtx watchDict =
         )
         []
         watchDict
+
+
+
+-- MINI APP RENDERING
+
+
+renderMiniApps : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Spec -> Html (Msg action)
+renderMiniApps registry state validationState spec =
+    case Dict.get spec.root spec.elements of
+        Just element ->
+            renderElementMiniApp registry state validationState Nothing spec element
+
+        Nothing ->
+            Html.text ""
+
+
+renderElementMiniApp : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
+renderElementMiniApp registry state validationState repeatCtx spec element =
+    case element.visible of
+        Just condition ->
+            case Visibility.evaluate state repeatCtx condition of
+                Ok True ->
+                    renderElementMiniAppInner registry state validationState repeatCtx spec element
+
+                Ok False ->
+                    Html.text ""
+
+                Err err ->
+                    Html.div
+                        [ Html.Attributes.style "background" "#fee2e2"
+                        , Html.Attributes.style "color" "#991b1b"
+                        , Html.Attributes.style "padding" "8px 12px"
+                        , Html.Attributes.style "border-radius" "4px"
+                        , Html.Attributes.style "font-size" "13px"
+                        , Html.Attributes.style "font-family" "monospace"
+                        ]
+                        [ Html.text ("Visibility error: " ++ err) ]
+
+        Nothing ->
+            renderElementMiniAppInner registry state validationState repeatCtx spec element
+
+
+renderElementMiniAppInner : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
+renderElementMiniAppInner registry state validationState repeatCtx spec element =
+    let
+        resolved =
+            Resolve.resolvePropsWith registry.functions state repeatCtx element.props
+
+        propsJson =
+            Encode.encode 0 (Resolve.encodeResolvedDict resolved)
+
+        bindingsJson =
+            Encode.encode 0 (encodeBindingsMetadata element.props repeatCtx)
+
+        eventsJson =
+            Encode.encode 0 (encodeEventHandlers element.on)
+
+        bindStatePath =
+            findBindStatePath element.props repeatCtx
+
+        fieldValidation =
+            case ( findBindPropName element.props, bindStatePath ) of
+                ( Just propName, Just path ) ->
+                    case Dict.get path validationState of
+                        Just fv ->
+                            Dict.singleton propName fv
+
+                        Nothing ->
+                            Dict.empty
+
+                _ ->
+                    Dict.empty
+
+        validationJson =
+            Encode.encode 0 (encodeValidationState fieldValidation)
+
+        children =
+            case element.repeat of
+                Just repeat ->
+                    renderRepeatedChildrenMiniApp registry state validationState spec element repeat
+
+                Nothing ->
+                    renderChildrenMiniApp registry state validationState repeatCtx spec element.children
+
+        actionHandler =
+            Html.Events.on "jr-component-action"
+                (decodeMiniAppAction element.on repeatCtx bindStatePath)
+
+        watcherTriggers =
+            renderWatcherTriggers state repeatCtx element.watch
+
+        validationFields =
+            case Validation.extractValidation element.checks element.validateOn element.enabled element.props repeatCtx of
+                Just ( path, config ) ->
+                    let
+                        isEnabled =
+                            case config.enabled of
+                                Just condition ->
+                                    Visibility.evaluate state repeatCtx condition
+                                        |> Result.withDefault True
+
+                                Nothing ->
+                                    True
+                    in
+                    if isEnabled then
+                        [ Html.node "validation-field"
+                            [ Html.Attributes.attribute "data-path" path
+                            , Html.Attributes.attribute "data-config"
+                                (Encode.encode 0 (Validation.encodeValidationConfig config repeatCtx))
+                            ]
+                            []
+                        ]
+
+                    else
+                        []
+
+                Nothing ->
+                    []
+
+        componentNode =
+            Html.node "jr-elm-component"
+                [ Html.Attributes.attribute "type" element.type_
+                , Html.Attributes.attribute "props" propsJson
+                , Html.Attributes.attribute "bindings" bindingsJson
+                , Html.Attributes.attribute "events" eventsJson
+                , Html.Attributes.attribute "validation" validationJson
+                , Html.Attributes.attribute "validate-on" (validateOnToString element.validateOn)
+                , actionHandler
+                ]
+                children
+
+        siblings =
+            watcherTriggers ++ validationFields
+    in
+    if List.isEmpty siblings then
+        componentNode
+
+    else
+        Html.div [ Html.Attributes.style "display" "contents" ]
+            (componentNode :: siblings)
+
+
+renderChildrenMiniApp : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> List String -> List (Html (Msg action))
+renderChildrenMiniApp registry state validationState repeatCtx spec childIds =
+    List.filterMap
+        (\id ->
+            Dict.get id spec.elements
+                |> Maybe.map (renderElementMiniApp registry state validationState repeatCtx spec)
+        )
+        childIds
+
+
+renderRepeatedChildrenMiniApp : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Spec -> Element -> Repeat -> List (Html (Msg action))
+renderRepeatedChildrenMiniApp registry state validationState spec element repeat =
+    case State.get repeat.statePath state |> Maybe.andThen decodeList of
+        Just items ->
+            let
+                singleChild =
+                    List.length element.children == 1
+
+                keyedChildren =
+                    List.indexedMap
+                        (\i item ->
+                            let
+                                ctx =
+                                    Just
+                                        { item = item
+                                        , index = i
+                                        , basePath = repeat.statePath ++ "/" ++ String.fromInt i
+                                        }
+
+                                itemKey =
+                                    getItemKey repeat.key i item
+                            in
+                            if singleChild then
+                                List.filterMap
+                                    (\id ->
+                                        Dict.get id spec.elements
+                                            |> Maybe.map (\el -> ( itemKey, renderElementMiniApp registry state validationState ctx spec el ))
+                                    )
+                                    element.children
+
+                            else
+                                List.filterMap
+                                    (\id ->
+                                        Dict.get id spec.elements
+                                            |> Maybe.map (\el -> ( id ++ "-" ++ String.fromInt i ++ "-" ++ itemKey, renderElementMiniApp registry state validationState ctx spec el ))
+                                    )
+                                    element.children
+                        )
+                        items
+                        |> List.concat
+            in
+            [ Html.Keyed.node "div" [ Html.Attributes.style "display" "contents" ] keyedChildren ]
+
+        Nothing ->
+            []
+
+
+encodeBindingsMetadata : Dict String PropValue -> Maybe RepeatContext -> Value
+encodeBindingsMetadata props repeatCtx =
+    Dict.foldl
+        (\key propValue acc ->
+            case propValue of
+                BindStateExpr path ->
+                    ( key, Encode.string path ) :: acc
+
+                BindItemExpr field ->
+                    case repeatCtx of
+                        Just ctx ->
+                            let
+                                path =
+                                    if field == "" then
+                                        ctx.basePath
+
+                                    else
+                                        ctx.basePath ++ "/" ++ field
+                            in
+                            ( key, Encode.string path ) :: acc
+
+                        Nothing ->
+                            acc
+
+                _ ->
+                    acc
+        )
+        []
+        props
+        |> Encode.object
+
+
+encodeEventHandlers : Dict String EventHandler -> Value
+encodeEventHandlers handlers =
+    handlers
+        |> Dict.toList
+        |> List.map (\( name, _ ) -> ( name, Encode.bool True ))
+        |> Encode.object
+
+
+encodeValidationState : Dict String Validation.FieldValidation -> Value
+encodeValidationState validationDict =
+    validationDict
+        |> Dict.toList
+        |> List.map
+            (\( key, fv ) ->
+                ( key
+                , Encode.object
+                    [ ( "errors", Encode.list Encode.string fv.errors )
+                    , ( "touched", Encode.bool fv.touched )
+                    , ( "validated", Encode.bool fv.validated )
+                    ]
+                )
+            )
+        |> Encode.object
+
+
+validateOnToString : Validation.ValidateOn -> String
+validateOnToString vo =
+    case vo of
+        Validation.OnSubmit ->
+            "submit"
+
+        Validation.OnBlur ->
+            "blur"
+
+        Validation.OnChange ->
+            "change"
+
+
+decodeMiniAppAction : Dict String EventHandler -> Maybe RepeatContext -> Maybe String -> Decode.Decoder (Msg action)
+decodeMiniAppAction onHandlers repeatCtx bindStatePath =
+    Decode.at [ "detail", "type" ] Decode.string
+        |> Decode.andThen
+            (\actionType ->
+                case actionType of
+                    "binding" ->
+                        Decode.map2
+                            (\path value -> BindingUpdate path value)
+                            (Decode.at [ "detail", "path" ] Decode.string)
+                            (Decode.at [ "detail", "value" ] Decode.value)
+
+                    "emit" ->
+                        Decode.at [ "detail", "event" ] Decode.string
+                            |> Decode.andThen
+                                (\eventName ->
+                                    case Dict.get eventName onHandlers of
+                                        Just handler ->
+                                            Decode.succeed (ExecuteAction handler repeatCtx)
+
+                                        Nothing ->
+                                            Decode.fail ("No handler for event: " ++ eventName)
+                                )
+
+                    "validate" ->
+                        case bindStatePath of
+                            Just path ->
+                                Decode.succeed (ValidateField path)
+
+                            Nothing ->
+                                Decode.fail "No bind state path for validation"
+
+                    _ ->
+                        Decode.fail ("Unknown action type: " ++ actionType)
+            )

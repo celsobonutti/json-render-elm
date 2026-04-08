@@ -3,10 +3,13 @@ module JsonRender exposing
     , Config
     , Model
     , create
+    , createMiniApps
     , init
     , receiveSpec
     , register
+    , registerStateful
     , render
+    , renderMiniApps
     , specDecoder
     )
 
@@ -129,6 +132,44 @@ render =
     Render.render
 
 
+{-| Render a spec using mini app mode, outputting `<jr-elm-component>` nodes
+instead of calling component view functions directly.
+-}
+renderMiniApps : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Spec -> Html (Msg action)
+renderMiniApps =
+    Render.renderMiniApps
+
+
+{-| Like `create`, but uses the mini app renderer that outputs `<jr-elm-component>` nodes.
+-}
+createMiniApps : Config action model msg -> App action model msg
+createMiniApps config =
+    let
+        functions =
+            config.registry.functions
+    in
+    { update =
+        \msg model ->
+            let
+                ( newJR, cmd ) =
+                    Actions.update functions config.actionConfig msg (config.getModel model)
+            in
+            ( config.setModel newJR model, Cmd.map config.toMsg cmd )
+    , render =
+        \model ->
+            let
+                jr =
+                    config.getModel model
+            in
+            case jr.spec of
+                Just spec ->
+                    Html.map config.toMsg (Render.renderMiniApps config.registry jr.state jr.validationState spec)
+
+                Nothing ->
+                    Html.text ""
+    }
+
+
 {-| Register a component with a props decoder, bindings decoder, validation decoder, and view function.
 -}
 register :
@@ -139,6 +180,26 @@ register :
     -> Component (Msg action)
 register =
     Render.register
+
+
+{-| Register a stateful component that will be rendered as a mini Elm app.
+
+At runtime, discards its arguments and returns a `Stateful` marker.
+The arguments exist for type documentation and so elm-review can parse
+source to generate Browser.element wrappers.
+
+-}
+registerStateful :
+    { init : props -> localModel
+    , update : localMsg -> localModel -> localModel
+    , propsDecoder : Dict String ResolvedValue -> Result String props
+    , bindingsDecoder : Dict String (Value -> EventHandle (Msg action)) -> bindings
+    , validationDecoder : Dict String Validation.FieldValidation -> validation
+    , view : localModel -> (localMsg -> Msg action) -> ComponentContext props bindings validation (Msg action) -> Html (Msg action)
+    }
+    -> Component (Msg action)
+registerStateful =
+    Render.registerStateful
 
 
 {-| Decoder for json-render specs.
