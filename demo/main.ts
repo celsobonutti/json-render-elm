@@ -1,4 +1,5 @@
 import "./style.css"
+import "./src/web-components/JrDropdown.ts"
 // @ts-ignore -- Elm module has no type declarations
 import { Elm } from "./src/Main.elm"
 import { createElmBridge } from "../packages/js-bridge/src/index.ts"

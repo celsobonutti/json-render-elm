@@ -77,6 +77,19 @@ export const catalog = defineCatalog(schema, {
       validatable: [],
       description: "An image element",
     },
+    Dropdown: {
+      props: z.object({
+        options: z.array(z.object({ label: z.string(), value: z.string() })),
+        value: z.string().optional(),
+        placeholder: z.string().optional(),
+        label: z.string().optional(),
+      }),
+      slots: [],
+      bindable: ["value"],
+      validatable: [],
+      description:
+        "A dropdown select with search filtering and keyboard navigation. Use { $bindState } on value for two-way binding.",
+    },
     Badge: {
       props: z.object({
         label: z.string(),
