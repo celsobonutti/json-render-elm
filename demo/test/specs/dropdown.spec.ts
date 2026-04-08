@@ -44,7 +44,10 @@ test.describe("Dropdown (Mini Elm App)", () => {
     await page.locator(".jr-dropdown-trigger").click()
     const search = page.locator(".jr-dropdown-search")
     await search.press("ArrowDown")
+    // Wait for the mini app to process the key event before pressing the next
+    await expect(page.locator(".jr-dropdown-option-highlighted")).toHaveText("Banana")
     await search.press("ArrowDown")
+    await expect(page.locator(".jr-dropdown-option-highlighted")).toHaveText("Cherry")
     await search.press("Enter")
     await expect(page.locator(".jr-dropdown-trigger")).toContainText("Cherry")
   })

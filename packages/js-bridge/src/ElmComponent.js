@@ -11,6 +11,10 @@ class ElmComponent extends HTMLElement {
   }
 
   connectedCallback() {
+    // If already initialized (re-parented), skip re-init
+    this._disconnecting = false;
+    if (this._app) return;
+
     const type = this.getAttribute("type");
     const registry = window.__jrElmComponents;
     if (!registry || !registry[type]) {
@@ -32,9 +36,17 @@ class ElmComponent extends HTMLElement {
       flags: flags,
     });
 
+    // Track the actual root element (vite-plugin-elm's HMR wrapper replaces
+    // _container with a div[data-elm-hot], so we need to find it)
+    this._elmRoot = Array.from(this.children).find(
+      (c) => c.hasAttribute && c.hasAttribute("data-elm-hot")
+    ) || this._container;
+
     // Listen for actions from the mini app
     if (this._app.ports && this._app.ports.actionsOut) {
       this._app.ports.actionsOut.subscribe((action) => {
+        // Skip empty init actions (mini apps send {} on init)
+        if (action && typeof action === "object" && Object.keys(action).length === 0) return;
         this.dispatchEvent(
           new CustomEvent("jr-component-action", {
             detail: action,
@@ -44,9 +56,36 @@ class ElmComponent extends HTMLElement {
       });
     }
 
-    // After mounting, move any pre-existing children (rendered by parent Elm)
-    // into the mini app's [data-children-slot] element
-    this._moveChildren();
+    // For stateful components with children, observe for the slot to appear
+    // and move children into it.
+    this._observeSlot();
+  }
+
+  _observeSlot() {
+    const root = this._elmRoot;
+    if (!root) return;
+    // Check immediately
+    if (this._tryMoveChildren(root)) return;
+    // Watch for the slot to appear after async render
+    this._slotObserver = new MutationObserver(() => {
+      if (this._tryMoveChildren(root)) {
+        this._slotObserver.disconnect();
+        this._slotObserver = null;
+      }
+    });
+    this._slotObserver.observe(root, { childList: true, subtree: true });
+  }
+
+  _tryMoveChildren(root) {
+    const slot = root.querySelector("[data-children-slot]");
+    if (!slot) return false;
+    const children = Array.from(this.children).filter(
+      (c) => c !== root && c !== this._container
+    );
+    for (const child of children) {
+      slot.appendChild(child);
+    }
+    return true;
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -54,30 +93,25 @@ class ElmComponent extends HTMLElement {
     if (this._app.ports && this._app.ports.propsIn) {
       this._app.ports.propsIn.send(this._collectFlags());
     }
-    // After prop update, re-move children (parent may have re-rendered them)
-    requestAnimationFrame(() => this._moveChildren());
-  }
-
-  _moveChildren() {
-    if (!this._container) return;
-    const slot = this._container.querySelector("[data-children-slot]");
-    if (!slot) return;
-    // Move all direct children that aren't our container into the slot
-    const children = Array.from(this.children).filter(
-      (c) => c !== this._container
-    );
-    for (const child of children) {
-      slot.appendChild(child);
-    }
   }
 
   disconnectedCallback() {
-    // Elm doesn't have a destroy API, but we clean up the container
-    if (this._container) {
-      this._container.remove();
-      this._container = null;
-    }
-    this._app = null;
+    // When _moveChildren re-parents this element, disconnectedCallback fires
+    // followed by connectedCallback. Use a microtask to defer cleanup.
+    this._disconnecting = true;
+    queueMicrotask(() => {
+      if (!this._disconnecting) return;
+      if (this._slotObserver) {
+        this._slotObserver.disconnect();
+        this._slotObserver = null;
+      }
+      if (this._container) {
+        this._container.remove();
+        this._container = null;
+      }
+      this._elmRoot = null;
+      this._app = null;
+    });
   }
 
   _collectFlags() {

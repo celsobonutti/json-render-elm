@@ -511,7 +511,22 @@ renderMiniApps : Registry (Msg action) -> Value -> Dict String Validation.FieldV
 renderMiniApps registry state validationState spec =
     case Dict.get spec.root spec.elements of
         Just element ->
-            renderElementMiniApp registry state validationState Nothing spec element
+            Html.node "jr-validation-root"
+                [ Html.Attributes.style "display" "contents"
+                , Html.Events.on "validation-register"
+                    (Decode.at [ "detail", "config" ] (Decode.string |> Decode.andThen decodeConfigString)
+                        |> Decode.andThen
+                            (\( config, repeatCtx ) ->
+                                Decode.at [ "detail", "path" ] Decode.string
+                                    |> Decode.map (\path -> RegisterValidation path config repeatCtx)
+                            )
+                    )
+                , Html.Events.on "validation-unregister"
+                    (Decode.at [ "detail", "path" ] Decode.string
+                        |> Decode.map UnregisterValidation
+                    )
+                ]
+                [ renderElementMiniApp registry state validationState Nothing spec element ]
 
         Nothing ->
             Html.text ""
@@ -545,6 +560,21 @@ renderElementMiniApp registry state validationState repeatCtx spec element =
 
 renderElementMiniAppInner : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
 renderElementMiniAppInner registry state validationState repeatCtx spec element =
+    case Dict.get element.type_ registry.components of
+        Just Stateful ->
+            -- Stateful components render as <jr-elm-component> custom elements
+            renderStatefulMiniApp registry state validationState repeatCtx spec element
+
+        Just (Component componentFn) ->
+            -- Non-stateful components render directly (same as standard renderer)
+            renderElementInner registry state validationState repeatCtx spec element
+
+        Nothing ->
+            Html.text ""
+
+
+renderStatefulMiniApp : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
+renderStatefulMiniApp registry state validationState repeatCtx spec element =
     let
         resolved =
             Resolve.resolvePropsWith registry.functions state repeatCtx element.props
