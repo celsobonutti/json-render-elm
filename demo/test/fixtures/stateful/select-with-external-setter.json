@@ -4,7 +4,7 @@
     "stack": {
       "type": "Stack",
       "props": { "direction": "vertical", "gap": 8 },
-      "children": ["display", "select1", "set-grape-btn"]
+      "children": ["top-row", "select1"]
     },
     "select1": {
       "type": "Select",
@@ -23,6 +23,11 @@
           }
         }
       }
+    },
+    "top-row": {
+      "type": "Stack",
+      "props": { "direction": "horizontal", "gap": 8 },
+      "children": ["display", "set-grape-btn"]
     },
     "display": {
       "type": "Text",
