@@ -422,51 +422,68 @@ declarationListVisitor declarations context =
                                                         ElmCodeGen.generatedComment componentName schema
 
                                                     -- Check each declaration
+                                                    usesRegisterStateful =
+                                                        case findDeclarationRange "component" ElmCodeGen.FunctionDecl declarations of
+                                                            Just compRange ->
+                                                                String.contains "registerStateful" (context.extractSourceCode compRange)
+
+                                                            Nothing ->
+                                                                False
+
                                                     declFixes =
-                                                        List.concatMap
-                                                            (\decl ->
-                                                                case findDeclarationRange decl.name decl.kind declarations of
-                                                                    Just declRange ->
-                                                                        let
-                                                                            currentCode =
-                                                                                context.extractSourceCode declRange
-                                                                        in
-                                                                        if String.trim currentCode == String.trim decl.code then
-                                                                            []
+                                                        if usesRegisterStateful then
+                                                            []
 
-                                                                        else if decl.name == "component" && String.contains "registerStateful" currentCode then
-                                                                            []
+                                                        else
+                                                            List.concatMap
+                                                                (\decl ->
+                                                                    case findDeclarationRange decl.name decl.kind declarations of
+                                                                        Just declRange ->
+                                                                            let
+                                                                                currentCode =
+                                                                                    context.extractSourceCode declRange
+                                                                            in
+                                                                            if String.trim currentCode == String.trim decl.code then
+                                                                                []
 
-                                                                        else
-                                                                            [ Fix.replaceRangeBy declRange (decl.code ++ "\n") ]
+                                                                            else
+                                                                                [ Fix.replaceRangeBy declRange (decl.code ++ "\n") ]
 
-                                                                    Nothing ->
-                                                                        [ Fix.insertAt vRange.start (decl.code ++ "\n\n\n") ]
-                                                            )
-                                                            expected
+                                                                        Nothing ->
+                                                                            [ Fix.insertAt vRange.start (decl.code ++ "\n\n\n") ]
+                                                                )
+                                                                expected
 
                                                     -- Check managed comment
                                                     commentFixes =
-                                                        case findManagedCommentRange context.extractSourceCode of
-                                                            Just commentRange ->
-                                                                let
-                                                                    currentComment =
-                                                                        context.extractSourceCode commentRange
-                                                                in
-                                                                if String.trim currentComment == String.trim expectedComment then
-                                                                    []
+                                                        if usesRegisterStateful then
+                                                            []
 
-                                                                else
-                                                                    [ Fix.replaceRangeBy commentRange (expectedComment ++ "\n") ]
+                                                        else
+                                                            case findManagedCommentRange context.extractSourceCode of
+                                                                Just commentRange ->
+                                                                    let
+                                                                        currentComment =
+                                                                            context.extractSourceCode commentRange
+                                                                    in
+                                                                    if String.trim currentComment == String.trim expectedComment then
+                                                                        []
 
-                                                            Nothing ->
-                                                                -- No comment found, insert at very top
-                                                                [ Fix.insertAt { row = 1, column = 1 } (expectedComment ++ "\n") ]
+                                                                    else
+                                                                        [ Fix.replaceRangeBy commentRange (expectedComment ++ "\n") ]
+
+                                                                Nothing ->
+                                                                    -- No comment found, insert at very top
+                                                                    [ Fix.insertAt { row = 1, column = 1 } (expectedComment ++ "\n") ]
 
                                                     -- Check imports
                                                     missingImportLines =
-                                                        requiredComponentImportLines schema
-                                                            |> List.filter (\( modName, _ ) -> not (Set.member modName context.importedModules))
+                                                        if usesRegisterStateful then
+                                                            []
+
+                                                        else
+                                                            requiredComponentImportLines schema
+                                                                |> List.filter (\( modName, _ ) -> not (Set.member modName context.importedModules))
 
                                                     importFixes =
                                                         case ( missingImportLines, context.lastImportEnd ) of

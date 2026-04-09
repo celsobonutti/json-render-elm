@@ -1,0 +1,38 @@
+{
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 8 },
+      "children": ["select1", "display"]
+    },
+    "select1": {
+      "type": "Select",
+      "props": {
+        "label": "Fruit",
+        "placeholder": "Pick a fruit...",
+        "options": ["Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape"],
+        "value": { "$bindState": "/selected" }
+      },
+      "on": {
+        "change": {
+          "action": "setState",
+          "params": {
+            "statePath": "/changed",
+            "value": true
+          }
+        }
+      }
+    },
+    "display": {
+      "type": "Text",
+      "props": {
+        "content": { "$template": "Selected: ${/selected}" }
+      }
+    }
+  },
+  "state": {
+    "selected": "",
+    "changed": false
+  }
+}

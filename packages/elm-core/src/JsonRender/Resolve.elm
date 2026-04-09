@@ -12,6 +12,7 @@ module JsonRender.Resolve exposing
     , resolvePropValue
     , resolveProps
     , resolvePropsWith
+    , list
     , object
     , resolvedToValue
     , string
@@ -535,6 +536,32 @@ bool val =
 
         _ ->
             Err "expected bool"
+
+
+list : (ResolvedValue -> Result String a) -> ResolvedValue -> Result String (List a)
+list itemDecoder val =
+    case val of
+        RList items ->
+            List.foldr
+                (\item acc ->
+                    case ( acc, itemDecoder item ) of
+                        ( Ok accList, Ok decoded ) ->
+                            Ok (decoded :: accList)
+
+                        ( Err e, _ ) ->
+                            Err e
+
+                        ( _, Err e ) ->
+                            Err e
+                )
+                (Ok [])
+                items
+
+        RError err ->
+            Err err
+
+        _ ->
+            Err "expected list"
 
 
 object : ResolvedValue -> Result String (Dict String ResolvedValue)
