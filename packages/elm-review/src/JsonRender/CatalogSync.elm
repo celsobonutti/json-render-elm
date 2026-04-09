@@ -434,6 +434,9 @@ declarationListVisitor declarations context =
                                                                         if String.trim currentCode == String.trim decl.code then
                                                                             []
 
+                                                                        else if decl.name == "component" && String.contains "registerStateful" currentCode then
+                                                                            []
+
                                                                         else
                                                                             [ Fix.replaceRangeBy declRange (decl.code ++ "\n") ]
 
