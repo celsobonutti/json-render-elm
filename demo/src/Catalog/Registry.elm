@@ -3,6 +3,7 @@ module Catalog.Registry exposing (registry)
 import Catalog.Components.Badge
 import Catalog.Components.Button
 import Catalog.Components.Card
+import Catalog.Components.Dropdown
 import Catalog.Components.Image
 import Catalog.Components.Input
 import Catalog.Components.Stack
@@ -19,6 +20,7 @@ registry =
             [ ( "Badge", Catalog.Components.Badge.component )
             , ( "Button", Catalog.Components.Button.component )
             , ( "Card", Catalog.Components.Card.component )
+            , ( "Dropdown", Catalog.Components.Dropdown.component )
             , ( "Image", Catalog.Components.Image.component )
             , ( "Input", Catalog.Components.Input.component )
             , ( "Stack", Catalog.Components.Stack.component )
