@@ -4,9 +4,11 @@ import Dict
 import Expect
 import Html exposing (div, text)
 import Html.Attributes exposing (class)
+import Html.Events
 import JsonRender.Events as Events
 import Json.Decode as Decode
 import Json.Encode as Encode
+import JsonRender.Actions
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Render as Render
 import JsonRender.Resolve as Resolve
@@ -18,7 +20,7 @@ import Test.Html.Query as Query
 import Test.Html.Selector as Selector
 
 
-testRegistry : Render.Registry msg
+testRegistry : Render.Registry (JsonRender.Actions.Msg action)
 testRegistry =
     { components =
         Dict.fromList
@@ -65,6 +67,30 @@ testRegistry =
                             ]
                             [ text ctx.props ]
                     )
+              )
+            , ( "Counter"
+              , Render.registerStateful
+                    (\props ->
+                        Resolve.succeed identity
+                            |> Resolve.required "label" Resolve.string
+                            |> (\d -> d props)
+                    )
+                    (\_ -> ())
+                    (\_ -> ())
+                    { init = \_ -> 0
+                    , update =
+                        \() count _ ->
+                            ( count + 1, [] )
+                    , view =
+                        \count label toMsg _ ->
+                            div [ class "counter" ]
+                                [ Html.button
+                                    [ class "counter-btn"
+                                    , Html.Events.onClick (toMsg ())
+                                    ]
+                                    [ text (label ++ ": " ++ String.fromInt count) ]
+                                ]
+                    }
               )
             ]
     , functions =
@@ -1497,5 +1523,90 @@ suite =
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)
+            ]
+        , describe "stateful components"
+            [ test "renders stateful component with initial state" <|
+                \_ ->
+                    let
+                        spec =
+                            { root = "c"
+                            , elements =
+                                Dict.fromList
+                                    [ ( "c"
+                                      , { type_ = "Counter"
+                                        , props = Dict.fromList [ ( "label", StringValue "Clicks" ) ]
+                                        , children = []
+                                        , visible = Nothing
+                                        , repeat = Nothing
+                                        , on = Dict.empty
+                                        , watch = Dict.empty
+                                        , enabled = Nothing
+                                        , checks = []
+                                        , validateOn = OnSubmit
+                                        }
+                                      )
+                                    ]
+                            , state = Nothing
+                            }
+                    in
+                    Render.render testRegistry Encode.null Dict.empty Dict.empty spec
+                        |> Query.fromHtml
+                        |> Query.find [ Selector.class "counter" ]
+                        |> Query.has [ Selector.text "Clicks: 0" ]
+            , test "wraps stateful component in component-mount on first render" <|
+                \_ ->
+                    let
+                        spec =
+                            { root = "c"
+                            , elements =
+                                Dict.fromList
+                                    [ ( "c"
+                                      , { type_ = "Counter"
+                                        , props = Dict.fromList [ ( "label", StringValue "Clicks" ) ]
+                                        , children = []
+                                        , visible = Nothing
+                                        , repeat = Nothing
+                                        , on = Dict.empty
+                                        , watch = Dict.empty
+                                        , enabled = Nothing
+                                        , checks = []
+                                        , validateOn = OnSubmit
+                                        }
+                                      )
+                                    ]
+                            , state = Nothing
+                            }
+                    in
+                    Render.render testRegistry Encode.null Dict.empty Dict.empty spec
+                        |> Query.fromHtml
+                        |> Query.find [ Selector.tag "component-mount" ]
+                        |> Query.has [ Selector.text "Clicks: 0" ]
+            , test "stateful component with props error shows error" <|
+                \_ ->
+                    let
+                        spec =
+                            { root = "c"
+                            , elements =
+                                Dict.fromList
+                                    [ ( "c"
+                                      , { type_ = "Counter"
+                                        , props = Dict.empty
+                                        , children = []
+                                        , visible = Nothing
+                                        , repeat = Nothing
+                                        , on = Dict.empty
+                                        , watch = Dict.empty
+                                        , enabled = Nothing
+                                        , checks = []
+                                        , validateOn = OnSubmit
+                                        }
+                                      )
+                                    ]
+                            , state = Nothing
+                            }
+                    in
+                    Render.render testRegistry Encode.null Dict.empty Dict.empty spec
+                        |> Query.fromHtml
+                        |> Query.has [ Selector.text "Props error:" ]
             ]
         ]
