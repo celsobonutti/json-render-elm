@@ -32,6 +32,7 @@ import Html exposing (Html)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions as Actions exposing (Msg)
+import JsonRender.Internal.ComponentInstance exposing (ComponentInstance)
 import JsonRender.Internal.EventHandle exposing (EventHandle)
 import JsonRender.Render as Render exposing (Component, ComponentContext, Registry)
 import JsonRender.Resolve exposing (ResolvedValue)
@@ -118,16 +119,16 @@ create config =
             in
             case jr.spec of
                 Just spec ->
-                    Html.map config.toMsg (Render.render config.registry jr.state jr.validationState spec)
+                    Html.map config.toMsg (Render.render config.registry jr.state jr.validationState jr.localComponents spec)
 
                 Nothing ->
                     Html.text ""
     }
 
 
-{-| Render a spec to Html using the given registry, state, and validation state.
+{-| Render a spec to Html using the given registry, state, validation state, and local components.
 -}
-render : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Spec -> Html (Msg action)
+render : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Dict String (ComponentInstance (Msg action)) -> Spec -> Html (Msg action)
 render =
     Render.render
 
