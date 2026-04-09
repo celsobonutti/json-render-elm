@@ -6,6 +6,7 @@ module JsonRender exposing
     , init
     , receiveSpec
     , register
+    , registerStateful
     , render
     , specDecoder
     )
@@ -31,6 +32,7 @@ import Html exposing (Html)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions as Actions exposing (Msg)
+import JsonRender.Internal.ComponentInstance exposing (ComponentInstance)
 import JsonRender.Internal.EventHandle exposing (EventHandle)
 import JsonRender.Render as Render exposing (Component, ComponentContext, Registry)
 import JsonRender.Resolve exposing (ResolvedValue)
@@ -41,8 +43,8 @@ import Random
 
 {-| The json-render model. Store this in your application model.
 -}
-type alias Model =
-    Actions.Model
+type alias Model action =
+    Actions.Model action
 
 
 {-| Configuration for `create`.
@@ -51,8 +53,8 @@ type alias Config action model msg =
     { actionConfig : Actions.ActionConfig action
     , registry : Registry (Msg action)
     , toMsg : Msg action -> msg
-    , getModel : model -> Model
-    , setModel : Model -> model -> model
+    , getModel : model -> Model action
+    , setModel : Model action -> model -> model
     }
 
 
@@ -66,19 +68,20 @@ type alias App action model msg =
 
 {-| Create an empty json-render model.
 -}
-init : Random.Seed -> Model
+init : Random.Seed -> Model action
 init seed =
     { spec = Nothing
     , state = Encode.object []
     , seed = seed
     , validationState = Dict.empty
     , validationRegistry = Dict.empty
+    , localComponents = Dict.empty
     }
 
 
 {-| Decode and apply an incoming spec to the model.
 -}
-receiveSpec : Value -> Model -> Result String Model
+receiveSpec : Value -> Model action -> Result String (Model action)
 receiveSpec val model =
     case Decode.decodeValue Spec.decoder val of
         Ok spec ->
@@ -86,6 +89,7 @@ receiveSpec val model =
                 { model
                     | spec = Just spec
                     , state = Maybe.withDefault model.state spec.state
+                    , localComponents = Dict.empty
                 }
 
         Err err ->
@@ -115,16 +119,16 @@ create config =
             in
             case jr.spec of
                 Just spec ->
-                    Html.map config.toMsg (Render.render config.registry jr.state jr.validationState spec)
+                    Html.map config.toMsg (Render.render config.registry jr.state jr.validationState jr.localComponents spec)
 
                 Nothing ->
                     Html.text ""
     }
 
 
-{-| Render a spec to Html using the given registry, state, and validation state.
+{-| Render a spec to Html using the given registry, state, validation state, and local components.
 -}
-render : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Spec -> Html (Msg action)
+render : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Dict String (ComponentInstance (Msg action)) -> Spec -> Html (Msg action)
 render =
     Render.render
 
@@ -139,6 +143,22 @@ register :
     -> Component (Msg action)
 register =
     Render.register
+
+
+{-| Register a stateful component with local state lifecycle.
+-}
+registerStateful :
+    (Dict String ResolvedValue -> Result String props)
+    -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
+    -> (Dict String Validation.FieldValidation -> validation)
+    -> { init : props -> state
+       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
+       , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
+       , onPropsChange : Maybe (props -> state -> ( state, List (EventHandle (Msg action)) ))
+       }
+    -> Component (Msg action)
+registerStateful =
+    Render.registerStateful
 
 
 {-| Decoder for json-render specs.

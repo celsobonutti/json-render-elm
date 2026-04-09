@@ -4,6 +4,7 @@ module JsonRender.Render exposing
     , RawComponentContext
     , Registry
     , register
+    , registerStateful
     , render
     )
 
@@ -18,6 +19,7 @@ import Html.Keyed
 import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions exposing (Msg(..))
+import JsonRender.Internal.ComponentInstance as ComponentInstance exposing (ComponentInstance(..))
 import JsonRender.Internal.EventHandle as EventHandle exposing (EventHandle)
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext, ResolvedValue)
@@ -40,19 +42,14 @@ type alias ComponentContext props bindings validation msg =
 
 
 type alias RawComponentContext msg =
-    { props : Dict String ResolvedValue
-    , bindings : Dict String (Value -> EventHandle msg)
-    , validation : Dict String Validation.FieldValidation
-    , children : List (Html msg)
-    , emit : String -> EventHandle msg
-    , validate : EventHandle msg
-    , validateAndEmit : String -> EventHandle msg
-    , validateOn : Validation.ValidateOn
-    }
+    ComponentInstance.RawComponentContext msg
 
 
 type Component msg
-    = Component (RawComponentContext msg -> Html msg)
+    = Stateless (RawComponentContext msg -> Html msg)
+    | Stateful
+        { create : String -> RawComponentContext msg -> ( ComponentInstance msg, Html msg )
+        }
 
 
 type alias Registry msg =
@@ -68,7 +65,7 @@ register :
     -> (ComponentContext props bindings validation msg -> Html msg)
     -> Component msg
 register propsDecoder bindingsDecoder validationDecoder view =
-    Component
+    Stateless
         (\raw ->
             case propsDecoder raw.props of
                 Ok typed ->
@@ -84,16 +81,146 @@ register propsDecoder bindingsDecoder validationDecoder view =
                         }
 
                 Err err ->
-                    Html.div
-                        [ Html.Attributes.style "background" "#fee2e2"
-                        , Html.Attributes.style "color" "#991b1b"
-                        , Html.Attributes.style "padding" "8px 12px"
-                        , Html.Attributes.style "border-radius" "4px"
-                        , Html.Attributes.style "font-size" "13px"
-                        , Html.Attributes.style "font-family" "monospace"
-                        ]
-                        [ Html.text ("Props error: " ++ err) ]
+                    propsErrorHtml err
         )
+
+
+registerStateful :
+    (Dict String ResolvedValue -> Result String props)
+    -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
+    -> (Dict String Validation.FieldValidation -> validation)
+    -> { init : props -> state
+       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
+       , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
+       , onPropsChange : Maybe (props -> state -> ( state, List (EventHandle (Msg action)) ))
+       }
+    -> Component (Msg action)
+registerStateful propsDecoder bindingsDecoder validationDecoder def =
+    Stateful
+        { create =
+            \key raw ->
+                case propsDecoder raw.props of
+                    Ok props ->
+                        let
+                            state =
+                                def.init props
+
+                            instance =
+                                buildInstance propsDecoder bindingsDecoder validationDecoder def key state
+                        in
+                        ( instance, viewInstance instance raw )
+
+                    Err err ->
+                        ( buildErrorInstance err
+                        , propsErrorHtml err
+                        )
+        }
+
+
+buildInstance :
+    (Dict String ResolvedValue -> Result String props)
+    -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
+    -> (Dict String Validation.FieldValidation -> validation)
+    -> { init : props -> state
+       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
+       , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
+       , onPropsChange : Maybe (props -> state -> ( state, List (EventHandle (Msg action)) ))
+       }
+    -> String
+    -> state
+    -> ComponentInstance (Msg action)
+buildInstance propsDecoder bindingsDecoder validationDecoder def key state =
+    -- elm-review: IGNORE TCO
+    -- buildInstance returns immediately. The self-references are lambda captures, not calls —
+    -- they only execute when the Elm runtime fires an event, in a separate call stack.
+    ComponentInstance
+        { view =
+            \raw ->
+                case propsDecoder raw.props of
+                    Ok props ->
+                        let
+                            ctx =
+                                { props = props
+                                , bindings = bindingsDecoder raw.bindings
+                                , validation = validationDecoder raw.validation
+                                , children = raw.children
+                                , emit = raw.emit
+                                , validate = raw.validate
+                                , validateAndEmit = raw.validateAndEmit
+                                , validateOn = raw.validateOn
+                                }
+
+                            toMsg localMsg =
+                                let
+                                    ( newState, handles ) =
+                                        def.update localMsg state ctx
+
+                                    newInstance =
+                                        buildInstance propsDecoder bindingsDecoder validationDecoder def key newState
+                                in
+                                UpdateLocal key newInstance handles
+                        in
+                        def.view state props toMsg raw.children
+
+                    Err err ->
+                        propsErrorHtml err
+        , onPropsChanged =
+            \raw ->
+                case def.onPropsChange of
+                    Nothing ->
+                        ( buildInstance propsDecoder bindingsDecoder validationDecoder def key state, [] )
+
+                    Just handler ->
+                        case propsDecoder raw.props of
+                            Ok props ->
+                                let
+                                    ( newState, handles ) =
+                                        handler props state
+                                in
+                                ( buildInstance propsDecoder bindingsDecoder validationDecoder def key newState, handles )
+
+                            Err _ ->
+                                ( buildInstance propsDecoder bindingsDecoder validationDecoder def key state, [] )
+        }
+
+
+viewInstance : ComponentInstance msg -> RawComponentContext msg -> Html msg
+viewInstance (ComponentInstance inst) raw =
+    inst.view raw
+
+
+buildErrorInstance : String -> ComponentInstance msg
+buildErrorInstance err =
+    -- elm-review: IGNORE TCO
+    -- buildErrorInstance returns immediately. The self-reference is a lambda capture, not a call —
+    -- it only executes when the Elm runtime fires a props-changed event, in a separate call stack.
+    ComponentInstance
+        { view = \_ -> propsErrorHtml err
+        , onPropsChanged = \_ -> ( buildErrorInstance err, [] )
+        }
+
+
+propsErrorHtml : String -> Html msg
+propsErrorHtml err =
+    Html.div
+        [ Html.Attributes.style "background" "#fee2e2"
+        , Html.Attributes.style "color" "#991b1b"
+        , Html.Attributes.style "padding" "8px 12px"
+        , Html.Attributes.style "border-radius" "4px"
+        , Html.Attributes.style "font-size" "13px"
+        , Html.Attributes.style "font-family" "monospace"
+        ]
+        [ Html.text ("Props error: " ++ err) ]
+
+
+localStateKey : String -> Maybe RepeatContext -> String
+localStateKey elementId repeatCtx =
+    case repeatCtx of
+        Just ctx ->
+            elementId ++ ":" ++ ctx.basePath
+
+        Nothing ->
+            elementId
 
 
 extractBindings : Maybe RepeatContext -> Dict String PropValue -> Dict String (Value -> EventHandle (Msg action))
@@ -197,12 +324,12 @@ buildEmit onHandlers repeatCtx eventName =
             EventHandle.fromMsg (ActionError ("No handler for event: " ++ eventName))
 
 
-renderChildren : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> List String -> List (Html (Msg action))
-renderChildren registry state validationState repeatCtx spec childIds =
+renderChildren : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Dict String (ComponentInstance (Msg action)) -> Maybe RepeatContext -> Spec -> List String -> List (Html (Msg action))
+renderChildren registry state validationState localComponents repeatCtx spec childIds =
     List.filterMap
         (\id ->
             Dict.get id spec.elements
-                |> Maybe.map (renderElement registry state validationState repeatCtx spec)
+                |> Maybe.map (renderElement registry state validationState localComponents repeatCtx spec id)
         )
         childIds
 
@@ -232,8 +359,8 @@ getItemKey maybeKey index item =
             String.fromInt index
 
 
-renderRepeatedChildren : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Spec -> Element -> Repeat -> List (Html (Msg action))
-renderRepeatedChildren registry state validationState spec element repeat =
+renderRepeatedChildren : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Dict String (ComponentInstance (Msg action)) -> Spec -> Element -> Repeat -> List (Html (Msg action))
+renderRepeatedChildren registry state validationState localComponents spec element repeat =
     case State.get repeat.statePath state |> Maybe.andThen decodeList of
         Just items ->
             let
@@ -258,7 +385,7 @@ renderRepeatedChildren registry state validationState spec element repeat =
                                 List.filterMap
                                     (\id ->
                                         Dict.get id spec.elements
-                                            |> Maybe.map (\el -> ( itemKey, renderElement registry state validationState ctx spec el ))
+                                            |> Maybe.map (\el -> ( itemKey, renderElement registry state validationState localComponents ctx spec id el ))
                                     )
                                     element.children
 
@@ -266,7 +393,7 @@ renderRepeatedChildren registry state validationState spec element repeat =
                                 List.filterMap
                                     (\id ->
                                         Dict.get id spec.elements
-                                            |> Maybe.map (\el -> ( id ++ "-" ++ String.fromInt i ++ "-" ++ itemKey, renderElement registry state validationState ctx spec el ))
+                                            |> Maybe.map (\el -> ( id ++ "-" ++ String.fromInt i ++ "-" ++ itemKey, renderElement registry state validationState localComponents ctx spec id el ))
                                     )
                                     element.children
                         )
@@ -279,8 +406,8 @@ renderRepeatedChildren registry state validationState spec element repeat =
             []
 
 
-render : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Spec -> Html (Msg action)
-render registry state validationState spec =
+render : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Dict String (ComponentInstance (Msg action)) -> Spec -> Html (Msg action)
+render registry state validationState localComponents spec =
     case Dict.get spec.root spec.elements of
         Just element ->
             Html.node "jr-validation-root"
@@ -298,19 +425,19 @@ render registry state validationState spec =
                         |> Decode.map UnregisterValidation
                     )
                 ]
-                [ renderElement registry state validationState Nothing spec element ]
+                [ renderElement registry state validationState localComponents Nothing spec spec.root element ]
 
         Nothing ->
             Html.text ""
 
 
-renderElement : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
-renderElement registry state validationState repeatCtx spec element =
+renderElement : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Dict String (ComponentInstance (Msg action)) -> Maybe RepeatContext -> Spec -> String -> Element -> Html (Msg action)
+renderElement registry state validationState localComponents repeatCtx spec elementId element =
     case element.visible of
         Just condition ->
             case Visibility.evaluate state repeatCtx condition of
                 Ok True ->
-                    renderElementInner registry state validationState repeatCtx spec element
+                    renderElementInner registry state validationState localComponents repeatCtx spec elementId element
 
                 Ok False ->
                     Html.text ""
@@ -327,13 +454,13 @@ renderElement registry state validationState repeatCtx spec element =
                         [ Html.text ("Visibility error: " ++ err) ]
 
         Nothing ->
-            renderElementInner registry state validationState repeatCtx spec element
+            renderElementInner registry state validationState localComponents repeatCtx spec elementId element
 
 
-renderElementInner : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
-renderElementInner registry state validationState repeatCtx spec element =
+renderElementInner : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Dict String (ComponentInstance (Msg action)) -> Maybe RepeatContext -> Spec -> String -> Element -> Html (Msg action)
+renderElementInner registry state validationState localComponents repeatCtx spec elementId element =
     case Dict.get element.type_ registry.components of
-        Just (Component componentFn) ->
+        Just (Stateless componentFn) ->
             let
                 resolved =
                     Resolve.resolvePropsWith registry.functions state repeatCtx element.props
@@ -344,10 +471,10 @@ renderElementInner registry state validationState repeatCtx spec element =
                 children =
                     case element.repeat of
                         Just repeat ->
-                            renderRepeatedChildren registry state validationState spec element repeat
+                            renderRepeatedChildren registry state validationState localComponents spec element repeat
 
                         Nothing ->
-                            renderChildren registry state validationState repeatCtx spec element.children
+                            renderChildren registry state validationState localComponents repeatCtx spec element.children
 
                 bindPropName =
                     findBindPropName element.props
@@ -426,6 +553,153 @@ renderElementInner registry state validationState repeatCtx spec element =
 
                         Nothing ->
                             []
+
+                siblings =
+                    watcherTriggers ++ validationFields
+            in
+            if List.isEmpty siblings then
+                componentHtml
+
+            else
+                Html.div [ Html.Attributes.style "display" "contents" ]
+                    (componentHtml :: siblings)
+
+        Just (Stateful { create }) ->
+            let
+                key =
+                    localStateKey elementId repeatCtx
+
+                resolved =
+                    Resolve.resolvePropsWith registry.functions state repeatCtx element.props
+
+                bindings =
+                    extractBindings repeatCtx element.props
+
+                children =
+                    case element.repeat of
+                        Just repeat ->
+                            renderRepeatedChildren registry state validationState localComponents spec element repeat
+
+                        Nothing ->
+                            renderChildren registry state validationState localComponents repeatCtx spec element.children
+
+                bindPropName =
+                    findBindPropName element.props
+
+                bindStatePath =
+                    findBindStatePath element.props repeatCtx
+
+                fieldValidation =
+                    case ( bindPropName, bindStatePath ) of
+                        ( Just propName, Just path ) ->
+                            case Dict.get path validationState of
+                                Just fv ->
+                                    Dict.singleton propName fv
+
+                                Nothing ->
+                                    Dict.empty
+
+                        _ ->
+                            Dict.empty
+
+                validateHandle =
+                    case bindStatePath of
+                        Just path ->
+                            EventHandle.fromMsg (ValidateField path)
+
+                        Nothing ->
+                            EventHandle.fromMsg (ActionError "No validation config")
+
+                validateAndEmitHandle eventName =
+                    case bindStatePath of
+                        Just path ->
+                            EventHandle.fromMsg (ValidateAndEmit path eventName repeatCtx)
+
+                        Nothing ->
+                            buildEmit element.on repeatCtx eventName
+
+                rawCtx =
+                    { props = resolved
+                    , bindings = bindings
+                    , validation = fieldValidation
+                    , children = children
+                    , emit = buildEmit element.on repeatCtx
+                    , validate = validateHandle
+                    , validateAndEmit = validateAndEmitHandle
+                    , validateOn = element.validateOn
+                    }
+
+                watcherTriggers =
+                    renderWatcherTriggers state repeatCtx element.watch
+
+                validationFields =
+                    case Validation.extractValidation element.checks element.validateOn element.enabled element.props repeatCtx of
+                        Just ( path, config ) ->
+                            let
+                                isEnabled =
+                                    case config.enabled of
+                                        Just condition ->
+                                            Visibility.evaluate state repeatCtx condition
+                                                |> Result.withDefault True
+
+                                        Nothing ->
+                                            True
+                            in
+                            if isEnabled then
+                                [ Html.node "validation-field"
+                                    [ Html.Attributes.attribute "data-path" path
+                                    , Html.Attributes.attribute "data-config"
+                                        (Encode.encode 0 (Validation.encodeValidationConfig config repeatCtx))
+                                    ]
+                                    []
+                                ]
+
+                            else
+                                []
+
+                        Nothing ->
+                            []
+
+                propsJson =
+                    resolved
+                        |> Dict.map (\_ v -> Resolve.resolvedToValue v)
+                        |> Dict.toList
+                        |> Encode.object
+                        |> Encode.encode 0
+
+                propsChangedHandler inst =
+                    let
+                        ( newInstance, handles ) =
+                            inst.onPropsChanged rawCtx
+                    in
+                    UpdateLocal key newInstance handles
+
+                componentHtml =
+                    case Dict.get key localComponents of
+                        Just (ComponentInstance inst) ->
+                            Html.node "component-mount"
+                                [ Html.Attributes.attribute "data-props" propsJson
+                                , Html.Events.on "props-changed"
+                                    (Decode.succeed (propsChangedHandler inst))
+                                ]
+                                [ inst.view rawCtx ]
+
+                        Nothing ->
+                            let
+                                ( instance, html ) =
+                                    create key rawCtx
+
+                                (ComponentInstance instRecord) =
+                                    instance
+                            in
+                            Html.node "component-mount"
+                                [ Html.Attributes.attribute "data-props" propsJson
+                                , Html.Events.on "component-mounted"
+                                    (Decode.succeed (InitLocal key instance))
+                                , Html.Events.on "props-changed"
+                                    (Decode.succeed (propsChangedHandler instRecord))
+                                ]
+                                [ html ]
 
                 siblings =
                     watcherTriggers ++ validationFields

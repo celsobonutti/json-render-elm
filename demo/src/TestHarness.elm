@@ -24,7 +24,7 @@ port testDecodeErrorOut : String -> Cmd msg
 
 
 type alias Model =
-    { jsonRender : JsonRender.Model
+    { jsonRender : JsonRender.Model Action
     }
 
 
@@ -41,7 +41,7 @@ init randomSeed =
     )
 
 
-handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
+handleAction : Action -> Actions.Model Action -> ( Actions.Model Action, Cmd (Actions.Msg Action) )
 handleAction action model =
     ( model, testActionOut (encodeAction action) )
 

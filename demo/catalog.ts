@@ -87,6 +87,28 @@ export const catalog = defineCatalog(schema, {
       validatable: [],
       description: "A small colored badge/tag",
     },
+    Toggle: {
+      props: z.object({
+        label: z.string(),
+      }),
+      slots: [],
+      bindable: [],
+      validatable: [],
+      description: "A toggle switch with local open/closed state",
+    },
+    Select: {
+      props: z.object({
+        label: z.string().optional(),
+        placeholder: z.string().optional(),
+        options: z.array(z.string()),
+        value: z.string(),
+      }),
+      slots: [],
+      bindable: ["value"],
+      validatable: [],
+      description:
+        "A filterable dropdown select with local state for open/close and search query. Use { $bindState } on value for two-way binding.",
+    },
   },
   actions: {
     press: {

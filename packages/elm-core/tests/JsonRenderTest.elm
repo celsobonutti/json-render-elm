@@ -161,6 +161,7 @@ suite =
                             , seed = testSeed
                             , validationState = Dict.empty
                             , validationRegistry = Dict.empty
+                            , localComponents = Dict.empty
                             }
 
                         result =

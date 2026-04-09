@@ -39,7 +39,7 @@ decodeAction name params =
             Err ("Unknown action: " ++ name)
 
 
-handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
+handleAction : Action -> Actions.Model Action -> ( Actions.Model Action, Cmd (Actions.Msg Action) )
 handleAction _ model =
     ( model, Cmd.none )
 

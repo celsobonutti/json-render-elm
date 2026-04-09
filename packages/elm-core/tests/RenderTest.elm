@@ -4,9 +4,11 @@ import Dict
 import Expect
 import Html exposing (div, text)
 import Html.Attributes exposing (class)
+import Html.Events
 import JsonRender.Events as Events
 import Json.Decode as Decode
 import Json.Encode as Encode
+import JsonRender.Actions
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Render as Render
 import JsonRender.Resolve as Resolve
@@ -18,7 +20,7 @@ import Test.Html.Query as Query
 import Test.Html.Selector as Selector
 
 
-testRegistry : Render.Registry msg
+testRegistry : Render.Registry (JsonRender.Actions.Msg action)
 testRegistry =
     { components =
         Dict.fromList
@@ -65,6 +67,31 @@ testRegistry =
                             ]
                             [ text ctx.props ]
                     )
+              )
+            , ( "Counter"
+              , Render.registerStateful
+                    (\props ->
+                        Resolve.succeed identity
+                            |> Resolve.required "label" Resolve.string
+                            |> (\d -> d props)
+                    )
+                    (\_ -> ())
+                    (\_ -> ())
+                    { init = \_ -> 0
+                    , update =
+                        \() count _ ->
+                            ( count + 1, [] )
+                    , view =
+                        \count label toMsg _ ->
+                            div [ class "counter" ]
+                                [ Html.button
+                                    [ class "counter-btn"
+                                    , Html.Events.onClick (toMsg ())
+                                    ]
+                                    [ text (label ++ ": " ++ String.fromInt count) ]
+                                ]
+                    , onPropsChange = Nothing
+                    }
               )
             ]
     , functions =
@@ -118,7 +145,7 @@ suite =
                         , state = Nothing
                         }
                 in
-                Render.render testRegistry Encode.null Dict.empty spec
+                Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                     |> Query.fromHtml
                     |> Query.has [ Selector.text "Hello" ]
         , test "renders nested elements" <|
@@ -158,7 +185,7 @@ suite =
                         , state = Nothing
                         }
                 in
-                Render.render testRegistry Encode.null Dict.empty spec
+                Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                     |> Query.fromHtml
                     |> Query.has [ Selector.class "card", Selector.text "My Card", Selector.text "Body" ]
         , test "renders nothing for unknown component" <|
@@ -185,7 +212,7 @@ suite =
                         , state = Nothing
                         }
                 in
-                Render.render testRegistry Encode.null Dict.empty spec
+                Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                     |> Query.fromHtml
                     |> Query.has []
         , test "respects visibility condition" <|
@@ -215,7 +242,7 @@ suite =
                         , state = Nothing
                         }
                 in
-                Render.render testRegistry state Dict.empty spec
+                Render.render testRegistry state Dict.empty Dict.empty spec
                     |> Query.fromHtml
                     |> Query.hasNot [ Selector.text "Hidden" ]
         , test "resolves $bindState and provides setter binding" <|
@@ -280,7 +307,7 @@ suite =
                         , state = Nothing
                         }
                 in
-                Render.render bindRegistry formState Dict.empty spec
+                Render.render bindRegistry formState Dict.empty Dict.empty spec
                     |> Query.fromHtml
                     |> Query.has [ Selector.text "Alice", Selector.text "[bound]" ]
         , describe "full pipeline (JSON → decode → render)"
@@ -303,7 +330,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry Encode.null Dict.empty spec
+                            Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.class "card", Selector.text "Hello World" ]
 
@@ -333,7 +360,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry Encode.null Dict.empty spec
+                            Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "Parent", Selector.text "Child content" ]
 
@@ -361,7 +388,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "Hello Alice" ]
 
@@ -390,7 +417,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "Welcome, Bob!" ]
 
@@ -419,7 +446,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.hasNot [ Selector.text "Secret" ]
 
@@ -448,7 +475,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "Visible" ]
 
@@ -485,7 +512,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has
                                     [ Selector.text "Contact Us"
@@ -521,7 +548,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "HELLO" ]
 
@@ -548,7 +575,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry Encode.null Dict.empty spec
+                            Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "Props error" ]
 
@@ -581,7 +608,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry Encode.null Dict.empty spec
+                            Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.class "button", Selector.text "Click Me" ]
 
@@ -606,7 +633,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry Encode.null Dict.empty spec
+                            Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "No events" ]
 
@@ -637,7 +664,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "Dynamic Label" ]
 
@@ -668,7 +695,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry Encode.null Dict.empty spec
+                            Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.class "button", Selector.text "Add Todo" ]
 
@@ -706,7 +733,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry Encode.null Dict.empty spec
+                            Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has
                                     [ Selector.text "Form"
@@ -742,7 +769,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry Encode.null Dict.empty spec
+                            Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.class "button", Selector.text "Submit Form" ]
 
@@ -773,7 +800,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry Encode.null Dict.empty spec
+                            Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.class "button", Selector.text "Go" ]
 
@@ -808,7 +835,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "HELLO" ]
 
@@ -843,7 +870,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry Encode.null Dict.empty spec
+                            Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "[HELLO]" ]
 
@@ -880,7 +907,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "HELLO" ]
 
@@ -914,7 +941,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry Encode.null Dict.empty spec
+                            Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "truthy" ]
 
@@ -960,7 +987,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "ALICE", Selector.text "BOB" ]
 
@@ -1065,7 +1092,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render bindComputedRegistry state Dict.empty spec
+                            Render.render bindComputedRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Expect.all
                                     [ Query.find [ Selector.class "input" ]
@@ -1106,7 +1133,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "primary" ]
 
@@ -1140,7 +1167,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "secondary" ]
 
@@ -1174,7 +1201,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "full-access" ]
 
@@ -1208,7 +1235,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "few" ]
 
@@ -1248,7 +1275,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "admin-panel" ]
 
@@ -1282,7 +1309,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "active" ]
 
@@ -1323,7 +1350,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "super-admin" ]
 
@@ -1370,7 +1397,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "completed", Selector.text "pending" ]
 
@@ -1410,7 +1437,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "authorized" ]
 
@@ -1457,7 +1484,7 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "first", Selector.text "other" ]
 
@@ -1491,11 +1518,96 @@ suite =
                     in
                     case Decode.decodeString Spec.decoder json of
                         Ok spec ->
-                            Render.render testRegistry state Dict.empty spec
+                            Render.render testRegistry state Dict.empty Dict.empty spec
                                 |> Query.fromHtml
                                 |> Query.has [ Selector.text "within-limit" ]
 
                         Err err ->
                             Expect.fail (Decode.errorToString err)
+            ]
+        , describe "stateful components"
+            [ test "renders stateful component with initial state" <|
+                \_ ->
+                    let
+                        spec =
+                            { root = "c"
+                            , elements =
+                                Dict.fromList
+                                    [ ( "c"
+                                      , { type_ = "Counter"
+                                        , props = Dict.fromList [ ( "label", StringValue "Clicks" ) ]
+                                        , children = []
+                                        , visible = Nothing
+                                        , repeat = Nothing
+                                        , on = Dict.empty
+                                        , watch = Dict.empty
+                                        , enabled = Nothing
+                                        , checks = []
+                                        , validateOn = OnSubmit
+                                        }
+                                      )
+                                    ]
+                            , state = Nothing
+                            }
+                    in
+                    Render.render testRegistry Encode.null Dict.empty Dict.empty spec
+                        |> Query.fromHtml
+                        |> Query.find [ Selector.class "counter" ]
+                        |> Query.has [ Selector.text "Clicks: 0" ]
+            , test "wraps stateful component in component-mount on first render" <|
+                \_ ->
+                    let
+                        spec =
+                            { root = "c"
+                            , elements =
+                                Dict.fromList
+                                    [ ( "c"
+                                      , { type_ = "Counter"
+                                        , props = Dict.fromList [ ( "label", StringValue "Clicks" ) ]
+                                        , children = []
+                                        , visible = Nothing
+                                        , repeat = Nothing
+                                        , on = Dict.empty
+                                        , watch = Dict.empty
+                                        , enabled = Nothing
+                                        , checks = []
+                                        , validateOn = OnSubmit
+                                        }
+                                      )
+                                    ]
+                            , state = Nothing
+                            }
+                    in
+                    Render.render testRegistry Encode.null Dict.empty Dict.empty spec
+                        |> Query.fromHtml
+                        |> Query.find [ Selector.tag "component-mount" ]
+                        |> Query.has [ Selector.text "Clicks: 0" ]
+            , test "stateful component with props error shows error" <|
+                \_ ->
+                    let
+                        spec =
+                            { root = "c"
+                            , elements =
+                                Dict.fromList
+                                    [ ( "c"
+                                      , { type_ = "Counter"
+                                        , props = Dict.empty
+                                        , children = []
+                                        , visible = Nothing
+                                        , repeat = Nothing
+                                        , on = Dict.empty
+                                        , watch = Dict.empty
+                                        , enabled = Nothing
+                                        , checks = []
+                                        , validateOn = OnSubmit
+                                        }
+                                      )
+                                    ]
+                            , state = Nothing
+                            }
+                    in
+                    Render.render testRegistry Encode.null Dict.empty Dict.empty spec
+                        |> Query.fromHtml
+                        |> Query.has [ Selector.text "Props error:" ]
             ]
         ]

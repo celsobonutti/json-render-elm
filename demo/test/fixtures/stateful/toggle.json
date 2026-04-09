@@ -1,0 +1,12 @@
+{
+  "root": "toggle1",
+  "elements": {
+    "toggle1": {
+      "type": "Toggle",
+      "props": {
+        "label": "Power"
+      },
+      "children": []
+    }
+  }
+}

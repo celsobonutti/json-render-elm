@@ -186,6 +186,59 @@
       "slots": [],
       "bindable": [],
       "validatable": []
+    },
+    "Toggle": {
+      "props": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "description": "A toggle switch with local open/closed state",
+      "slots": [],
+      "bindable": [],
+      "validatable": []
+    },
+    "Select": {
+      "props": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "placeholder": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "options",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "description": "A filterable dropdown select with local state for open/close and search query. Use { $bindState } on value for two-way binding.",
+      "slots": [],
+      "bindable": [
+        "value"
+      ],
+      "validatable": []
     }
   },
   "actions": {
