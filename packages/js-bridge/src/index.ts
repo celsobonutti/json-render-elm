@@ -3,6 +3,7 @@ export { generateCatalogSchema } from './generateCatalogSchema'
 export { generateElmReviewCatalog } from './generateElmReviewCatalog'
 import './WatcherTrigger.js'
 import './ValidationField.js'
+import './ComponentMount.js'
 
 export interface ElmPorts {
   jsonRenderSpecIn: {
