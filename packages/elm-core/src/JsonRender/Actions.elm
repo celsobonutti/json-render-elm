@@ -15,6 +15,8 @@ module JsonRender.Actions exposing
 import Dict exposing (Dict)
 import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
+import JsonRender.Internal.ComponentInstance exposing (ComponentInstance)
+import JsonRender.Internal.EventHandle exposing (EventHandle(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext)
 import JsonRender.Spec as Spec exposing (ActionBinding, EventHandler(..), Spec)
 import JsonRender.State as State
@@ -25,12 +27,13 @@ import Recursion.Fold
 import UUID
 
 
-type alias Model =
+type alias Model action =
     { spec : Maybe Spec
     , state : Value
     , seed : Random.Seed
     , validationState : Dict String Validation.FieldValidation
     , validationRegistry : Dict String ( Validation.ValidationConfig, Maybe RepeatContext )
+    , localComponents : Dict String (ComponentInstance (Msg action))
     }
 
 
@@ -38,7 +41,7 @@ type alias Model =
 actions with a decoder that turns action name + resolved params into an action.
 -}
 type alias ActionConfig action =
-    { handleAction : action -> Model -> ( Model, Cmd (Msg action) )
+    { handleAction : action -> Model action -> ( Model action, Cmd (Msg action) )
     , decodeAction : String -> Dict String Value -> Result String action
     }
 
@@ -62,9 +65,11 @@ type Msg action
     | ValidateAndEmit String String (Maybe RepeatContext)
     | RegisterValidation String Validation.ValidationConfig (Maybe RepeatContext)
     | UnregisterValidation String
+    | InitLocal String (ComponentInstance (Msg action))
+    | UpdateLocal String (ComponentInstance (Msg action)) (List (EventHandle (Msg action)))
 
 
-update : Resolve.FunctionDict -> ActionConfig action -> Msg action -> Model -> ( Model, Cmd (Msg action) )
+update : Resolve.FunctionDict -> ActionConfig action -> Msg action -> Model action -> ( Model action, Cmd (Msg action) )
 update functions config msg model =
     case msg of
         SpecReceived _ ->
@@ -110,10 +115,36 @@ update functions config msg model =
                 Nothing ->
                     ( validatedModel, Cmd.none )
 
+        InitLocal key instance ->
+            ( { model | localComponents = Dict.insert key instance model.localComponents }
+            , Cmd.none
+            )
+
+        UpdateLocal key newInstance handles ->
+            let
+                model_ =
+                    { model | localComponents = Dict.insert key newInstance model.localComponents }
+            in
+            processHandles functions config handles model_
+
+
+processHandles : Resolve.FunctionDict -> ActionConfig action -> List (EventHandle (Msg action)) -> Model action -> ( Model action, Cmd (Msg action) )
+processHandles functions config handles model =
+    List.foldl
+        (\(EventHandle { message }) ( accModel, accCmd ) ->
+            let
+                ( m, c ) =
+                    update functions config message accModel
+            in
+            ( m, Cmd.batch [ accCmd, c ] )
+        )
+        ( model, Cmd.none )
+        handles
+
 
 {-| Execute an EventHandler (single or chained actions) against the model.
 -}
-executeHandler : Resolve.FunctionDict -> ActionConfig action -> EventHandler -> Maybe RepeatContext -> Model -> ( Model, Cmd (Msg action) )
+executeHandler : Resolve.FunctionDict -> ActionConfig action -> EventHandler -> Maybe RepeatContext -> Model action -> ( Model action, Cmd (Msg action) )
 executeHandler functions config handler repeatCtx model =
     let
         bindings =
@@ -207,7 +238,7 @@ substituteIdsStep ( seed, value ) =
 {-| Resolve an ActionBinding into a typed ResolvedAction.
 Combines param resolution, $id substitution, and action decoding into one step.
 -}
-resolveBinding : Resolve.FunctionDict -> ActionConfig action -> ActionBinding -> Maybe RepeatContext -> Model -> Result String ( ResolvedAction action, Random.Seed )
+resolveBinding : Resolve.FunctionDict -> ActionConfig action -> ActionBinding -> Maybe RepeatContext -> Model action -> Result String ( ResolvedAction action, Random.Seed )
 resolveBinding functions config binding repeatCtx model =
     let
         resolvedParams =
@@ -286,7 +317,7 @@ resolveBinding functions config binding repeatCtx model =
 
 {-| Apply a ResolvedAction to the model.
 -}
-applyAction : Resolve.FunctionDict -> ActionConfig action -> ResolvedAction action -> Model -> ( Model, Cmd (Msg action) )
+applyAction : Resolve.FunctionDict -> ActionConfig action -> ResolvedAction action -> Model action -> ( Model action, Cmd (Msg action) )
 applyAction functions config resolved model =
     case resolved of
         SetState { path, value } ->
@@ -361,7 +392,7 @@ applyAction functions config resolved model =
 -- Helpers
 
 
-validateFieldHelper : Resolve.FunctionDict -> Model -> String -> Model
+validateFieldHelper : Resolve.FunctionDict -> Model action -> String -> Model action
 validateFieldHelper functions model path =
     let
         maybeEntry =

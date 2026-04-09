@@ -49,9 +49,9 @@ decodeTestAction name params =
             Err ("Unknown action: " ++ name)
 
 
-testModel : Encode.Value -> Actions.Model
+testModel : Encode.Value -> Actions.Model TestAction
 testModel state =
-    { spec = Nothing, state = state, seed = Random.initialSeed 42, validationState = Dict.empty, validationRegistry = Dict.empty }
+    { spec = Nothing, state = state, seed = Random.initialSeed 42, validationState = Dict.empty, validationRegistry = Dict.empty, localComponents = Dict.empty }
 
 
 executeAction : String -> List ( String, PropValue ) -> Msg TestAction
@@ -1178,6 +1178,7 @@ suite =
                                         )
                                       )
                                     ]
+                            , localComponents = Dict.empty
                             }
 
                         binding =
@@ -1228,6 +1229,7 @@ suite =
                                         )
                                       )
                                     ]
+                            , localComponents = Dict.empty
                             }
 
                         binding =
@@ -1290,6 +1292,7 @@ suite =
                                         )
                                       )
                                     ]
+                            , localComponents = Dict.empty
                             }
 
                         binding =
@@ -1365,6 +1368,7 @@ suite =
                                         )
                                       )
                                     ]
+                            , localComponents = Dict.empty
                             }
 
                         binding =
@@ -1429,6 +1433,7 @@ suite =
                                         )
                                       )
                                     ]
+                            , localComponents = Dict.empty
                             }
 
                         ( newModel, _ ) =
@@ -1479,6 +1484,7 @@ suite =
                                         )
                                       )
                                     ]
+                            , localComponents = Dict.empty
                             }
 
                         ( newModel, _ ) =

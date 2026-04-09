@@ -4,6 +4,7 @@ module JsonRender.Render exposing
     , RawComponentContext
     , Registry
     , register
+    , registerStateful
     , render
     )
 
@@ -18,6 +19,7 @@ import Html.Keyed
 import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions exposing (Msg(..))
+import JsonRender.Internal.ComponentInstance as ComponentInstance exposing (ComponentInstance(..))
 import JsonRender.Internal.EventHandle as EventHandle exposing (EventHandle)
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext, ResolvedValue)
@@ -40,19 +42,14 @@ type alias ComponentContext props bindings validation msg =
 
 
 type alias RawComponentContext msg =
-    { props : Dict String ResolvedValue
-    , bindings : Dict String (Value -> EventHandle msg)
-    , validation : Dict String Validation.FieldValidation
-    , children : List (Html msg)
-    , emit : String -> EventHandle msg
-    , validate : EventHandle msg
-    , validateAndEmit : String -> EventHandle msg
-    , validateOn : Validation.ValidateOn
-    }
+    ComponentInstance.RawComponentContext msg
 
 
 type Component msg
-    = Component (RawComponentContext msg -> Html msg)
+    = Stateless (RawComponentContext msg -> Html msg)
+    | Stateful
+        { create : String -> RawComponentContext msg -> ( ComponentInstance msg, Html msg )
+        }
 
 
 type alias Registry msg =
@@ -68,7 +65,7 @@ register :
     -> (ComponentContext props bindings validation msg -> Html msg)
     -> Component msg
 register propsDecoder bindingsDecoder validationDecoder view =
-    Component
+    Stateless
         (\raw ->
             case propsDecoder raw.props of
                 Ok typed ->
@@ -84,16 +81,124 @@ register propsDecoder bindingsDecoder validationDecoder view =
                         }
 
                 Err err ->
-                    Html.div
-                        [ Html.Attributes.style "background" "#fee2e2"
-                        , Html.Attributes.style "color" "#991b1b"
-                        , Html.Attributes.style "padding" "8px 12px"
-                        , Html.Attributes.style "border-radius" "4px"
-                        , Html.Attributes.style "font-size" "13px"
-                        , Html.Attributes.style "font-family" "monospace"
-                        ]
-                        [ Html.text ("Props error: " ++ err) ]
+                    propsErrorHtml err
         )
+
+
+registerStateful :
+    (Dict String ResolvedValue -> Result String props)
+    -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
+    -> (Dict String Validation.FieldValidation -> validation)
+    -> { init : props -> state
+       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
+       , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
+       }
+    -> Component (Msg action)
+registerStateful propsDecoder bindingsDecoder validationDecoder def =
+    Stateful
+        { create =
+            \key raw ->
+                case propsDecoder raw.props of
+                    Ok props ->
+                        let
+                            state =
+                                def.init props
+
+                            instance =
+                                buildInstance propsDecoder bindingsDecoder validationDecoder def key state
+                        in
+                        ( instance, viewInstance instance raw )
+
+                    Err err ->
+                        ( buildErrorInstance err
+                        , propsErrorHtml err
+                        )
+        }
+
+
+buildInstance :
+    (Dict String ResolvedValue -> Result String props)
+    -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
+    -> (Dict String Validation.FieldValidation -> validation)
+    -> { init : props -> state
+       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
+       , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
+       }
+    -> String
+    -> state
+    -> ComponentInstance (Msg action)
+buildInstance propsDecoder bindingsDecoder validationDecoder def key state =
+    ComponentInstance
+        { view = makeInstanceView propsDecoder bindingsDecoder validationDecoder def key state
+        }
+
+
+makeInstanceView :
+    (Dict String ResolvedValue -> Result String props)
+    -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
+    -> (Dict String Validation.FieldValidation -> validation)
+    -> { init : props -> state
+       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
+       , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
+       }
+    -> String
+    -> state
+    -> RawComponentContext (Msg action)
+    -> Html (Msg action)
+makeInstanceView propsDecoder bindingsDecoder validationDecoder def key state raw =
+    case propsDecoder raw.props of
+        Ok props ->
+            let
+                ctx =
+                    { props = props
+                    , bindings = bindingsDecoder raw.bindings
+                    , validation = validationDecoder raw.validation
+                    , children = raw.children
+                    , emit = raw.emit
+                    , validate = raw.validate
+                    , validateAndEmit = raw.validateAndEmit
+                    , validateOn = raw.validateOn
+                    }
+
+                toMsg localMsg =
+                    let
+                        ( newState, handles ) =
+                            def.update localMsg state ctx
+
+                        newInstance =
+                            buildInstance propsDecoder bindingsDecoder validationDecoder def key newState
+                    in
+                    UpdateLocal key newInstance handles
+            in
+            def.view state props toMsg raw.children
+
+        Err err ->
+            propsErrorHtml err
+
+
+viewInstance : ComponentInstance msg -> RawComponentContext msg -> Html msg
+viewInstance (ComponentInstance inst) raw =
+    inst.view raw
+
+
+buildErrorInstance : String -> ComponentInstance msg
+buildErrorInstance err =
+    ComponentInstance
+        { view = \_ -> propsErrorHtml err
+        }
+
+
+propsErrorHtml : String -> Html msg
+propsErrorHtml err =
+    Html.div
+        [ Html.Attributes.style "background" "#fee2e2"
+        , Html.Attributes.style "color" "#991b1b"
+        , Html.Attributes.style "padding" "8px 12px"
+        , Html.Attributes.style "border-radius" "4px"
+        , Html.Attributes.style "font-size" "13px"
+        , Html.Attributes.style "font-family" "monospace"
+        ]
+        [ Html.text ("Props error: " ++ err) ]
 
 
 extractBindings : Maybe RepeatContext -> Dict String PropValue -> Dict String (Value -> EventHandle (Msg action))
@@ -333,7 +438,7 @@ renderElement registry state validationState repeatCtx spec element =
 renderElementInner : Registry (Msg action) -> Value -> Dict String Validation.FieldValidation -> Maybe RepeatContext -> Spec -> Element -> Html (Msg action)
 renderElementInner registry state validationState repeatCtx spec element =
     case Dict.get element.type_ registry.components of
-        Just (Component componentFn) ->
+        Just (Stateless componentFn) ->
             let
                 resolved =
                     Resolve.resolvePropsWith registry.functions state repeatCtx element.props
@@ -436,6 +541,9 @@ renderElementInner registry state validationState repeatCtx spec element =
             else
                 Html.div [ Html.Attributes.style "display" "contents" ]
                     (componentHtml :: siblings)
+
+        Just (Stateful _) ->
+            Html.text ""
 
         Nothing ->
             Html.text ""

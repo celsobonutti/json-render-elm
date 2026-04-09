@@ -6,6 +6,7 @@ module JsonRender exposing
     , init
     , receiveSpec
     , register
+    , registerStateful
     , render
     , specDecoder
     )
@@ -41,8 +42,8 @@ import Random
 
 {-| The json-render model. Store this in your application model.
 -}
-type alias Model =
-    Actions.Model
+type alias Model action =
+    Actions.Model action
 
 
 {-| Configuration for `create`.
@@ -51,8 +52,8 @@ type alias Config action model msg =
     { actionConfig : Actions.ActionConfig action
     , registry : Registry (Msg action)
     , toMsg : Msg action -> msg
-    , getModel : model -> Model
-    , setModel : Model -> model -> model
+    , getModel : model -> Model action
+    , setModel : Model action -> model -> model
     }
 
 
@@ -66,19 +67,20 @@ type alias App action model msg =
 
 {-| Create an empty json-render model.
 -}
-init : Random.Seed -> Model
+init : Random.Seed -> Model action
 init seed =
     { spec = Nothing
     , state = Encode.object []
     , seed = seed
     , validationState = Dict.empty
     , validationRegistry = Dict.empty
+    , localComponents = Dict.empty
     }
 
 
 {-| Decode and apply an incoming spec to the model.
 -}
-receiveSpec : Value -> Model -> Result String Model
+receiveSpec : Value -> Model action -> Result String (Model action)
 receiveSpec val model =
     case Decode.decodeValue Spec.decoder val of
         Ok spec ->
@@ -86,6 +88,7 @@ receiveSpec val model =
                 { model
                     | spec = Just spec
                     , state = Maybe.withDefault model.state spec.state
+                    , localComponents = Dict.empty
                 }
 
         Err err ->
@@ -139,6 +142,21 @@ register :
     -> Component (Msg action)
 register =
     Render.register
+
+
+{-| Register a stateful component with local state lifecycle.
+-}
+registerStateful :
+    (Dict String ResolvedValue -> Result String props)
+    -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
+    -> (Dict String Validation.FieldValidation -> validation)
+    -> { init : props -> state
+       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
+       , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
+       }
+    -> Component (Msg action)
+registerStateful =
+    Render.registerStateful
 
 
 {-| Decoder for json-render specs.
