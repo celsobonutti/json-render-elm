@@ -90,6 +90,7 @@ testRegistry =
                                     ]
                                     [ text (label ++ ": " ++ String.fromInt count) ]
                                 ]
+                    , onPropsChange = Nothing
                     }
               )
             ]

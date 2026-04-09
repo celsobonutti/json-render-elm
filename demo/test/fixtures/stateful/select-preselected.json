@@ -1,0 +1,27 @@
+{
+  "root": "stack",
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 8 },
+      "children": ["display", "select1"]
+    },
+    "select1": {
+      "type": "Select",
+      "props": {
+        "label": "Fruit",
+        "options": ["Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape"],
+        "value": { "$bindState": "/selected" }
+      }
+    },
+    "display": {
+      "type": "Text",
+      "props": {
+        "content": { "$template": "Selected: ${/selected}" }
+      }
+    }
+  },
+  "state": {
+    "selected": "Cherry"
+  }
+}

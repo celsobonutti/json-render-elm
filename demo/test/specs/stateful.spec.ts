@@ -137,4 +137,38 @@ test.describe("Stateful components", () => {
     await page.locator(".jr-select-trigger").click()
     await expect(page.locator(".jr-select-dropdown")).toBeVisible()
   })
+
+  test("select renders with preselected value from state", async ({ page }) => {
+    await sendSpec(page, "stateful/select-preselected.json")
+
+    // Trigger shows the preselected value, not the placeholder
+    await expect(page.locator(".jr-select-trigger")).toHaveText("Cherry")
+    await expect(page.locator(".jr-text")).toHaveText("Selected: Cherry")
+
+    // Changing selection updates both
+    await page.locator(".jr-select-trigger").click()
+    await page.locator(".jr-select-option", { hasText: "Fig" }).click()
+    await expect(page.locator(".jr-select-trigger")).toHaveText("Fig")
+    await expect(page.locator(".jr-text")).toHaveText("Selected: Fig")
+  })
+
+  test("onPropsChange closes dropdown when value changes externally", async ({
+    page,
+  }) => {
+    await sendSpec(page, "stateful/select-with-display.json")
+
+    // Open the dropdown
+    await page.locator(".jr-select-trigger").click()
+    await expect(page.locator(".jr-select-dropdown")).toBeVisible()
+
+    // External state change while dropdown is open
+    await setState(page, { selected: "Date", changed: true })
+
+    // onPropsChange should close the dropdown
+    await expect(page.locator(".jr-select-dropdown")).not.toBeVisible()
+
+    // Trigger shows the externally set value
+    await expect(page.locator(".jr-select-trigger")).toHaveText("Date")
+    await expect(page.locator(".jr-text")).toHaveText("Selected: Date")
+  })
 })

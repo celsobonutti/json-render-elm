@@ -92,6 +92,7 @@ registerStateful :
     -> { init : props -> state
        , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
        , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
+       , onPropsChange : Maybe (props -> state -> ( state, List (EventHandle (Msg action)) ))
        }
     -> Component (Msg action)
 registerStateful propsDecoder bindingsDecoder validationDecoder def =
@@ -123,57 +124,64 @@ buildInstance :
     -> { init : props -> state
        , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
        , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
+       , onPropsChange : Maybe (props -> state -> ( state, List (EventHandle (Msg action)) ))
        }
     -> String
     -> state
     -> ComponentInstance (Msg action)
 buildInstance propsDecoder bindingsDecoder validationDecoder def key state =
+    -- elm-review: IGNORE TCO
+    -- Self-references in view/onPropsChanged closures are corecursive (deferred in lambdas),
+    -- not stack-recursive. buildInstance lazily produces new instances only when events fire.
     ComponentInstance
-        { view = makeInstanceView propsDecoder bindingsDecoder validationDecoder def key state
+        { view =
+            \raw ->
+                case propsDecoder raw.props of
+                    Ok props ->
+                        let
+                            ctx =
+                                { props = props
+                                , bindings = bindingsDecoder raw.bindings
+                                , validation = validationDecoder raw.validation
+                                , children = raw.children
+                                , emit = raw.emit
+                                , validate = raw.validate
+                                , validateAndEmit = raw.validateAndEmit
+                                , validateOn = raw.validateOn
+                                }
+
+                            toMsg localMsg =
+                                let
+                                    ( newState, handles ) =
+                                        def.update localMsg state ctx
+
+                                    newInstance =
+                                        buildInstance propsDecoder bindingsDecoder validationDecoder def key newState
+                                in
+                                UpdateLocal key newInstance handles
+                        in
+                        def.view state props toMsg raw.children
+
+                    Err err ->
+                        propsErrorHtml err
+        , onPropsChanged =
+            \raw ->
+                case def.onPropsChange of
+                    Nothing ->
+                        ( buildInstance propsDecoder bindingsDecoder validationDecoder def key state, [] )
+
+                    Just handler ->
+                        case propsDecoder raw.props of
+                            Ok props ->
+                                let
+                                    ( newState, handles ) =
+                                        handler props state
+                                in
+                                ( buildInstance propsDecoder bindingsDecoder validationDecoder def key newState, handles )
+
+                            Err _ ->
+                                ( buildInstance propsDecoder bindingsDecoder validationDecoder def key state, [] )
         }
-
-
-makeInstanceView :
-    (Dict String ResolvedValue -> Result String props)
-    -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
-    -> (Dict String Validation.FieldValidation -> validation)
-    -> { init : props -> state
-       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
-       , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
-       }
-    -> String
-    -> state
-    -> RawComponentContext (Msg action)
-    -> Html (Msg action)
-makeInstanceView propsDecoder bindingsDecoder validationDecoder def key state raw =
-    case propsDecoder raw.props of
-        Ok props ->
-            let
-                ctx =
-                    { props = props
-                    , bindings = bindingsDecoder raw.bindings
-                    , validation = validationDecoder raw.validation
-                    , children = raw.children
-                    , emit = raw.emit
-                    , validate = raw.validate
-                    , validateAndEmit = raw.validateAndEmit
-                    , validateOn = raw.validateOn
-                    }
-
-                toMsg localMsg =
-                    let
-                        ( newState, handles ) =
-                            def.update localMsg state ctx
-
-                        newInstance =
-                            buildInstance propsDecoder bindingsDecoder validationDecoder def key newState
-                    in
-                    UpdateLocal key newInstance handles
-            in
-            def.view state props toMsg raw.children
-
-        Err err ->
-            propsErrorHtml err
 
 
 viewInstance : ComponentInstance msg -> RawComponentContext msg -> Html msg
@@ -183,8 +191,12 @@ viewInstance (ComponentInstance inst) raw =
 
 buildErrorInstance : String -> ComponentInstance msg
 buildErrorInstance err =
+    -- elm-review: IGNORE TCO
+    -- Self-reference is corecursive (deferred in a lambda), not stack-recursive.
+    -- The instance lazily produces a new instance only when onPropsChanged is called.
     ComponentInstance
         { view = \_ -> propsErrorHtml err
+        , onPropsChanged = \_ -> ( buildErrorInstance err, [] )
         }
 
 
@@ -648,19 +660,44 @@ renderElementInner registry state validationState localComponents repeatCtx spec
                         Nothing ->
                             []
 
+                propsJson =
+                    resolved
+                        |> Dict.map (\_ v -> Resolve.resolvedToValue v)
+                        |> Dict.toList
+                        |> Encode.object
+                        |> Encode.encode 0
+
+                propsChangedHandler inst =
+                    let
+                        ( newInstance, handles ) =
+                            inst.onPropsChanged rawCtx
+                    in
+                    UpdateLocal key newInstance handles
+
                 componentHtml =
                     case Dict.get key localComponents of
                         Just (ComponentInstance inst) ->
-                            inst.view rawCtx
+                            Html.node "component-mount"
+                                [ Html.Attributes.attribute "data-props" propsJson
+                                , Html.Events.on "props-changed"
+                                    (Decode.succeed (propsChangedHandler inst))
+                                ]
+                                [ inst.view rawCtx ]
 
                         Nothing ->
                             let
                                 ( instance, html ) =
                                     create key rawCtx
+
+                                (ComponentInstance instRecord) =
+                                    instance
                             in
                             Html.node "component-mount"
-                                [ Html.Events.on "component-mounted"
+                                [ Html.Attributes.attribute "data-props" propsJson
+                                , Html.Events.on "component-mounted"
                                     (Decode.succeed (InitLocal key instance))
+                                , Html.Events.on "props-changed"
+                                    (Decode.succeed (propsChangedHandler instRecord))
                                 ]
                                 [ html ]
 

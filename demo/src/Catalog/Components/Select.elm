@@ -67,7 +67,13 @@ component =
         { init = \_ -> { open = False, query = "", focusedIndex = 0 }
         , update = update
         , view = selectView
+        , onPropsChange = Just onPropsChange
         }
+
+
+onPropsChange : SelectProps -> State -> ( State, List (EventHandle (Actions.Msg action)) )
+onPropsChange _ state =
+    ( { state | open = False, query = "" }, [] )
 
 
 update : LocalMsg -> State -> ComponentContext SelectProps (SelectBindings (Actions.Msg action)) () (Actions.Msg action) -> ( State, List (EventHandle (Actions.Msg action)) )

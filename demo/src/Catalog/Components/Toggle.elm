@@ -42,6 +42,7 @@ component =
             \ToggleClicked state _ ->
                 ( { state | active = not state.active }, [] )
         , view = toggleView
+        , onPropsChange = Nothing
         }
 
 

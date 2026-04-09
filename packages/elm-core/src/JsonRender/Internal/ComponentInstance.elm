@@ -34,4 +34,5 @@ type alias RawComponentContext msg =
 type ComponentInstance msg
     = ComponentInstance
         { view : RawComponentContext msg -> Html msg
+        , onPropsChanged : RawComponentContext msg -> ( ComponentInstance msg, List (EventHandle msg) )
         }

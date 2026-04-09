@@ -154,6 +154,7 @@ registerStateful :
     -> { init : props -> state
        , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
        , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
+       , onPropsChange : Maybe (props -> state -> ( state, List (EventHandle (Msg action)) ))
        }
     -> Component (Msg action)
 registerStateful =
