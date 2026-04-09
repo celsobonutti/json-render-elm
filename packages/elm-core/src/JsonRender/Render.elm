@@ -131,9 +131,8 @@ buildInstance :
     -> ComponentInstance (Msg action)
 buildInstance propsDecoder bindingsDecoder validationDecoder def key state =
     -- elm-review: IGNORE TCO
-    -- Guarded recursion: self-references are behind lambdas (view/onPropsChanged closures),
-    -- so buildInstance returns immediately. The recursive calls only happen when an event fires
-    -- in a separate call stack — no stack growth, TCO is irrelevant.
+    -- buildInstance returns immediately. The self-references are lambda captures, not calls —
+    -- they only execute when the Elm runtime fires an event, in a separate call stack.
     ComponentInstance
         { view =
             \raw ->
@@ -193,8 +192,8 @@ viewInstance (ComponentInstance inst) raw =
 buildErrorInstance : String -> ComponentInstance msg
 buildErrorInstance err =
     -- elm-review: IGNORE TCO
-    -- Guarded recursion: self-reference is behind a lambda (onPropsChanged closure),
-    -- so buildErrorInstance returns immediately. No stack growth, TCO is irrelevant.
+    -- buildErrorInstance returns immediately. The self-reference is a lambda capture, not a call —
+    -- it only executes when the Elm runtime fires a props-changed event, in a separate call stack.
     ComponentInstance
         { view = \_ -> propsErrorHtml err
         , onPropsChanged = \_ -> ( buildErrorInstance err, [] )
