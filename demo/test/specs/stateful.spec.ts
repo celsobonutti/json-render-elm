@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { sendSpec, setState } from "../helpers"
+import { sendSpec } from "../helpers"
 
 test.describe("Stateful components", () => {
   test.beforeEach(async ({ page }) => {
@@ -52,7 +52,6 @@ test.describe("Stateful components", () => {
     const search = page.locator(".jr-select-search")
     await search.fill("an")
 
-    // "Banana" and "Cranberry" won't match, "Banana" does match "an"
     // Apple, Banana, Cherry, Date, Elderberry, Fig, Grape
     // Contains "an": Banana
     const options = page.locator(".jr-select-option")
@@ -91,14 +90,9 @@ test.describe("Stateful components", () => {
   test("selecting an option fires the on.change action", async ({ page }) => {
     await sendSpec(page, "stateful/select-with-display.json")
 
-    // /changed starts as false
     await page.locator(".jr-select-trigger").click()
     await page.locator(".jr-select-option", { hasText: "Apple" }).click()
 
-    // The on.change handler sets /changed to true.
-    // We can verify by checking state — use a visibility condition as proxy.
-    // Or just trust the binding test + verify the trigger shows the value.
-    // The setState action was executed if the binding update went through.
     await expect(page.locator(".jr-select-trigger")).toHaveText("Apple")
   })
 
@@ -116,18 +110,18 @@ test.describe("Stateful components", () => {
     await expect(page.locator(".jr-select-option")).toHaveCount(7)
   })
 
-  test("select preserves local state across global state changes", async ({
+  test("select preserves local state across external state changes", async ({
     page,
   }) => {
-    await sendSpec(page, "stateful/select-with-display.json")
+    await sendSpec(page, "stateful/select-with-external-setter.json")
 
     // Select Apple via the dropdown
     await page.locator(".jr-select-trigger").click()
     await page.locator(".jr-select-option", { hasText: "Apple" }).click()
     await expect(page.locator(".jr-select-trigger")).toHaveText("Apple")
 
-    // Push external state change (simulating another component updating /selected)
-    await setState(page, { selected: "Grape", changed: true })
+    // Another component sets /selected to Grape
+    await page.locator(".jr-button", { hasText: "Set Grape" }).click()
 
     // The trigger should reflect the new global state (props re-resolve)
     await expect(page.locator(".jr-select-trigger")).toHaveText("Grape")
@@ -155,20 +149,20 @@ test.describe("Stateful components", () => {
   test("onPropsChange closes dropdown when value changes externally", async ({
     page,
   }) => {
-    await sendSpec(page, "stateful/select-with-display.json")
+    await sendSpec(page, "stateful/select-with-external-setter.json")
 
     // Open the dropdown
     await page.locator(".jr-select-trigger").click()
     await expect(page.locator(".jr-select-dropdown")).toBeVisible()
 
-    // External state change while dropdown is open
-    await setState(page, { selected: "Date", changed: true })
+    // Another component sets /selected to Grape while dropdown is open
+    await page.locator(".jr-button", { hasText: "Set Grape" }).click()
 
     // onPropsChange should close the dropdown
     await expect(page.locator(".jr-select-dropdown")).not.toBeVisible()
 
     // Trigger shows the externally set value
-    await expect(page.locator(".jr-select-trigger")).toHaveText("Date")
-    await expect(page.locator(".jr-text")).toHaveText("Selected: Date")
+    await expect(page.locator(".jr-select-trigger")).toHaveText("Grape")
+    await expect(page.locator(".jr-text")).toHaveText("Selected: Grape")
   })
 })
