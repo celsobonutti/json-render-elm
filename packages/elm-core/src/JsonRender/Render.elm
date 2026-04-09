@@ -131,8 +131,9 @@ buildInstance :
     -> ComponentInstance (Msg action)
 buildInstance propsDecoder bindingsDecoder validationDecoder def key state =
     -- elm-review: IGNORE TCO
-    -- Self-references in view/onPropsChanged closures are corecursive (deferred in lambdas),
-    -- not stack-recursive. buildInstance lazily produces new instances only when events fire.
+    -- Guarded recursion: self-references are behind lambdas (view/onPropsChanged closures),
+    -- so buildInstance returns immediately. The recursive calls only happen when an event fires
+    -- in a separate call stack — no stack growth, TCO is irrelevant.
     ComponentInstance
         { view =
             \raw ->
@@ -192,8 +193,8 @@ viewInstance (ComponentInstance inst) raw =
 buildErrorInstance : String -> ComponentInstance msg
 buildErrorInstance err =
     -- elm-review: IGNORE TCO
-    -- Self-reference is corecursive (deferred in a lambda), not stack-recursive.
-    -- The instance lazily produces a new instance only when onPropsChanged is called.
+    -- Guarded recursion: self-reference is behind a lambda (onPropsChanged closure),
+    -- so buildErrorInstance returns immediately. No stack growth, TCO is irrelevant.
     ComponentInstance
         { view = \_ -> propsErrorHtml err
         , onPropsChanged = \_ -> ( buildErrorInstance err, [] )
