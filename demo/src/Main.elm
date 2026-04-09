@@ -48,7 +48,7 @@ type alias Model =
     , error : Maybe String
     , showJson : Bool
     , specJson : Maybe Value
-    , jsonRender : JsonRender.Model
+    , jsonRender : JsonRender.Model Action
     }
 
 
@@ -65,7 +65,7 @@ init randomSeed =
     )
 
 
-handleAction : Action -> Actions.Model -> ( Actions.Model, Cmd (Actions.Msg Action) )
+handleAction : Action -> Actions.Model Action -> ( Actions.Model Action, Cmd (Actions.Msg Action) )
 handleAction action model =
     case action of
         Press ->

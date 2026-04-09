@@ -87,6 +87,15 @@ export const catalog = defineCatalog(schema, {
       validatable: [],
       description: "A small colored badge/tag",
     },
+    Toggle: {
+      props: z.object({
+        label: z.string(),
+      }),
+      slots: [],
+      bindable: [],
+      validatable: [],
+      description: "A toggle switch with local open/closed state",
+    },
   },
   actions: {
     press: {
