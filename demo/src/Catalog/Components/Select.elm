@@ -18,6 +18,7 @@ import Json.Encode exposing (Value)
 import JsonRender.Actions as Actions
 import JsonRender.Bind as Bind
 import JsonRender.Events exposing (EventHandle)
+import JsonRender.Internal.Effect exposing (Effect(..))
 import JsonRender.Render exposing (Component, ComponentContext, registerStateful)
 import JsonRender.Resolve as ResolvedValue exposing (ResolvedValue)
 
@@ -68,15 +69,17 @@ component =
         , update = update
         , view = selectView
         , onPropsChange = Just onPropsChange
+        , portSubscriptions =
+            [ ( "clickOutside", \_ -> Close ) ]
         }
 
 
-onPropsChange : SelectProps -> State -> ( State, List (EventHandle (Actions.Msg action)) )
+onPropsChange : SelectProps -> State -> ( State, List (Effect (Actions.Msg action) LocalMsg) )
 onPropsChange _ state =
     ( { state | open = False, query = "" }, [] )
 
 
-update : LocalMsg -> State -> ComponentContext SelectProps (SelectBindings (Actions.Msg action)) () (Actions.Msg action) -> ( State, List (EventHandle (Actions.Msg action)) )
+update : LocalMsg -> State -> ComponentContext SelectProps (SelectBindings (Actions.Msg action)) () (Actions.Msg action) -> ( State, List (Effect (Actions.Msg action) LocalMsg) )
 update msg state ctx =
     case msg of
         ToggleOpen ->
@@ -95,10 +98,10 @@ update msg state ctx =
             ( { state | open = False, query = "" }
             , case ctx.bindings.value of
                 Just setValue ->
-                    [ setValue opt, ctx.emit "change" ]
+                    [ Emit (setValue opt), Emit (ctx.emit "change") ]
 
                 Nothing ->
-                    [ ctx.emit "change" ]
+                    [ Emit (ctx.emit "change") ]
             )
 
 
