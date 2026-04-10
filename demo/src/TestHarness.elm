@@ -23,6 +23,12 @@ port testActionOut : Value -> Cmd msg
 port testDecodeErrorOut : String -> Cmd msg
 
 
+port componentPortIn : (Value -> msg) -> Sub msg
+
+
+port componentPortOut : Value -> Cmd msg
+
+
 type alias Model =
     { jsonRender : JsonRender.Model Action
     }
@@ -70,6 +76,7 @@ app =
         , toMsg = JsonRenderMsg
         , getModel = .jsonRender
         , setModel = \jr model -> { model | jsonRender = jr }
+        , componentPortOut = Just componentPortOut
         }
 
 
@@ -112,6 +119,7 @@ subscriptions _ =
     Sub.batch
         [ jsonRenderSpecIn SpecReceived
         , jsonRenderStateIn StateReceived
+        , componentPortIn (JsonRender.decodePortIn JsonRenderMsg)
         ]
 
 
