@@ -157,6 +157,9 @@ buildInstance propsDecoder bindingsDecoder validationDecoder def key state cache
                     Err err
 
         makeToMsg raw localMsg =
+            -- elm-review: IGNORE TCO
+            -- makeToMsg is guarded recursion: the self-reference in processEffects is a partial
+            -- application passed to Cmd.map, only called asynchronously by the Elm runtime.
             case propsDecoder raw.props of
                 Ok props ->
                     let
@@ -177,7 +180,7 @@ buildInstance propsDecoder bindingsDecoder validationDecoder def key state cache
                         newInstance =
                             buildInstance propsDecoder bindingsDecoder validationDecoder def key newState raw
                     in
-                    UpdateLocal key newInstance (processEffectsSimple key effects)
+                    UpdateLocal key newInstance (processEffects (makeToMsg raw) effects)
 
                 Err _ ->
                     ActionError "Props decode failed during update"
@@ -207,7 +210,7 @@ buildInstance propsDecoder bindingsDecoder validationDecoder def key state cache
                                     newInstance =
                                         buildInstance propsDecoder bindingsDecoder validationDecoder def key newState raw
                                 in
-                                ( newInstance, processEffectsSimple key effects )
+                                ( newInstance, processEffects (makeToMsg raw) effects )
 
                             Err _ ->
                                 ( buildInstance propsDecoder bindingsDecoder validationDecoder def key state raw, [] )
@@ -227,7 +230,7 @@ buildInstance propsDecoder bindingsDecoder validationDecoder def key state cache
                                     newInstance =
                                         buildInstance propsDecoder bindingsDecoder validationDecoder def key newState cachedRaw
                                 in
-                                Just ( newInstance, processEffectsSimple key effects )
+                                Just ( newInstance, processEffects (makeToMsg cachedRaw) effects )
 
                             Err _ ->
                                 Nothing
@@ -237,26 +240,22 @@ buildInstance propsDecoder bindingsDecoder validationDecoder def key state cache
         }
 
 
-{-| Process effects. RunCmd effects require a toMsg function for mapping,
-which would create a self-reference inside buildInstance. Since RunCmd is
-reserved for future use, those effects are currently dropped.
--}
-processEffectsSimple :
-    String
+processEffects :
+    (localMsg -> Msg action)
     -> List (Effect (Msg action) localMsg)
     -> List (EffectResult (Msg action))
-processEffectsSimple _ effects =
-    List.filterMap
+processEffects toMsg effects =
+    List.map
         (\effect ->
             case effect of
                 Emit handle ->
-                    Just (EmitResult handle)
+                    EmitResult handle
 
                 SendPort portName value ->
-                    Just (SendPortResult (PortCmd.portCmd portName value))
+                    SendPortResult (PortCmd.portCmd portName value)
 
-                RunCmd _ ->
-                    Nothing
+                RunCmd cmd ->
+                    RunCmdResult (Cmd.map toMsg cmd)
         )
         effects
 
