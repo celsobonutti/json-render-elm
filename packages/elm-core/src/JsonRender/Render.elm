@@ -20,7 +20,9 @@ import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions exposing (Msg(..))
 import JsonRender.Internal.ComponentInstance as ComponentInstance exposing (ComponentInstance(..))
+import JsonRender.Internal.Effect exposing (Effect(..), EffectResult(..))
 import JsonRender.Internal.EventHandle as EventHandle exposing (EventHandle)
+import JsonRender.Internal.PortCmd as PortCmd
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Resolve as Resolve exposing (RepeatContext, ResolvedValue)
 import JsonRender.Spec exposing (Element, EventHandler, Repeat, Spec, shouldPreventDefault)
@@ -90,9 +92,10 @@ registerStateful :
     -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
     -> (Dict String Validation.FieldValidation -> validation)
     -> { init : props -> state
-       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
+       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (Effect (Msg action) localMsg) )
        , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
-       , onPropsChange : Maybe (props -> state -> ( state, List (EventHandle (Msg action)) ))
+       , onPropsChange : Maybe (props -> state -> ( state, List (Effect (Msg action) localMsg) ))
+       , portSubscriptions : List ( String, Value -> localMsg )
        }
     -> Component (Msg action)
 registerStateful propsDecoder bindingsDecoder validationDecoder def =
@@ -106,7 +109,7 @@ registerStateful propsDecoder bindingsDecoder validationDecoder def =
                                 def.init props
 
                             instance =
-                                buildInstance propsDecoder bindingsDecoder validationDecoder def key state
+                                buildInstance propsDecoder bindingsDecoder validationDecoder def key state raw
                         in
                         ( instance, viewInstance instance raw )
 
@@ -122,45 +125,69 @@ buildInstance :
     -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
     -> (Dict String Validation.FieldValidation -> validation)
     -> { init : props -> state
-       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
+       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (Effect (Msg action) localMsg) )
        , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
-       , onPropsChange : Maybe (props -> state -> ( state, List (EventHandle (Msg action)) ))
+       , onPropsChange : Maybe (props -> state -> ( state, List (Effect (Msg action) localMsg) ))
+       , portSubscriptions : List ( String, Value -> localMsg )
        }
     -> String
     -> state
+    -> RawComponentContext (Msg action)
     -> ComponentInstance (Msg action)
-buildInstance propsDecoder bindingsDecoder validationDecoder def key state =
+buildInstance propsDecoder bindingsDecoder validationDecoder def key state cachedRaw =
     -- elm-review: IGNORE TCO
     -- buildInstance returns immediately. The self-references are lambda captures, not calls —
     -- they only execute when the Elm runtime fires an event, in a separate call stack.
+    let
+        buildCtx raw =
+            case propsDecoder raw.props of
+                Ok props ->
+                    Ok
+                        { props = props
+                        , bindings = bindingsDecoder raw.bindings
+                        , validation = validationDecoder raw.validation
+                        , children = raw.children
+                        , emit = raw.emit
+                        , validate = raw.validate
+                        , validateAndEmit = raw.validateAndEmit
+                        , validateOn = raw.validateOn
+                        }
+
+                Err err ->
+                    Err err
+
+        makeToMsg raw localMsg =
+            case propsDecoder raw.props of
+                Ok props ->
+                    let
+                        ctx =
+                            { props = props
+                            , bindings = bindingsDecoder raw.bindings
+                            , validation = validationDecoder raw.validation
+                            , children = raw.children
+                            , emit = raw.emit
+                            , validate = raw.validate
+                            , validateAndEmit = raw.validateAndEmit
+                            , validateOn = raw.validateOn
+                            }
+
+                        ( newState, effects ) =
+                            def.update localMsg state ctx
+
+                        newInstance =
+                            buildInstance propsDecoder bindingsDecoder validationDecoder def key newState raw
+                    in
+                    UpdateLocal key newInstance (processEffectsSimple key effects)
+
+                Err _ ->
+                    ActionError "Props decode failed during update"
+    in
     ComponentInstance
         { view =
             \raw ->
-                case propsDecoder raw.props of
-                    Ok props ->
-                        let
-                            ctx =
-                                { props = props
-                                , bindings = bindingsDecoder raw.bindings
-                                , validation = validationDecoder raw.validation
-                                , children = raw.children
-                                , emit = raw.emit
-                                , validate = raw.validate
-                                , validateAndEmit = raw.validateAndEmit
-                                , validateOn = raw.validateOn
-                                }
-
-                            toMsg localMsg =
-                                let
-                                    ( newState, handles ) =
-                                        def.update localMsg state ctx
-
-                                    newInstance =
-                                        buildInstance propsDecoder bindingsDecoder validationDecoder def key newState
-                                in
-                                UpdateLocal key newInstance handles
-                        in
-                        def.view state props toMsg raw.children
+                case buildCtx raw of
+                    Ok ctx ->
+                        def.view state ctx.props (makeToMsg raw) raw.children
 
                     Err err ->
                         propsErrorHtml err
@@ -168,20 +195,84 @@ buildInstance propsDecoder bindingsDecoder validationDecoder def key state =
             \raw ->
                 case def.onPropsChange of
                     Nothing ->
-                        ( buildInstance propsDecoder bindingsDecoder validationDecoder def key state, [] )
+                        ( buildInstance propsDecoder bindingsDecoder validationDecoder def key state raw, [] )
 
                     Just handler ->
                         case propsDecoder raw.props of
                             Ok props ->
                                 let
-                                    ( newState, handles ) =
+                                    ( newState, effects ) =
                                         handler props state
+
+                                    newInstance =
+                                        buildInstance propsDecoder bindingsDecoder validationDecoder def key newState raw
                                 in
-                                ( buildInstance propsDecoder bindingsDecoder validationDecoder def key newState, handles )
+                                ( newInstance, processEffectsSimple key effects )
 
                             Err _ ->
-                                ( buildInstance propsDecoder bindingsDecoder validationDecoder def key state, [] )
+                                ( buildInstance propsDecoder bindingsDecoder validationDecoder def key state raw, [] )
+        , handlePortIn =
+            \portName value ->
+                case findPortSubscription portName def.portSubscriptions of
+                    Just portDecoder ->
+                        case buildCtx cachedRaw of
+                            Ok ctx ->
+                                let
+                                    localMsg =
+                                        portDecoder value
+
+                                    ( newState, effects ) =
+                                        def.update localMsg state ctx
+
+                                    newInstance =
+                                        buildInstance propsDecoder bindingsDecoder validationDecoder def key newState cachedRaw
+                                in
+                                Just ( newInstance, processEffectsSimple key effects )
+
+                            Err _ ->
+                                Nothing
+
+                    Nothing ->
+                        Nothing
         }
+
+
+{-| Process effects. RunCmd effects require a toMsg function for mapping,
+which would create a self-reference inside buildInstance. Since RunCmd is
+reserved for future use, those effects are currently dropped.
+-}
+processEffectsSimple :
+    String
+    -> List (Effect (Msg action) localMsg)
+    -> List (EffectResult (Msg action))
+processEffectsSimple _ effects =
+    List.filterMap
+        (\effect ->
+            case effect of
+                Emit handle ->
+                    Just (EmitResult handle)
+
+                SendPort portName value ->
+                    Just (SendPortResult (PortCmd.portCmd portName value))
+
+                RunCmd _ ->
+                    Nothing
+        )
+        effects
+
+
+findPortSubscription : String -> List ( String, Value -> localMsg ) -> Maybe (Value -> localMsg)
+findPortSubscription name subs =
+    case subs of
+        [] ->
+            Nothing
+
+        ( n, decoder ) :: rest ->
+            if n == name then
+                Just decoder
+
+            else
+                findPortSubscription name rest
 
 
 viewInstance : ComponentInstance msg -> RawComponentContext msg -> Html msg
@@ -197,6 +288,7 @@ buildErrorInstance err =
     ComponentInstance
         { view = \_ -> propsErrorHtml err
         , onPropsChanged = \_ -> ( buildErrorInstance err, [] )
+        , handlePortIn = \_ _ -> Nothing
         }
 
 
@@ -669,16 +761,18 @@ renderElementInner registry state validationState localComponents repeatCtx spec
 
                 propsChangedHandler inst =
                     let
-                        ( newInstance, handles ) =
+                        ( newInstance, effects ) =
                             inst.onPropsChanged rawCtx
                     in
-                    UpdateLocal key newInstance handles
+                    UpdateLocal key newInstance effects
 
                 componentHtml =
                     case Dict.get key localComponents of
                         Just (ComponentInstance inst) ->
                             Html.node "component-mount"
                                 [ Html.Attributes.attribute "data-props" propsJson
+                                , Html.Attributes.attribute "data-instance" key
+                                , Html.Attributes.attribute "data-component-type" element.type_
                                 , Html.Events.on "props-changed"
                                     (Decode.succeed (propsChangedHandler inst))
                                 ]
@@ -694,6 +788,8 @@ renderElementInner registry state validationState localComponents repeatCtx spec
                             in
                             Html.node "component-mount"
                                 [ Html.Attributes.attribute "data-props" propsJson
+                                , Html.Attributes.attribute "data-instance" key
+                                , Html.Attributes.attribute "data-component-type" element.type_
                                 , Html.Events.on "component-mounted"
                                     (Decode.succeed (InitLocal key instance))
                                 , Html.Events.on "props-changed"
