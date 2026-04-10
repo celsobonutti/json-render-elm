@@ -1,0 +1,30 @@
+{
+  "root": "stack",
+  "state": { "selected": "", "changed": false },
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 8 },
+      "children": ["select", "target"]
+    },
+    "select": {
+      "type": "Select",
+      "props": {
+        "label": "Fruit",
+        "options": ["Apple", "Banana", "Cherry"],
+        "placeholder": "Pick one...",
+        "value": { "$bindState": "/selected" }
+      },
+      "on": {
+        "change": {
+          "action": "setState",
+          "params": { "statePath": "/changed", "value": true }
+        }
+      }
+    },
+    "target": {
+      "type": "Button",
+      "props": { "label": "Click target", "variant": "secondary" }
+    }
+  }
+}
