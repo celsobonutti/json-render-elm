@@ -9,12 +9,15 @@ import JsonRender.Events as Events
 import Json.Decode as Decode
 import Json.Encode as Encode
 import JsonRender.Actions
+import JsonRender.Internal.ComponentInstance exposing (ComponentInstance(..))
+import JsonRender.Internal.Effect exposing (Effect(..), EffectResult(..))
+import JsonRender.Internal.EventHandle as EventHandle
 import JsonRender.Internal.PropValue exposing (PropValue(..))
 import JsonRender.Render as Render
 import JsonRender.Resolve as Resolve
 import JsonRender.Spec as Spec
 import JsonRender.Internal.Condition exposing (Condition(..), Source(..), Operator(..))
-import JsonRender.Validation exposing (ValidateOn(..))
+import JsonRender.Validation as Validation exposing (ValidateOn(..))
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
@@ -91,6 +94,38 @@ testRegistry =
                                     [ text (label ++ ": " ++ String.fromInt count) ]
                                 ]
                     , onPropsChange = Nothing
+                    , portSubscriptions = []
+                    }
+              )
+            , ( "PortEcho"
+              , Render.registerStateful
+                    (\props ->
+                        Resolve.succeed identity
+                            |> Resolve.required "label" Resolve.string
+                            |> (\d -> d props)
+                    )
+                    (\_ -> ())
+                    (\_ -> ())
+                    { init = \_ -> "none"
+                    , update =
+                        \msg _ _ ->
+                            ( msg, [ SendPort "echo" (Encode.string msg) ] )
+                    , view =
+                        \lastMsg label _ _ ->
+                            div [ class "port-echo" ]
+                                [ text (label ++ ": " ++ lastMsg) ]
+                    , onPropsChange = Nothing
+                    , portSubscriptions =
+                        [ ( "ping"
+                          , \val ->
+                                case Decode.decodeValue Decode.string val of
+                                    Ok s ->
+                                        s
+
+                                    Err _ ->
+                                        "decode-error"
+                          )
+                        ]
                     }
               )
             ]
@@ -1609,5 +1644,75 @@ suite =
                     Render.render testRegistry Encode.null Dict.empty Dict.empty spec
                         |> Query.fromHtml
                         |> Query.has [ Selector.text "Props error:" ]
+            ]
+        , describe "port handling"
+            [ test "handlePortIn dispatches to port subscription decoder" <|
+                \_ ->
+                    case Dict.get "PortEcho" testRegistry.components of
+                        Just (Render.Stateful { create }) ->
+                            let
+                                dummyHandle =
+                                    EventHandle.fromMsg (JsonRender.Actions.ActionError "unused")
+
+                                rawCtx =
+                                    { props = Dict.fromList [ ( "label", Resolve.RString "Echo" ) ]
+                                    , bindings = Dict.empty
+                                    , validation = Dict.empty
+                                    , children = []
+                                    , emit = \_ -> dummyHandle
+                                    , validate = dummyHandle
+                                    , validateAndEmit = \_ -> dummyHandle
+                                    , validateOn = Validation.OnSubmit
+                                    }
+
+                                ( instance, _ ) =
+                                    create "echo-1" rawCtx
+
+                                (ComponentInstance inst) =
+                                    instance
+                            in
+                            case inst.handlePortIn "ping" (Encode.string "hello") of
+                                Just ( _, effects ) ->
+                                    case effects of
+                                        [ SendPortResult portCmd_ ] ->
+                                            Expect.equal portCmd_.port_ "echo"
+
+                                        _ ->
+                                            Expect.fail ("Expected single SendPortResult, got " ++ String.fromInt (List.length effects) ++ " effects")
+
+                                Nothing ->
+                                    Expect.fail "Expected Just from handlePortIn"
+
+                        _ ->
+                            Expect.fail "PortEcho not found or not Stateful"
+            , test "handlePortIn returns Nothing for unknown port name" <|
+                \_ ->
+                    case Dict.get "PortEcho" testRegistry.components of
+                        Just (Render.Stateful { create }) ->
+                            let
+                                dummyHandle =
+                                    EventHandle.fromMsg (JsonRender.Actions.ActionError "unused")
+
+                                rawCtx =
+                                    { props = Dict.fromList [ ( "label", Resolve.RString "Echo" ) ]
+                                    , bindings = Dict.empty
+                                    , validation = Dict.empty
+                                    , children = []
+                                    , emit = \_ -> dummyHandle
+                                    , validate = dummyHandle
+                                    , validateAndEmit = \_ -> dummyHandle
+                                    , validateOn = Validation.OnSubmit
+                                    }
+
+                                ( instance, _ ) =
+                                    create "echo-1" rawCtx
+
+                                (ComponentInstance inst) =
+                                    instance
+                            in
+                            Expect.equal (inst.handlePortIn "unknown-port" Encode.null) Nothing
+
+                        _ ->
+                            Expect.fail "PortEcho not found or not Stateful"
             ]
         ]

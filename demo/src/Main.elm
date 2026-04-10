@@ -32,6 +32,12 @@ port downloadJson : Value -> Cmd msg
 port jsonRenderSpecIn : (Value -> msg) -> Sub msg
 
 
+port componentPortIn : (Value -> msg) -> Sub msg
+
+
+port componentPortOut : Value -> Cmd msg
+
+
 
 -- MODEL
 
@@ -86,6 +92,7 @@ app =
         , toMsg = JsonRenderMsg
         , getModel = .jsonRender
         , setModel = \jr model -> { model | jsonRender = jr }
+        , componentPortOut = Just componentPortOut
         }
 
 
@@ -291,6 +298,7 @@ subscriptions _ =
     Sub.batch
         [ jsonRenderSpecIn SpecReceived
         , receiveError ErrorReceived
+        , componentPortIn (JsonRender.decodePortIn JsonRenderMsg)
         ]
 
 

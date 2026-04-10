@@ -51,7 +51,7 @@ decodeTestAction name params =
 
 testModel : Encode.Value -> Actions.Model TestAction
 testModel state =
-    { spec = Nothing, state = state, seed = Random.initialSeed 42, validationState = Dict.empty, validationRegistry = Dict.empty, localComponents = Dict.empty }
+    { spec = Nothing, state = state, seed = Random.initialSeed 42, validationState = Dict.empty, validationRegistry = Dict.empty, localComponents = Dict.empty, pendingPortCmds = [] }
 
 
 executeAction : String -> List ( String, PropValue ) -> Msg TestAction
@@ -1179,6 +1179,7 @@ suite =
                                       )
                                     ]
                             , localComponents = Dict.empty
+                            , pendingPortCmds = []
                             }
 
                         binding =
@@ -1230,6 +1231,7 @@ suite =
                                       )
                                     ]
                             , localComponents = Dict.empty
+                            , pendingPortCmds = []
                             }
 
                         binding =
@@ -1293,6 +1295,7 @@ suite =
                                       )
                                     ]
                             , localComponents = Dict.empty
+                            , pendingPortCmds = []
                             }
 
                         binding =
@@ -1369,6 +1372,7 @@ suite =
                                       )
                                     ]
                             , localComponents = Dict.empty
+                            , pendingPortCmds = []
                             }
 
                         binding =
@@ -1434,6 +1438,7 @@ suite =
                                       )
                                     ]
                             , localComponents = Dict.empty
+                            , pendingPortCmds = []
                             }
 
                         ( newModel, _ ) =
@@ -1485,6 +1490,7 @@ suite =
                                       )
                                     ]
                             , localComponents = Dict.empty
+                            , pendingPortCmds = []
                             }
 
                         ( newModel, _ ) =

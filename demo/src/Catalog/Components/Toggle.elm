@@ -43,6 +43,7 @@ component =
                 ( { state | active = not state.active }, [] )
         , view = toggleView
         , onPropsChange = Nothing
+        , portSubscriptions = []
         }
 
 

@@ -2,6 +2,7 @@ import "./style.css"
 // @ts-ignore -- Elm module has no type declarations
 import { Elm } from "./src/Main.elm"
 import { createElmBridge } from "../packages/js-bridge/src/index.ts"
+import { catalog as componentCatalog } from "./catalog"
 
 if (process.env.NODE_ENV === "development") {
   const ElmDebugTransform = await import("elm-debug-transformer")
@@ -14,7 +15,7 @@ crypto.getRandomValues(seedArray)
 const app = Elm.Main!.init({ node: root, flags: seedArray[0] })
 
 // Set up the json-render-elm bridge (handles spec-in port)
-const bridge = createElmBridge(app)
+const bridge = createElmBridge(app, componentCatalog)
 
 // --- Fixture catalog sidebar ---
 
@@ -109,6 +110,19 @@ app.ports.downloadJson.subscribe((state: unknown) => {
   a.download = "state.json"
   a.click()
   URL.revokeObjectURL(url)
+})
+
+// --- Select component port handlers ---
+
+bridge.registerPortHandler("Select", "clickOutside", (instanceId, send) => {
+  const handler = (e: MouseEvent) => {
+    const el = document.querySelector(`[data-instance="${instanceId}"]`)
+    if (el && !el.contains(e.target as Node)) {
+      send(null)
+    }
+  }
+  document.addEventListener("click", handler)
+  return () => document.removeEventListener("click", handler)
 })
 
 // App-specific: prompt → API → bridge.sendSpec

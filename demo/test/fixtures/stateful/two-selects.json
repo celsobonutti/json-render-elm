@@ -1,0 +1,29 @@
+{
+  "root": "stack",
+  "state": { "fruit": "", "color": "" },
+  "elements": {
+    "stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": 8 },
+      "children": ["fruit-select", "color-select"]
+    },
+    "fruit-select": {
+      "type": "Select",
+      "props": {
+        "label": "Fruit",
+        "options": ["Apple", "Banana"],
+        "placeholder": "Pick fruit...",
+        "value": { "$bindState": "/fruit" }
+      }
+    },
+    "color-select": {
+      "type": "Select",
+      "props": {
+        "label": "Color",
+        "options": ["Red", "Blue"],
+        "placeholder": "Pick color...",
+        "value": { "$bindState": "/color" }
+      }
+    }
+  }
+}

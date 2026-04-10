@@ -10,6 +10,7 @@ Defined in an Internal module to avoid circular imports between Render.elm
 import Dict exposing (Dict)
 import Html exposing (Html)
 import Json.Encode exposing (Value)
+import JsonRender.Internal.Effect exposing (EffectResult)
 import JsonRender.Internal.EventHandle exposing (EventHandle)
 import JsonRender.Resolve exposing (ResolvedValue)
 import JsonRender.Validation
@@ -34,5 +35,6 @@ type alias RawComponentContext msg =
 type ComponentInstance msg
     = ComponentInstance
         { view : RawComponentContext msg -> Html msg
-        , onPropsChanged : RawComponentContext msg -> ( ComponentInstance msg, List (EventHandle msg) )
+        , onPropsChanged : RawComponentContext msg -> ( ComponentInstance msg, List (EffectResult msg) )
+        , handlePortIn : String -> Value -> Maybe ( ComponentInstance msg, List (EffectResult msg) )
         }

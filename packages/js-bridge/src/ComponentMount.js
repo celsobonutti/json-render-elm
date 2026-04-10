@@ -14,8 +14,23 @@ class ComponentMount extends HTMLElement {
     this.style.display = 'contents';
     this._initialized = true;
     this.dispatchEvent(
-      new CustomEvent('component-mounted', { bubbles: true })
+      new CustomEvent('component-mounted', {
+        bubbles: true,
+        detail: {
+          instanceId: this.getAttribute('data-instance'),
+          componentType: this.getAttribute('data-component-type')
+        }
+      })
     );
+  }
+
+  disconnectedCallback() {
+    // Can't dispatch bubbling events after DOM removal — use global registry
+    const instanceId = this.getAttribute('data-instance');
+    const componentType = this.getAttribute('data-component-type');
+    if (instanceId && window.__jsonRenderPortCleanup) {
+      window.__jsonRenderPortCleanup(instanceId, componentType);
+    }
   }
 
   attributeChangedCallback(name, oldValue, newValue) {

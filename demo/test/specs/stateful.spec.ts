@@ -146,6 +146,45 @@ test.describe("Stateful components", () => {
     await expect(page.locator(".jr-text")).toHaveText("Selected: Fig")
   })
 
+  test("click outside select closes dropdown via port", async ({ page }) => {
+    await sendSpec(page, "stateful/select-click-outside.json")
+
+    // Open the dropdown
+    await page.locator(".jr-select-trigger").click()
+    await expect(page.locator(".jr-select-dropdown")).toBeVisible()
+
+    // Click the button outside the select
+    await page.locator(".jr-button", { hasText: "Click target" }).click()
+
+    // Dropdown should close via clickOutside port
+    await expect(page.locator(".jr-select-dropdown")).not.toBeVisible()
+  })
+
+  test("click outside one select does not close the other", async ({
+    page,
+  }) => {
+    await sendSpec(page, "stateful/two-selects.json")
+
+    const selects = page.locator(".jr-select")
+    const fruitTrigger = selects.nth(0).locator(".jr-select-trigger")
+    const colorTrigger = selects.nth(1).locator(".jr-select-trigger")
+
+    // Open the fruit select
+    await fruitTrigger.click()
+    await expect(selects.nth(0).locator(".jr-select-dropdown")).toBeVisible()
+
+    // Click on the color select trigger (outside fruit select)
+    await colorTrigger.click()
+
+    // Fruit dropdown should close (click was outside it)
+    await expect(
+      selects.nth(0).locator(".jr-select-dropdown")
+    ).not.toBeVisible()
+
+    // Color dropdown should now be open
+    await expect(selects.nth(1).locator(".jr-select-dropdown")).toBeVisible()
+  })
+
   test("onPropsChange closes dropdown when value changes externally", async ({
     page,
   }) => {

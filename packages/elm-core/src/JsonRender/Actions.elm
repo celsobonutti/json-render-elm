@@ -15,8 +15,10 @@ module JsonRender.Actions exposing
 import Dict exposing (Dict)
 import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
-import JsonRender.Internal.ComponentInstance exposing (ComponentInstance)
+import JsonRender.Internal.ComponentInstance exposing (ComponentInstance(..))
+import JsonRender.Internal.Effect exposing (EffectResult(..))
 import JsonRender.Internal.EventHandle exposing (EventHandle(..))
+import JsonRender.Internal.PortCmd exposing (PortCmd)
 import JsonRender.Resolve as Resolve exposing (RepeatContext)
 import JsonRender.Spec as Spec exposing (ActionBinding, EventHandler(..), Spec)
 import JsonRender.State as State
@@ -34,6 +36,7 @@ type alias Model action =
     , validationState : Dict String Validation.FieldValidation
     , validationRegistry : Dict String ( Validation.ValidationConfig, Maybe RepeatContext )
     , localComponents : Dict String (ComponentInstance (Msg action))
+    , pendingPortCmds : List ( String, PortCmd )
     }
 
 
@@ -65,8 +68,9 @@ type Msg action
     | ValidateAndEmit String String (Maybe RepeatContext)
     | RegisterValidation String Validation.ValidationConfig (Maybe RepeatContext)
     | UnregisterValidation String
+    | PortIn String String Value
     | InitLocal String (ComponentInstance (Msg action))
-    | UpdateLocal String (ComponentInstance (Msg action)) (List (EventHandle (Msg action)))
+    | UpdateLocal String (ComponentInstance (Msg action)) (List (EffectResult (Msg action)))
 
 
 update : Resolve.FunctionDict -> ActionConfig action -> Msg action -> Model action -> ( Model action, Cmd (Msg action) )
@@ -120,26 +124,56 @@ update functions config msg model =
             , Cmd.none
             )
 
-        UpdateLocal key newInstance handles ->
+        UpdateLocal key newInstance effects ->
             let
                 model_ =
                     { model | localComponents = Dict.insert key newInstance model.localComponents }
             in
-            processHandles functions config handles model_
+            processEffectResults functions config key effects model_
+
+        PortIn instanceId portName value ->
+            case Dict.get instanceId model.localComponents of
+                Just (ComponentInstance inst) ->
+                    case inst.handlePortIn portName value of
+                        Just ( newInstance, effects ) ->
+                            let
+                                model_ =
+                                    { model | localComponents = Dict.insert instanceId newInstance model.localComponents }
+                            in
+                            processEffectResults functions config instanceId effects model_
+
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
 
-processHandles : Resolve.FunctionDict -> ActionConfig action -> List (EventHandle (Msg action)) -> Model action -> ( Model action, Cmd (Msg action) )
-processHandles functions config handles model =
+processEffectResults : Resolve.FunctionDict -> ActionConfig action -> String -> List (EffectResult (Msg action)) -> Model action -> ( Model action, Cmd (Msg action) )
+processEffectResults functions config instanceId effects model =
     List.foldl
-        (\(EventHandle { message }) ( accModel, accCmd ) ->
-            let
-                ( m, c ) =
-                    update functions config message accModel
-            in
-            ( m, Cmd.batch [ accCmd, c ] )
+        (\effect ( accModel, accCmd ) ->
+            case effect of
+                EmitResult (EventHandle { message }) ->
+                    let
+                        ( m, c ) =
+                            update functions config message accModel
+                    in
+                    ( m, Cmd.batch [ accCmd, c ] )
+
+                SendPortResult portCmd_ ->
+                    ( { accModel
+                        | pendingPortCmds =
+                            accModel.pendingPortCmds ++ [ ( instanceId, portCmd_ ) ]
+                      }
+                    , accCmd
+                    )
+
+                RunCmdResult cmd ->
+                    ( accModel, Cmd.batch [ accCmd, cmd ] )
         )
         ( model, Cmd.none )
-        handles
+        effects
 
 
 {-| Execute an EventHandler (single or chained actions) against the model.

@@ -3,6 +3,7 @@ module JsonRender exposing
     , Config
     , Model
     , create
+    , decodePortIn
     , init
     , receiveSpec
     , register
@@ -33,7 +34,9 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import JsonRender.Actions as Actions exposing (Msg)
 import JsonRender.Internal.ComponentInstance exposing (ComponentInstance)
+import JsonRender.Internal.Effect as Effect
 import JsonRender.Internal.EventHandle exposing (EventHandle)
+import JsonRender.Internal.PortCmd as PortCmd
 import JsonRender.Render as Render exposing (Component, ComponentContext, Registry)
 import JsonRender.Resolve exposing (ResolvedValue)
 import JsonRender.Spec as Spec exposing (Spec)
@@ -55,6 +58,7 @@ type alias Config action model msg =
     , toMsg : Msg action -> msg
     , getModel : model -> Model action
     , setModel : Model action -> model -> model
+    , componentPortOut : Maybe (Value -> Cmd msg)
     }
 
 
@@ -76,6 +80,7 @@ init seed =
     , validationState = Dict.empty
     , validationRegistry = Dict.empty
     , localComponents = Dict.empty
+    , pendingPortCmds = []
     }
 
 
@@ -90,6 +95,7 @@ receiveSpec val model =
                     | spec = Just spec
                     , state = Maybe.withDefault model.state spec.state
                     , localComponents = Dict.empty
+                    , pendingPortCmds = []
                 }
 
         Err err ->
@@ -103,14 +109,31 @@ create config =
     let
         functions =
             config.registry.functions
+
+        drainPortCmds : List ( String, PortCmd.PortCmd ) -> Cmd msg
+        drainPortCmds cmds =
+            case config.componentPortOut of
+                Just send ->
+                    cmds
+                        |> List.map (\( instanceId, cmd ) -> send (PortCmd.encode instanceId cmd))
+                        |> Cmd.batch
+
+                Nothing ->
+                    Cmd.none
     in
     { update =
         \msg model ->
             let
                 ( newJR, cmd ) =
                     Actions.update functions config.actionConfig msg (config.getModel model)
+
+                portOutCmd =
+                    drainPortCmds newJR.pendingPortCmds
+
+                cleanJR =
+                    { newJR | pendingPortCmds = [] }
             in
-            ( config.setModel newJR model, Cmd.map config.toMsg cmd )
+            ( config.setModel cleanJR model, Cmd.batch [ Cmd.map config.toMsg cmd, portOutCmd ] )
     , render =
         \model ->
             let
@@ -152,13 +175,34 @@ registerStateful :
     -> (Dict String (Value -> EventHandle (Msg action)) -> bindings)
     -> (Dict String Validation.FieldValidation -> validation)
     -> { init : props -> state
-       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (EventHandle (Msg action)) )
+       , update : localMsg -> state -> ComponentContext props bindings validation (Msg action) -> ( state, List (Effect.Effect (Msg action) localMsg) )
        , view : state -> props -> (localMsg -> Msg action) -> List (Html (Msg action)) -> Html (Msg action)
-       , onPropsChange : Maybe (props -> state -> ( state, List (EventHandle (Msg action)) ))
+       , onPropsChange : Maybe (props -> state -> ( state, List (Effect.Effect (Msg action) localMsg) ))
+       , portSubscriptions : List ( String, Value -> localMsg )
        }
     -> Component (Msg action)
 registerStateful =
     Render.registerStateful
+
+
+{-| Decode a componentPortIn message and route it to the correct component instance.
+-}
+decodePortIn : (Msg action -> msg) -> Value -> msg
+decodePortIn toMsg val =
+    case Decode.decodeValue portInDecoder val of
+        Ok ( instanceId, portName, value ) ->
+            toMsg (Actions.PortIn instanceId portName value)
+
+        Err _ ->
+            toMsg (Actions.ActionError "Failed to decode componentPortIn message")
+
+
+portInDecoder : Decode.Decoder ( String, String, Value )
+portInDecoder =
+    Decode.map3 (\a b c -> ( a, b, c ))
+        (Decode.field "instanceId" Decode.string)
+        (Decode.field "port" Decode.string)
+        (Decode.field "value" Decode.value)
 
 
 {-| Decoder for json-render specs.
