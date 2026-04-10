@@ -162,6 +162,7 @@ suite =
                             , validationState = Dict.empty
                             , validationRegistry = Dict.empty
                             , localComponents = Dict.empty
+                            , pendingPortCmds = []
                             }
 
                         result =

@@ -1,5 +1,5 @@
 module JsonRender.Render exposing
-    ( Component
+    ( Component(..)
     , ComponentContext
     , RawComponentContext
     , Registry
